@@ -10,7 +10,7 @@ export default function Footer() {
     <footer className="w-full bg-white select-none pt-16 pb-12">
       <div className="max-w-7xl mx-auto px-6 lg:px-12">
         {/* Footer Top Column Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10 md:gap-12 pb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 items-center gap-10 md:gap-12 pb-12">
           {/* Brand profile column */}
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1 items-start">
