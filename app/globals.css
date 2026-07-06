@@ -2,25 +2,198 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #1E3A2C;
+  --primary-green: #1E3A2C;
+  --accent-gold: #DAA87C;
+  --bg-gradient-start: #fcfbfa;
+  --bg-gradient-end: #f5f2eb;
 }
 
-@theme inline {
+@theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-open-sans), sans-serif;
+  
+  /* Animations for growing up from bottom to top on load */
+  --animate-grow-up-1: growUp 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-grow-up-2: growUp 1.4s cubic-bezier(0.16, 1, 0.3, 1) 0.15s forwards;
+  --animate-grow-up-3: growUp 1.6s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
+  
+  /* Animations for texts */
+  --animate-text-slide-up-1: slideUpFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards;
+  --animate-text-slide-up-2: slideUpFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.25s forwards;
+  --animate-text-slide-up-3: slideUpFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards;
+  --animate-text-slide-up-4: slideUpFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.55s forwards;
+  
+  --animate-float-slow-1: float1 12s ease-in-out infinite;
+  --animate-float-slow-2: float2 14s ease-in-out infinite;
+  --animate-float-slow-3: float3 16s ease-in-out infinite;
+  
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-scroll-wheel: scrollWheel 2s ease-in-out infinite;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@keyframes scrollWheel {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(8px);
+    opacity: 0.3;
+  }
+}
+
+@keyframes growUp {
+  from {
+    opacity: 0;
+    transform: translateY(120px) scale(0.95);
+    transform-origin: bottom;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    transform-origin: bottom;
+  }
+}
+
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float1 {
+  0%, 100% {
+    transform: translateY(-12px) rotate(-0.5deg);
+  }
+  50% {
+    transform: translateY(12px) rotate(0.5deg);
+  }
+}
+
+@keyframes float2 {
+  0%, 100% {
+    transform: translateY(15px) rotate(0.5deg);
+  }
+  50% {
+    transform: translateY(-15px) rotate(-0.5deg);
+  }
+}
+
+@keyframes float3 {
+  0%, 100% {
+    transform: translateY(-8px) rotate(0.2deg);
+  }
+  50% {
+    transform: translateY(18px) rotate(-0.2deg);
   }
 }
 
 body {
-  background: var(--background);
+  background: linear-gradient(135deg, var(--bg-gradient-start) 0%, #ffffff 50%, var(--bg-gradient-end) 100%);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-open-sans), Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
 }
+
+/* Custom glassmorphism navbar links capsule */
+.nav-capsule {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(214, 167, 124, 0.15);
+  box-shadow: 0 4px 30px rgba(30, 58, 44, 0.02);
+}
+
+/* Image container styling */
+.image-card {
+  box-shadow: 0 20px 40px rgba(30, 58, 44, 0.06);
+}
+
+/* Animated border for buttons (Border Flow Effect) */
+@keyframes border-flow {
+  0% {
+    background-position: 0% 0%, 0% 0%;
+  }
+  100% {
+    background-position: 0% 0%, -200% 0%;
+  }
+}
+
+.btn-animate-border {
+  position: relative;
+  z-index: 1;
+  border: 1.5px solid transparent !important;
+  background-image: 
+    linear-gradient(var(--btn-bg, #ffffff), var(--btn-bg, #ffffff)), 
+    linear-gradient(90deg, #DAA87C, #1E3A2C, #DAA87C) !important;
+  background-origin: border-box !important;
+  background-clip: padding-box, border-box !important;
+  background-size: 100% 100%, 200% 100% !important;
+  animation: border-flow 4s linear infinite;
+  transition: color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease !important;
+}
+
+.btn-animate-border::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-color: var(--btn-hover-bg, #1E3A2C);
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.btn-animate-border:hover::after {
+  opacity: 1;
+}
+
+.btn-animate-border:hover {
+  color: var(--btn-hover-text, #ffffff) !important;
+  background-image: 
+    linear-gradient(transparent, transparent), 
+    linear-gradient(90deg, #DAA87C, #ffffff, #DAA87C) !important;
+}
+
+/* Light theme defaults */
+.btn-animate-border-light {
+  --btn-bg: #ffffff;
+  --btn-hover-bg: #1E3A2C;
+  --btn-hover-text: #ffffff;
+  color: #1E3A2C;
+}
+
+/* Dark theme defaults */
+.btn-animate-border-dark {
+  --btn-bg: #1E3A2C;
+  --btn-hover-bg: #0c2b1c;
+  --btn-hover-text: #ffffff;
+  color: #ffffff;
+}
+
+/* Circular/Icon button variant */
+.btn-animate-border-circle {
+  border: 1.5px solid transparent !important;
+  background-image: 
+    linear-gradient(var(--btn-bg, #ffffff), var(--btn-bg, #ffffff)), 
+    linear-gradient(90deg, #DAA87C, #1E3A2C, #DAA87C) !important;
+  background-origin: border-box !important;
+  background-clip: padding-box, border-box !important;
+  background-size: 100% 100%, 200% 100% !important;
+  animation: border-flow 4s linear infinite;
+  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease !important;
+}
+
+.btn-animate-border-circle:hover {
+  background-image: 
+    linear-gradient(var(--btn-hover-bg, #0c2b1c), var(--btn-hover-bg, #0c2b1c)), 
+    linear-gradient(90deg, #DAA87C, #ffffff, #DAA87C) !important;
+  color: #ffffff !important;
+}
+
