@@ -4,6 +4,7 @@ import OnamCollection from "@/components/OnamCollection";
 import CategoryTabs from "@/components/CategoryTabs";
 import NewArrivals from "@/components/NewArrivals";
 import BestSellers from "@/components/BestSellers";
+import PhotoshootSlider from "@/components/PhotoshootSlider";
 import InstagramFeed from "@/components/InstagramFeed";
 import Footer from "@/components/Footer";
 
@@ -13,6 +14,7 @@ export default function Home() {
       <Header />
       <div className="w-full border-b border-[#1E3A2C]/15"></div>
       <Hero />
+      <PhotoshootSlider />
       <OnamCollection />
       <CategoryTabs />
       <NewArrivals />

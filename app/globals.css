@@ -31,6 +31,11 @@
   
   --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   --animate-scroll-wheel: scrollWheel 2s ease-in-out infinite;
+
+  --animate-saree-wave-1: sareeWave1 22s ease-in-out infinite;
+  --animate-saree-wave-2: sareeWave2 26s ease-in-out infinite;
+  --animate-saree-wave-3: sareeWave3 30s ease-in-out infinite;
+  --animate-spin-slow: spin 45s linear infinite;
 }
 
 @keyframes scrollWheel {
@@ -92,6 +97,33 @@
   }
   50% {
     transform: translateY(18px) rotate(-0.2deg);
+  }
+}
+
+@keyframes sareeWave1 {
+  0%, 100% {
+    transform: translate(0, 0) rotate(0deg) scaleY(1);
+  }
+  50% {
+    transform: translate(12px, 8px) rotate(0.8deg) scaleY(1.02);
+  }
+}
+
+@keyframes sareeWave2 {
+  0%, 100% {
+    transform: translate(0, 0) rotate(0deg) scaleY(1);
+  }
+  50% {
+    transform: translate(-8px, 12px) rotate(-1deg) scaleY(0.98);
+  }
+}
+
+@keyframes sareeWave3 {
+  0%, 100% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+  }
+  50% {
+    transform: translate(8px, -6px) rotate(0.5deg) scale(1.01);
   }
 }
 
@@ -195,5 +227,17 @@ body {
     linear-gradient(var(--btn-hover-bg, #0c2b1c), var(--btn-hover-bg, #0c2b1c)), 
     linear-gradient(90deg, #DAA87C, #ffffff, #DAA87C) !important;
   color: #ffffff !important;
+}
+
+/* Remove outline highlight on clicking links, buttons, inputs */
+a, button, select, input, textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+a:focus, button:focus, select:focus, input:focus, textarea:focus {
+  outline: none !important;
+}
+a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent-gold) !important;
+  outline-offset: 2px;
 }
 

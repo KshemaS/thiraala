@@ -1,6 +1,8 @@
 "use client";
 
+import { motion } from "framer-motion";
 import ProductCard from "@/components/ProductCard";
+import Container from "@/components/Container";
 
 // Import all saree assets statically to match local codebase practices
 import foldedGopuram from "@/public/images/folded-gopuram.jpeg";
@@ -80,30 +82,109 @@ const onamSarees = [
 ];
 
 export default function OnamCollection() {
-  return (
-    <section className="w-full mt-[140px] mb-[140px] max-w-7xl mx-auto px-6 lg:px-12 select-none">
-      {/* Centered Heading and Description */}
-      <div className="text-center max-w-2xl mx-auto mb-16">
-        <h2 className="text-[#1E3A2C] font-bold text-3xl sm:text-4xl tracking-tight">
-          Onam Collection
-        </h2>
-        <div className="w-12 h-1 bg-[#0c2b1c] mx-auto my-4 rounded-full"></div>
-        <p className="text-[#1E3A2C]/70 text-sm sm:text-base leading-relaxed">
-          Welcome the season of abundance with our signature sarees. From fine golden Kasavu borders to custom floral weaves, celebrate in simple elegance.
-        </p>
-      </div>
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.15,
+      },
+    },
+  };
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10">
-        {onamSarees.map((saree) => (
-          <ProductCard
-            key={saree.id}
-            saree={{
-              ...saree,
-              priority: saree.id <= 3,
-            }}
-          />
-        ))}
-      </div>
+  const itemVariants = {
+    hidden: { y: 45, opacity: 0 },
+    show: {
+      y: 0,
+      opacity: 1,
+      transition: {
+        duration: 1.8,
+        ease: [0.16, 1, 0.3, 1] as const,
+      },
+    },
+  };
+
+  const leftVariant = {
+    hidden: { x: -60, opacity: 0 },
+    show: {
+      x: 0,
+      opacity: 1,
+      transition: {
+        duration: 1.8,
+        ease: [0.16, 1, 0.3, 1] as const,
+      },
+    },
+  };
+
+  const rightVariant = {
+    hidden: { x: 60, opacity: 0 },
+    show: {
+      x: 0,
+      opacity: 1,
+      transition: {
+        duration: 1.8,
+        ease: [0.16, 1, 0.3, 1] as const,
+      },
+    },
+  };
+
+  const centerVariant = {
+    hidden: { y: 60, opacity: 0 },
+    show: {
+      y: 0,
+      opacity: 1,
+      transition: {
+        duration: 1.8,
+        ease: [0.16, 1, 0.3, 1] as const,
+      },
+    },
+  };
+
+  return (
+    <section className="w-full mt-[140px] mb-[140px] select-none">
+      <Container>
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, amount: 0.10 }}
+          className="space-y-16"
+        >
+          {/* Centered Heading and Description */}
+          <motion.div className="text-center max-w-2xl mx-auto" variants={itemVariants}>
+            <h2 className="text-[#1E3A2C] font-bold text-3xl sm:text-4xl tracking-tight">
+              Onam Collection
+            </h2>
+            <div className="w-12 h-1 bg-[#0c2b1c] mx-auto my-4 rounded-full"></div>
+            <p className="text-[#1E3A2C]/70 text-sm sm:text-base leading-relaxed">
+              Welcome the season of abundance with our signature sarees. From fine golden Kasavu borders to custom floral weaves, celebrate in simple elegance.
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10">
+            {onamSarees.map((saree, idx) => {
+              const col = idx % 3;
+              const cardVariant = col === 0 ? leftVariant : col === 2 ? rightVariant : centerVariant;
+              return (
+                <motion.div
+                  key={saree.id}
+                  variants={cardVariant}
+                  initial="hidden"
+                  whileInView="show"
+                  viewport={{ once: true, amount: 0.25 }}
+                >
+                  <ProductCard
+                    saree={{
+                      ...saree,
+                      priority: saree.id <= 3,
+                    }}
+                  />
+                </motion.div>
+              );
+            })}
+          </div>
+        </motion.div>
+      </Container>
     </section>
   );
 }

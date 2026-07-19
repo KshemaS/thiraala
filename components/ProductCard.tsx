@@ -1,5 +1,4 @@
-"use client";
-
+import Link from "next/link";
 import Image, { StaticImageData } from "next/image";
 
 export interface SareeProduct {
@@ -20,7 +19,7 @@ interface ProductCardProps {
 
 export default function ProductCard({ saree }: ProductCardProps) {
   return (
-    <div className="group flex flex-col justify-between bg-white rounded-2xl border border-[#1E3A2C]/5 overflow-hidden shadow-md hover:shadow-lg transition-all duration-300">
+    <Link href={`/products/${saree.id}`} className="group flex flex-col justify-between bg-white rounded-2xl border border-[#1E3A2C]/5 overflow-hidden shadow-md hover:shadow-lg transition-all duration-300">
       {/* Image Container with Cross-Fade Hover Effect */}
       <div className="relative aspect-[3/4] w-full overflow-hidden bg-[#fbfaf8]">
         {/* Folded Saree (Initially shown) */}
@@ -57,14 +56,14 @@ export default function ProductCard({ saree }: ProductCardProps) {
             {saree.price}
           </span>
           
-          <button className="text-[11px] font-bold text-[#1E3A2C] group-hover:text-[#0c2b1c] flex items-center gap-1 transition-colors cursor-pointer">
+          <span className="text-[11px] font-bold text-[#1E3A2C] group-hover:text-[#0c2b1c] flex items-center gap-1 transition-colors">
             Quick View
             <svg className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
             </svg>
-          </button>
+          </span>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

@@ -1,14 +1,16 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import logo from "@/public/images/thiraala-logo.svg";
+import Container from "@/components/Container";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
     <footer className="w-full bg-white select-none pt-16 pb-12">
-      <div className="max-w-7xl mx-auto px-6 lg:px-12">
+      <Container>
         {/* Footer Top Column Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 items-center gap-10 md:gap-12 pb-12">
           {/* Brand profile column */}
@@ -21,9 +23,6 @@ export default function Footer() {
                 height={40}
                 className="object-contain"
               />
-              <span className="text-[10px] font-bold tracking-widest text-[#0c2b1c] uppercase pl-1.5 mt-0.5">
-                woven by waves
-              </span>
             </div>
             <p className="text-[#1E3A2C]/70 text-xs md:text-sm leading-relaxed mt-2">
               A curated boutique brand for simple, handpicked daily wear and festive sarees. Bringing effortless elegance straight to your wardrobe.
@@ -63,7 +62,7 @@ export default function Footer() {
                 <a href="#" className="hover:text-[#0c2b1c] transition-colors">Shipping & Returns</a>
               </li>
               <li>
-                <a href="#" className="hover:text-[#0c2b1c] transition-colors">Contact Support</a>
+                <Link href="/contact" className="hover:text-[#0c2b1c] transition-colors">Contact Support</Link>
               </li>
             </ul>
           </div>
@@ -127,7 +126,7 @@ export default function Footer() {
             <a href="#" className="hover:text-[#0c2b1c] transition-colors">Terms of Service</a>
           </div>
         </div>
-      </div>
+      </Container>
     </footer>
   );
 }
