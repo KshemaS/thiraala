@@ -33,36 +33,36 @@ export default function OnamCollection() {
   };
 
   const leftVariant = {
-    hidden: { x: -60, opacity: 0 },
+    hidden: { x: -30, opacity: 0 },
     show: {
       x: 0,
       opacity: 1,
       transition: {
-        duration: 1.8,
+        duration: 0.5,
         ease: [0.16, 1, 0.3, 1] as const,
       },
     },
   };
 
   const rightVariant = {
-    hidden: { x: 60, opacity: 0 },
+    hidden: { x: 30, opacity: 0 },
     show: {
       x: 0,
       opacity: 1,
       transition: {
-        duration: 1.8,
+        duration: 0.5,
         ease: [0.16, 1, 0.3, 1] as const,
       },
     },
   };
 
   const centerVariant = {
-    hidden: { y: 60, opacity: 0 },
+    hidden: { y: 30, opacity: 0 },
     show: {
       y: 0,
       opacity: 1,
       transition: {
-        duration: 1.8,
+        duration: 0.5,
         ease: [0.16, 1, 0.3, 1] as const,
       },
     },
@@ -97,9 +97,6 @@ export default function OnamCollection() {
                 <motion.div
                   key={saree.id}
                   variants={cardVariant}
-                  initial="hidden"
-                  whileInView="show"
-                  viewport={{ once: true, amount: 0.25 }}
                 >
                   <ProductCard
                     saree={{

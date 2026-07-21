@@ -29,7 +29,7 @@ export default function CategoryTabs() {
     show: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.12,
+        staggerChildren: 0.04,
       },
     },
   };
@@ -40,43 +40,43 @@ export default function CategoryTabs() {
       y: 0,
       opacity: 1,
       transition: {
-        duration: 1.2,
+        duration: 0.5,
         ease: [0.16, 1, 0.3, 1] as const,
       },
     },
   };
 
   const leftVariant = {
-    hidden: { x: -60, opacity: 0 },
+    hidden: { x: -30, opacity: 0 },
     show: {
       x: 0,
       opacity: 1,
       transition: {
-        duration: 1.8,
+        duration: 0.5,
         ease: [0.16, 1, 0.3, 1] as const,
       },
     },
   };
 
   const rightVariant = {
-    hidden: { x: 60, opacity: 0 },
+    hidden: { x: 30, opacity: 0 },
     show: {
       x: 0,
       opacity: 1,
       transition: {
-        duration: 1.8,
+        duration: 0.5,
         ease: [0.16, 1, 0.3, 1] as const,
       },
     },
   };
 
   const centerVariant = {
-    hidden: { y: 60, opacity: 0 },
+    hidden: { y: 30, opacity: 0 },
     show: {
       y: 0,
       opacity: 1,
       transition: {
-        duration: 1.8,
+        duration: 0.5,
         ease: [0.16, 1, 0.3, 1] as const,
       },
     },
@@ -138,9 +138,6 @@ export default function CategoryTabs() {
                 <motion.div
                   key={product.id}
                   variants={cardVariant}
-                  initial="hidden"
-                  whileInView="show"
-                  viewport={{ once: true, amount: 0.25 }}
                 >
                   <CategoryCard product={product} />
                 </motion.div>
