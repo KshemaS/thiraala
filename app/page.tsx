@@ -12,7 +12,6 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col justify-between selection:bg-[#DAA87C]/20 selection:text-[#DAA87C]">
       <Header />
-      <div className="w-full border-b border-[#1E3A2C]/15"></div>
       <Hero />
       <PhotoshootSlider />
       <OnamCollection />

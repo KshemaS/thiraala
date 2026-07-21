@@ -6,6 +6,10 @@ import Footer from "@/components/Footer";
 import Container from "@/components/Container";
 import { Headset, Locate, Mail, Phone, ShieldCheck, TruckElectric } from "lucide-react";
 
+// Web3Forms Public Access Key
+// Get your free key at https://web3forms.com/
+const WEB3FORMS_ACCESS_KEY = "YOUR_ACCESS_KEY_HERE";
+
 export default function ContactPage() {
   const [formData, setFormData] = useState({
     name: "",
@@ -14,21 +18,62 @@ export default function ContactPage() {
     query: "",
   });
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<"success" | "error" | null>(null);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert(`Thank you ${formData.name}, your message has been sent successfully.`);
-    setFormData({ name: "", email: "", phone: "", query: "" });
+    setIsSubmitting(true);
+    setSubmitStatus(null);
+
+    // If key is not configured, show error warning
+    if (WEB3FORMS_ACCESS_KEY === "YOUR_ACCESS_KEY_HERE") {
+      setSubmitStatus("error");
+      setIsSubmitting(false);
+      alert("Please configure your Web3Forms Access Key at the top of app/contact/page.tsx");
+      return;
+    }
+
+    try {
+      const response = await fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          access_key: WEB3FORMS_ACCESS_KEY,
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone || "Not Provided",
+          message: formData.query,
+          subject: `thiraala Contact Form: Message from ${formData.name}`,
+        }),
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        setSubmitStatus("success");
+        setFormData({ name: "", email: "", phone: "", query: "" });
+      } else {
+        setSubmitStatus("error");
+      }
+    } catch (error) {
+      console.error("Failed to submit contact form:", error);
+      setSubmitStatus("error");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="min-h-screen flex flex-col justify-between selection:bg-[#DAA87C]/20 selection:text-[#DAA87C] bg-[#fcfbfa]">
       <Header />
-      <div className="w-full border-b border-[#1E3A2C]/10"></div>
 
       <main className="flex-1 py-12 sm:py-16 lg:py-20 flex flex-col justify-between gap-16 lg:gap-24">
         {/* Contact Info and Form Grid Container */}
@@ -118,9 +163,20 @@ export default function ContactPage() {
               onSubmit={handleSubmit}
               className="lg:col-span-7 bg-white p-8 rounded-3xl border border-stone-200/60 shadow-md flex flex-col justify-between space-y-6"
             >
-              <h2 className="text-xl sm:text-2xl font-bold text-[#1E3A2C] tracking-tight">
+              <h2 className="text-xl sm:text-2xl font-bold text-[#1E3A2C] tracking-tight select-none">
                 Send us a message
               </h2>
+
+              {submitStatus === "success" && (
+                <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs font-semibold select-none">
+                  Message sent successfully! We will get back to you shortly.
+                </div>
+              )}
+              {submitStatus === "error" && (
+                <div className="p-4 bg-red-50 border border-red-200 text-red-800 rounded-2xl text-xs font-semibold select-none">
+                  Failed to send message. Please verify your access key configuration or try again.
+                </div>
+              )}
 
               <div className="space-y-4">
                 {/* Name Input */}
@@ -128,11 +184,12 @@ export default function ContactPage() {
                   <input
                     type="text"
                     name="name"
+                    disabled={isSubmitting}
                     value={formData.name}
                     onChange={handleChange}
                     placeholder="Your Name"
                     required
-                    className="w-full h-12 px-4 rounded-xl border border-[#daa87c] text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/40 focus:border-[#1e3a2c focus:ring-1 focus:ring-[#1e3a2c transition-all bg-[#fcfbfa]/50"
+                    className="w-full h-12 px-4 rounded-xl border border-[#daa87c] text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/40 focus:border-[#1e3a2c] focus:ring-1 focus:ring-[#1e3a2c] transition-all bg-[#fcfbfa]/50 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -141,11 +198,12 @@ export default function ContactPage() {
                   <input
                     type="email"
                     name="email"
+                    disabled={isSubmitting}
                     value={formData.email}
                     onChange={handleChange}
                     placeholder="Your Email"
                     required
-                    className="w-full h-12 px-4 rounded-xl border border-[#daa87c] text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/40 focus:border-[#1e3a2c focus:ring-1 focus:ring-[#1e3a2c transition-all bg-[#fcfbfa]/50"
+                    className="w-full h-12 px-4 rounded-xl border border-[#daa87c] text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/40 focus:border-[#1e3a2c] focus:ring-1 focus:ring-[#1e3a2c] transition-all bg-[#fcfbfa]/50 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -154,10 +212,11 @@ export default function ContactPage() {
                   <input
                     type="tel"
                     name="phone"
+                    disabled={isSubmitting}
                     value={formData.phone}
                     onChange={handleChange}
                     placeholder="Your Phone"
-                    className="w-full h-12 px-4 rounded-xl border border-[#daa87c] text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/40 focus:border-[#1e3a2c focus:ring-1 focus:ring-[#1e3a2c transition-all bg-[#fcfbfa]/50"
+                    className="w-full h-12 px-4 rounded-xl border border-[#daa87c] text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/40 focus:border-[#1e3a2c] focus:ring-1 focus:ring-[#1e3a2c] transition-all bg-[#fcfbfa]/50 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -166,20 +225,32 @@ export default function ContactPage() {
                   <textarea
                     name="query"
                     rows={4}
+                    disabled={isSubmitting}
                     value={formData.query}
                     onChange={handleChange}
                     placeholder="Your Query"
                     required
-                    className="w-full p-4 rounded-xl border border-[#daa87c] text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/40 focus:border-[#1e3a2c] focus:ring-1 focus:ring-[#1e3a2c transition-all bg-[#fcfbfa]/50 resize-none"
+                    className="w-full p-4 rounded-xl border border-[#daa87c] text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/40 focus:border-[#1e3a2c] focus:ring-1 focus:ring-[#1e3a2c] transition-all bg-[#fcfbfa]/50 resize-none disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full h-12 rounded-xl font-bold text-xs tracking-wider uppercase bg-[#1e3a2c] text-white hover:bg-[#1e3a2c] transition-colors shadow-md shadow-[#1e3a2c/10 cursor-pointer border-[#1e3a2c]"
+                disabled={isSubmitting}
+                className={`w-full h-12 rounded-xl font-bold text-xs tracking-wider uppercase transition-colors shadow-md shadow-[#1e3a2c]/10 border-[#1e3a2c] flex items-center justify-center gap-2 ${isSubmitting
+                    ? "bg-[#1e3a2c]/65 text-white/80 cursor-not-allowed"
+                    : "bg-[#1e3a2c] text-white hover:bg-[#0c2b1c] cursor-pointer"
+                  }`}
               >
-                Send Message
+                {isSubmitting ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                    Sending...
+                  </>
+                ) : (
+                  "Send Message"
+                )}
               </button>
             </form>
           </div>
@@ -199,7 +270,7 @@ export default function ContactPage() {
                 </p>
               </div>
               <div className="flex flex-col items-center text-center px-4">
-                <ShieldCheck size={40} className="mb-4"  />
+                <ShieldCheck size={40} className="mb-4" />
                 <h3 className="text-[#1E3A2C] font-bold text-xs uppercase tracking-wider">
                   Authentic Quality
                 </h3>

@@ -181,16 +181,16 @@ export default function Hero() {
       </div>
 
       <Container className="relative z-10 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center w-full">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-12 items-center w-full">
 
           {/* Left Column: Headings & Subtext */}
           <motion.div
-            className="lg:col-span-5 flex flex-col justify-between h-full min-h-[380px] lg:py-16"
+            className="lg:col-span-5 flex flex-col justify-between h-full min-h-[auto] lg:min-h-[380px] py-4 lg:py-16 text-center lg:text-left"
             variants={containerVariants}
             initial="hidden"
             animate="show"
           >
-            <div className="space-y-6">
+            <div className="space-y-4 lg:space-y-6">
               {/* Gold small heading */}
               <motion.h2
                 className="text-[#DAA87C] font-bold text-sm lg:text-base tracking-wide uppercase select-none"
@@ -201,7 +201,7 @@ export default function Hero() {
 
               {/* Giant bold title */}
               <motion.h1
-                className="text-5xl lg:text-7xl font-bold tracking-tight text-[#1E3A2C] leading-none select-none"
+                className="text-4xl sm:text-5xl lg:text-7xl font-bold tracking-tight text-[#1E3A2C] leading-none select-none"
                 variants={itemVariants}
               >
                 Saree Collections
@@ -209,7 +209,7 @@ export default function Hero() {
 
               {/* Description */}
               <motion.p
-                className="text-[#1E3A2C]/85 text-sm lg:text-[15px] leading-relaxed max-w-sm"
+                className="text-[#1E3A2C]/85 text-sm lg:text-[15px] leading-relaxed max-w-sm mx-auto lg:mx-0"
                 variants={itemVariants}
               >
                 Welcome to thiraala. Discover our curated collection of beautiful sarees for every occasion—blending simple elegance, comfort, and premium quality to make your everyday and special moments look effortless.
@@ -218,11 +218,11 @@ export default function Hero() {
           </motion.div>
 
           {/* Right Column: Moving / Floating Images Grid */}
-          <div className="lg:col-span-7 flex items-end justify-end gap-3 sm:gap-4 lg:gap-6 w-full h-[400px] sm:h-[480px] lg:h-[580px] select-none mt-8 lg:mt-0 relative">
+          <div className="lg:col-span-7 flex items-end justify-center lg:justify-end gap-2.5 sm:gap-4 lg:gap-6 w-full h-[260px] sm:h-[480px] lg:h-[580px] select-none  relative">
 
             {/* Decorative Rotating Mandala & Floating Circles */}
             <div
-              className="absolute left-2 sm:left-[-20px] lg:left-[-60px] xl:left-[-80px] top-[15%] lg:top-[25%] pointer-events-none select-none z-10"
+              className="absolute left-0 sm:left-[-20px] lg:left-[-60px] xl:left-[-80px] top-[15%] lg:top-[25%] pointer-events-none select-none z-10"
               style={{
                 transform: !isMobile
                   ? `translateY(${scrollY * 0.04}px) rotate(${scrollY * 0.12}deg)`
@@ -230,7 +230,7 @@ export default function Hero() {
               }}
             >
               {/* Main Mandala */}
-              <div className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 relative flex items-center justify-center">
+              <div className="w-12 h-12 sm:w-20 lg:w-24 lg:h-24 relative flex items-center justify-center">
                 <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full stroke-[#DAA87C]/70 animate-spin-slow">
                   {/* Outer dotted circle */}
                   <circle cx="50" cy="50" r="45" strokeDasharray="2 3" strokeWidth="1" />
@@ -261,7 +261,7 @@ export default function Hero() {
 
             {/* Card 1: Small left (Cream gold saree) */}
             <motion.div
-              className="w-[110px] sm:w-[150px] lg:w-[180px] h-[110px] sm:h-[150px] lg:h-[180px] self-end flex-shrink-0"
+              className="w-[75px] sm:w-[150px] lg:w-[180px] h-[75px] sm:h-[150px] lg:h-[180px] self-end flex-shrink-0"
               variants={cardVariants1}
               initial="hidden"
               animate="show"
@@ -269,12 +269,12 @@ export default function Hero() {
                 transform: !isMobile ? `translateY(${scrollY * 0.07}px)` : "none"
               }}
             >
-              <div className="w-full h-full rounded-[24px] sm:rounded-[32px] overflow-hidden image-card animate-float-slow-1 relative">
+              <div className="w-full h-full rounded-[16px] sm:rounded-[32px] overflow-hidden image-card animate-float-slow-1 relative">
                 <Image
                   src={honey.src}
                   alt="Elegant cream saree"
                   fill
-                  sizes="(max-width: 768px) 110px, 180px"
+                  sizes="(max-width: 768px) 75px, 180px"
                   className="object-cover pointer-events-none"
                   priority
                 />
@@ -283,7 +283,7 @@ export default function Hero() {
 
             {/* Card 2: Medium center (Green gold saree) */}
             <motion.div
-              className="w-[110px] sm:w-[150px] lg:w-[180px] h-[170px] sm:h-[230px] lg:h-[280px] self-end flex-shrink-0"
+              className="w-[75px] sm:w-[150px] lg:w-[180px] h-[120px] sm:h-[230px] lg:h-[280px] self-end flex-shrink-0"
               variants={cardVariants2}
               initial="hidden"
               animate="show"
@@ -291,12 +291,12 @@ export default function Hero() {
                 transform: !isMobile ? `translateY(${scrollY * 0.03}px)` : "none"
               }}
             >
-              <div className="w-full h-full rounded-[24px] sm:rounded-[32px] overflow-hidden image-card animate-float-slow-2 relative">
+              <div className="w-full h-full rounded-[16px] sm:rounded-[32px] overflow-hidden image-card animate-float-slow-2 relative">
                 <Image
                   src={kshe.src}
                   alt="Elegant green saree"
                   fill
-                  sizes="(max-width: 768px) 110px, 180px"
+                  sizes="(max-width: 768px) 75px, 180px"
                   className="object-cover pointer-events-none"
                   priority
                 />
@@ -305,7 +305,7 @@ export default function Hero() {
 
             {/* Card 3: Large right (Emerald designer saree) */}
             <motion.div
-              className="w-[220px] sm:w-[300px] lg:w-[360px] h-[310px] sm:h-[420px] lg:h-[520px] self-end flex-shrink-0"
+              className="w-[145px] sm:w-[300px] lg:w-[360px] h-[210px] sm:h-[420px] lg:h-[520px] self-end flex-shrink-0"
               variants={cardVariants3}
               initial="hidden"
               animate="show"
@@ -313,12 +313,12 @@ export default function Hero() {
                 transform: !isMobile ? `translateY(${scrollY * -0.03}px)` : "none"
               }}
             >
-              <div className="w-full h-full rounded-[24px] sm:rounded-[32px] overflow-hidden image-card animate-float-slow-3 relative">
+              <div className="w-full h-full rounded-[20px] sm:rounded-[32px] overflow-hidden image-card animate-float-slow-3 relative">
                 <Image
                   src={swa.src}
                   alt="Beautiful designer saree"
                   fill
-                  sizes="(max-width: 768px) 220px, 360px"
+                  sizes="(max-width: 768px) 145px, 360px"
                   className="object-cover pointer-events-none"
                   priority
                 />

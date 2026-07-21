@@ -5,179 +5,24 @@ import Container from "@/components/Container";
 import { motion } from "framer-motion";
 import CategoryCard, { CategoryProduct } from "@/components/CategoryCard";
 
-// Import all saree assets statically to align with workspace practices
-import kshe from "@/public/images/kshe.jpeg";
-import honey from "@/public/images/honey.jpeg";
-import swa from "@/public/images/swa.jpeg";
-import arayannam from "@/public/images/arayannam.jpeg";
-import gopura from "@/public/images/gopura.jpeg";
-import mambazham from "@/public/images/mambazham.jpeg";
-import mulcottom from "@/public/images/mulcottom.jpeg";
-
-import foldedGopuram from "@/public/images/folded-gopuram.jpeg";
-import foldedArayannam from "@/public/images/folded-arayannam.jpeg";
-import foldedChembaruthy from "@/public/images/folded-chembaruthy.jpeg";
-import foldedMambazham from "@/public/images/folded-mambazham.jpeg";
-import foldedMulcotton from "@/public/images/folded-mulcotton.jpeg";
+import { sareesData } from "@/data/products";
 
 const categories = [
-  { id: "kalyani", name: "Kalyani Cotton" },
-  { id: "khadi", name: "Khadi Cotton" },
-  { id: "maheswari", name: "Maheswari Cotton" },
-  { id: "tissue", name: "Tissue Silk Saree" },
-  { id: "kerala", name: "Kerala Set Saree" },
+  { id: "cotton-saree", name: "Cotton Set Saree" },
+  { id: "tissue", name: "Tissue Set Saree" },
+  { id: "mul-cotton", name: "Mul Mul Cotton" },
+  { id: "mund", name: "Cotton Set Mund" },
 ];
 
-const categoryProducts: Record<string, CategoryProduct[]> = {
-  kalyani: [
-    {
-      id: 101,
-      name: "Kalyani Fine Cotton Saree",
-      price: "₹1,550",
-      foldedImg: foldedMulcotton,
-      wornImg: mulcottom,
-      altFolded: "Folded Kalyani fine cotton saree border",
-      altWorn: "Kalyani fine cotton saree with subtle borders",
-    },
-    {
-      id: 102,
-      name: "Kalyani Gold Zari Cotton",
-      price: "₹1,690",
-      foldedImg: foldedMulcotton,
-      wornImg: honey,
-      altFolded: "Folded Kalyani gold border cotton saree",
-      altWorn: "Kalyani gold border cotton saree",
-    },
-    {
-      id: 103,
-      name: "Traditional Kalyani Weave",
-      price: "₹1,480",
-      foldedImg: foldedChembaruthy,
-      wornImg: kshe,
-      altFolded: "Folded Traditional Kalyani cotton saree",
-      altWorn: "Kalyani weave cotton saree",
-    },
-  ],
-  khadi: [
-    {
-      id: 201,
-      name: "Handloom Khadi Plain Saree",
-      price: "₹1,850",
-      foldedImg: foldedChembaruthy,
-      wornImg: kshe,
-      altFolded: "Folded handloom plain Khadi cotton saree",
-      altWorn: "Handwoven plain Khadi cotton saree",
-    },
-    {
-      id: 202,
-      name: "Premium Khadi Stripe Edit",
-      price: "₹2,100",
-      foldedImg: foldedMulcotton,
-      wornImg: mulcottom,
-      altFolded: "Folded striped handloom Khadi cotton saree",
-      altWorn: "Striped handloom Khadi cotton saree",
-    },
-    {
-      id: 203,
-      name: "Natural Dyed Khadi Saree",
-      price: "₹1,950",
-      foldedImg: foldedMulcotton,
-      wornImg: honey,
-      altFolded: "Folded Khadi organic cotton saree",
-      altWorn: "Khadi cotton saree dyed with organic colors",
-    },
-  ],
-  maheswari: [
-    {
-      id: 301,
-      name: "Maheswari Classic Zari Saree",
-      price: "₹2,550",
-      foldedImg: foldedGopuram,
-      wornImg: swa,
-      altFolded: "Folded Maheswari classic gold border saree",
-      altWorn: "Maheswari silk cotton saree with fine border",
-    },
-    {
-      id: 302,
-      name: "Maheswari Silk Blend Special",
-      price: "₹2,900",
-      foldedImg: foldedChembaruthy,
-      wornImg: kshe,
-      altFolded: "Folded Maheswari silk cotton blend saree",
-      altWorn: "Sheer Maheswari silk cotton blend saree",
-    },
-    {
-      id: 303,
-      name: "Traditional Maheswari checks",
-      price: "₹2,400",
-      foldedImg: foldedArayannam,
-      wornImg: arayannam,
-      altFolded: "Folded checked Maheswari handloom saree",
-      altWorn: "Checked Maheswari handloom saree",
-    },
-  ],
-  tissue: [
-    {
-      id: 401,
-      name: "Golden Tissue Silk Saree",
-      price: "₹3,850",
-      foldedImg: foldedGopuram,
-      wornImg: gopura,
-      altFolded: "Folded golden tissue silk saree showing gold borders",
-      altWorn: "Gold metallic tissue silk designer saree",
-    },
-    {
-      id: 402,
-      name: "Silver Tissue Chanderi Saree",
-      price: "₹4,200",
-      foldedImg: foldedGopuram,
-      wornImg: swa,
-      altFolded: "Folded silver zari tissue chanderi saree",
-      altWorn: "Silver zari tissue chanderi saree",
-    },
-    {
-      id: 403,
-      name: "Tissue Brocade Special Saree",
-      price: "₹4,950",
-      foldedImg: foldedArayannam,
-      wornImg: arayannam,
-      altFolded: "Folded heavy brocade tissue silk saree",
-      altWorn: "Heavy brocade tissue silk bridal saree",
-    },
-  ],
-  kerala: [
-    {
-      id: 501,
-      name: "Traditional Set Mundu",
-      price: "₹1,250",
-      foldedImg: foldedMulcotton,
-      wornImg: honey,
-      altFolded: "Folded traditional Kerala set mundu with gold border",
-      altWorn: "Classic Kerala set mundu with gold border",
-    },
-    {
-      id: 502,
-      name: "Kasavu Kerala Set Saree",
-      price: "₹1,650",
-      foldedImg: foldedGopuram,
-      wornImg: gopura,
-      altFolded: "Folded Kerala style set saree gold borders",
-      altWorn: "Kerala style set saree with golden zari borders",
-    },
-    {
-      id: 503,
-      name: "Kerala Onam Handloom Saree",
-      price: "₹1,450",
-      foldedImg: foldedMambazham,
-      wornImg: mambazham,
-      altFolded: "Folded handwoven Kerala set saree gold borders",
-      altWorn: "Special handwoven Kerala set saree",
-    },
-  ],
-};
-
 export default function CategoryTabs() {
-  const [activeTab, setActiveTab] = useState("kalyani");
+  const [activeTab, setActiveTab] = useState("cotton-saree");
+
+  const categoryProducts: Record<string, any[]> = {
+    "cotton-saree": sareesData.filter((s) => s.category === "Cotton Set Saree"),
+    tissue: sareesData.filter((s) => s.category === "Tissue Set Saree"),
+    "mul-cotton": sareesData.filter((s) => s.category === "Mul Mul Cotton"),
+    mund: sareesData.filter((s) => s.category === "Cotton Set Mund"),
+  };
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -260,12 +105,12 @@ export default function CategoryTabs() {
 
           {/* Category Tabs Header Bar */}
           <motion.div className="flex flex-col items-center mb-12" variants={itemVariants}>
-            <div className="relative flex items-center justify-center gap-2 md:gap-6 flex-wrap border-b border-[#1E3A2C]/10 w-full pb-4">
+            <div className="relative flex items-center justify-start md:justify-center gap-4 md:gap-6 overflow-x-auto no-scrollbar border-b border-[#1E3A2C]/10 w-full pb-4 whitespace-nowrap select-none px-4 md:px-0">
               {categories.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`relative px-4 py-2 text-xs md:text-sm font-semibold tracking-wide transition-all duration-300 cursor-pointer ${
+                  className={`relative px-4 py-2 text-xs md:text-sm font-semibold tracking-wide transition-all duration-300 cursor-pointer flex-shrink-0 ${
                     activeTab === tab.id
                       ? "text-[#1E3A2C] font-bold"
                       : "text-[#1E3A2C]/50 hover:text-[#1E3A2C]"
@@ -285,7 +130,7 @@ export default function CategoryTabs() {
           </motion.div>
 
           {/* Product Card Grid (Using the CategoryCard component) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10 mb-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10 mb-12">
             {categoryProducts[activeTab]?.map((product, idx) => {
               const col = idx % 3;
               const cardVariant = col === 0 ? leftVariant : col === 2 ? rightVariant : centerVariant;

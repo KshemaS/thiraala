@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { SareeProduct } from "@/data/products";
+import { useCart } from "@/context/CartContext";
 
 // Color definitions matching the design reference swatches
 const colorVariants = [
@@ -16,6 +17,7 @@ const colorVariants = [
 export default function ProductInfo({ product }: { product: SareeProduct }) {
   const [quantity, setQuantity] = useState(1);
   const [isAccordionOpen, setIsAccordionOpen] = useState(false);
+  const { addToCart } = useCart();
 
   const getProductDescription = (saree: SareeProduct) => {
     switch (saree.fabric) {
@@ -33,9 +35,11 @@ export default function ProductInfo({ product }: { product: SareeProduct }) {
   return (
     <div className="lg:col-span-5 space-y-6">
       {/* Category, Item Code & Share Link */}
-      <div className="flex items-center justify-between text-xs font-semibold text-[#0c2b1c]/60 uppercase tracking-widest">
-        <span>Item No: S-{1000 + product.id}</span>
-        <span className="text-[#DAA87C]">In Stock</span>
+      <div className="flex items-center justify-between text-xs font-semibold text-[#0c2b1c]/60 uppercase tracking-widest select-none">
+        <span>Product Code: {product.sku}</span>
+        <span className={product.stock && product.stock > 0 ? "text-[#DAA87C]" : "text-red-500"}>
+          {product.stock && product.stock > 0 ? "In Stock" : "Out of Stock"}
+        </span>
       </div>
 
       {/* Saree Name */}
@@ -81,8 +85,8 @@ export default function ProductInfo({ product }: { product: SareeProduct }) {
                 key={color.id}
                 href={`/products/${color.productId}`}
                 className={`flex items-center justify-between p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${isActive
-                    ? "bg-[#1E3A2C]/5 border-[#1E3A2C] text-[#1E3A2C]"
-                    : "border-stone-200 text-[#1E3A2C]/70 hover:border-[#DAA87C] hover:text-[#1E3A2C]"
+                  ? "bg-[#1E3A2C]/5 border-[#1E3A2C] text-[#1E3A2C]"
+                  : "border-stone-200 text-[#1E3A2C]/70 hover:border-[#DAA87C] hover:text-[#1E3A2C]"
                   }`}
               >
                 <div className="flex items-center gap-3">
@@ -106,9 +110,8 @@ export default function ProductInfo({ product }: { product: SareeProduct }) {
             Saree Specifications
           </span>
           <svg
-            className={`w-4 h-4 text-[#1E3A2C] transition-transform duration-300 ${
-              isAccordionOpen ? "rotate-180" : "rotate-0"
-            }`}
+            className={`w-4 h-4 text-[#1E3A2C] transition-transform duration-300 ${isAccordionOpen ? "rotate-180" : "rotate-0"
+              }`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -131,10 +134,36 @@ export default function ProductInfo({ product }: { product: SareeProduct }) {
         )}
       </div>
       {/* Quantity Selector & Add to Cart Counter */}
-      <div className="flex items-center gap-4 pt-4 max-w-[200px]">
-        <button className="flex-1 h-12 rounded-full font-bold text-xs tracking-wider uppercase bg-[#1E3A2C] text-[#fcfbfa] hover:bg-[#0c2b1c] transition-colors shadow-md shadow-[#1E3A2C]/10 cursor-pointer">
+      <div className="flex items-center gap-4 pt-4 select-none">
+        {/* Quantity Selector */}
+        <div className="flex items-center border border-[#1E3A2C]/20 rounded-full h-12 px-2 bg-white flex-shrink-0">
+          <button
+            onClick={() => setQuantity(Math.max(1, quantity - 1))}
+            className="w-8 h-8 rounded-full flex items-center justify-center text-[#1E3A2C] hover:bg-[#1E3A2C]/5 font-bold cursor-pointer transition-colors"
+          >
+            -
+          </button>
+          <span className="w-8 text-center text-sm font-bold text-[#1E3A2C]">
+            {quantity}
+          </span>
+          <button
+            onClick={() => setQuantity(quantity + 1)}
+            className="w-8 h-8 rounded-full flex items-center justify-center text-[#1E3A2C] hover:bg-[#1E3A2C]/5 font-bold cursor-pointer transition-colors"
+          >
+            +
+          </button>
+        </div>
+
+        {/* Add to Cart Button */}
+        {/* <button
+          onClick={() => addToCart(product, quantity)}
+          className="flex-1 h-12 rounded-full font-bold text-xs tracking-wider uppercase bg-[#1E3A2C] text-[#fcfbfa] hover:bg-[#0c2b1c] transition-colors shadow-md shadow-[#1E3A2C]/10 cursor-pointer flex items-center justify-center gap-2 group"
+        >
+          <svg className="w-4 h-4 group-hover:scale-105 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+          </svg>
           Add to Cart
-        </button>
+        </button> */}
       </div>
 
     </div>

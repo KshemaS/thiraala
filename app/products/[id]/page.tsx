@@ -21,7 +21,6 @@ export default async function ProductDetailPage({
   return (
     <div className="min-h-screen flex flex-col justify-between selection:bg-[#DAA87C]/20 selection:text-[#DAA87C] bg-[#fcfbfa]">
       <Header />
-      <div className="w-full border-b border-[#1E3A2C]/10"></div>
 
       <main className="flex-1 py-8 sm:py-12 md:py-16">
         <Container>

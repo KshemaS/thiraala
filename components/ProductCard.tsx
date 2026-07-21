@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import Image, { StaticImageData } from "next/image";
+import { useWishlist } from "@/context/WishlistContext";
 
 export interface SareeProduct {
   id: number;
@@ -18,10 +21,35 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ saree }: ProductCardProps) {
+  const { toggleWishlist, isInWishlist } = useWishlist();
+  const isWishlisted = isInWishlist(saree.id);
+
+  const handleWishlistClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleWishlist(saree);
+  };
+
   return (
     <Link href={`/products/${saree.id}`} className="group flex flex-col justify-between bg-white rounded-2xl border border-[#1E3A2C]/5 overflow-hidden shadow-md hover:shadow-lg transition-all duration-300">
       {/* Image Container with Cross-Fade Hover Effect */}
       <div className="relative aspect-[3/4] w-full overflow-hidden bg-[#fbfaf8]">
+        {/* Wishlist Toggle Button */}
+        <button
+          onClick={handleWishlistClick}
+          className="absolute top-4 right-4 z-20 p-2.5 rounded-full bg-white/85 hover:bg-white text-[#1E3A2C]/80 hover:text-red-500 transition-all duration-300 shadow-md backdrop-blur-xs flex items-center justify-center cursor-pointer group/wishlist active:scale-90"
+        >
+          <svg
+            className={`w-4 h-4 transition-transform duration-300 group-hover/wishlist:scale-110 ${
+              isWishlisted ? "fill-red-500 stroke-red-500 text-red-500" : "fill-none stroke-current"
+            }`}
+            viewBox="0 0 24 24"
+            strokeWidth="2"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+          </svg>
+        </button>
+
         {/* Folded Saree (Initially shown) */}
         <Image
           src={saree.foldedImg.src}

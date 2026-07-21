@@ -50,7 +50,7 @@ export default function PhotoshootSlider() {
   };
 
   return (
-    <section className="w-full mt-[80px] lg:mt-[120px] mb-12 sm:mb-16">
+    <section className="w-full mt-[80px] lg:mt-[120px] mb-10 md:mb-4">
       <Container>
         <motion.div
           variants={containerVariants}
@@ -72,7 +72,7 @@ export default function PhotoshootSlider() {
 
           {/* Image Slider Container (400px Height, Rounded Corners) */}
           <motion.div
-            className="relative w-full h-[400px] overflow-hidden rounded-[24px] sm:rounded-[32px] select-none bg-stone-100 shadow-md"
+            className="relative w-full h-[400px] overflow-hidden rounded-[24px] sm:rounded-[32px] select-none shadow-md"
             variants={itemVariants}
           >
             <div className="relative w-full h-full">

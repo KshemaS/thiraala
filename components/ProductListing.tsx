@@ -41,18 +41,18 @@ export default function ProductListing() {
     show: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.15,
+        staggerChildren: 0.04,
       },
     },
   };
 
   const itemVariants = {
-    hidden: { y: 40, opacity: 0 },
+    hidden: { y: 10, opacity: 0 },
     show: {
       y: 0,
       opacity: 1,
       transition: {
-        duration: 1.8,
+        duration: 0.5,
         ease: [0.16, 1, 0.3, 1] as const,
       },
     },
@@ -64,8 +64,7 @@ export default function ProductListing() {
         <motion.div
           variants={containerVariants}
           initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, amount: 0.10 }}
+          animate="show"
           className="flex flex-col lg:flex-row gap-10 items-start w-full"
         >
         

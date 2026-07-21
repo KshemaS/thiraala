@@ -14,34 +14,33 @@ import arayannam from "@/public/images/arayannam.jpeg";
 
 const bestSellers = [
   {
-    id: 701,
-    name: "Gopuram Kasavu Saree",
-    price: "₹2,450",
+    id: 1,
+    name: "Thumba Saree",
+    price: "₹1,350",
     wornImg: gopura,
-    altWorn: "Model wearing Gopuram Kasavu saree with gold temple borders",
+    altWorn: "Model wearing Thumba Saree",
   },
   {
-    id: 702,
-    name: "Chembaruthy Cotton Saree",
-    price: "₹2,250",
+    id: 2,
+    name: "Puliyilakkara",
+    price: "₹499",
     wornImg: kshe,
-    altWorn: "Model showing drape of Chembaruthy cotton saree",
+    altWorn: "Model wearing Puliyilakkara saree",
   },
   {
-    id: 703,
-    name: "Arayannam Kasavu Silk",
-    price: "₹2,850",
+    id: 3,
+    name: "Mul Cotton White",
+    price: "₹1,090",
     wornImg: arayannam,
-    altWorn: "Model in white and gold Arayannam silk saree",
+    altWorn: "Model wearing Mul Cotton White saree",
   },
   {
-    id: 703,
-    name: "Kalippattam Kasavu",
-    price: "₹2,850",
+    id: 4,
+    name: "Vaka Saree",
+    price: "₹1,250",
     wornImg: swa,
-    altWorn: "Model in white and gold Arayannam silk saree",
+    altWorn: "Model wearing Vaka Saree",
   },
-
 ];
 
 export default function BestSellers() {
@@ -125,7 +124,7 @@ export default function BestSellers() {
           </motion.div>
 
           {/* Grid listing section using unique Arch Card style */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10 sm:gap-4">
             {bestSellers.map((saree, idx) => {
               const col = idx % 4;
               const cardVariant = col === 0 ? leftVariant : col === 3 ? rightVariant : centerVariant;
