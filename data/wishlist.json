@@ -1,0 +1,32 @@
+[
+  {
+    "id": "wish_1791393652364_aab8b990",
+    "userId": null,
+    "productId": 2,
+    "name": "Mayil Peacock Motif Saree",
+    "price": "?6,299",
+    "foldedImg": "/images/folded-mayil.jpeg",
+    "wornImg": "/images/model-mayil.jpeg",
+    "img": "/images/folded-mayil.jpeg",
+    "altFolded": "Mayil Peacock Motif Saree",
+    "altWorn": "Mayil Peacock Motif Saree",
+    "category": "Handloom",
+    "createdAt": "2026-10-07T17:20:52.364Z",
+    "updatedAt": "2026-10-07T17:20:52.364Z"
+  },
+  {
+    "id": "wish_1791393652293_285fd20b",
+    "userId": null,
+    "productId": 1,
+    "name": "Gopuram Classic Kasavu",
+    "price": "?5,499",
+    "foldedImg": "/images/folded-gopuram.jpeg",
+    "wornImg": "/images/model-gopuram.jpeg",
+    "img": "/images/folded-gopuram.jpeg",
+    "altFolded": "Gopuram Classic Kasavu",
+    "altWorn": "Gopuram Classic Kasavu",
+    "category": "Kasavu Sarees",
+    "createdAt": "2026-10-07T17:20:52.293Z",
+    "updatedAt": "2026-10-07T17:20:52.293Z"
+  }
+]

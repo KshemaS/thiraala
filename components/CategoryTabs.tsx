@@ -1,28 +1,86 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Container from "@/components/Container";
 import { motion } from "framer-motion";
 import CategoryCard, { CategoryProduct } from "@/components/CategoryCard";
 
 import { sareesData } from "@/data/products";
 
-const categories = [
-  { id: "cotton-saree", name: "Cotton Set Saree" },
-  { id: "tissue", name: "Tissue Set Saree" },
-  { id: "mul-cotton", name: "Mul Mul Cotton" },
-  { id: "mund", name: "Cotton Set Mund" },
-];
+interface CategoryItem {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  image?: string;
+  status?: string;
+}
 
 export default function CategoryTabs() {
-  const [activeTab, setActiveTab] = useState("cotton-saree");
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
+  const [activeTab, setActiveTab] = useState("");
 
-  const categoryProducts: Record<string, any[]> = {
-    "cotton-saree": sareesData.filter((s) => s.category === "Cotton Set Saree"),
-    tissue: sareesData.filter((s) => s.category === "Tissue Set Saree"),
-    "mul-cotton": sareesData.filter((s) => s.category === "Mul Mul Cotton"),
-    mund: sareesData.filter((s) => s.category === "Cotton Set Mund"),
-  };
+  const fetchCategories = useCallback(async () => {
+    try {
+      const saved = localStorage.getItem("thiraala_categories");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const active = parsed.filter((c: CategoryItem) => c.status !== "inactive");
+          setCategories(active);
+          if (active.length > 0 && !active.some((c: CategoryItem) => c.slug === activeTab)) {
+            setActiveTab(active[0].slug);
+          }
+        }
+      }
+
+      const res = await fetch("/api/categories");
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          const active = data.filter((c: CategoryItem) => c.status !== "inactive");
+          setCategories(active);
+          localStorage.setItem("thiraala_categories", JSON.stringify(data));
+          if (active.length > 0 && !active.some((c: CategoryItem) => c.slug === activeTab)) {
+            setActiveTab(active[0].slug);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load categories:", e);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    fetchCategories();
+
+    const handleUpdate = () => fetchCategories();
+    window.addEventListener("thiraala-categories-updated", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
+
+    return () => {
+      window.removeEventListener("thiraala-categories-updated", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
+    };
+  }, [fetchCategories]);
+
+  if (categories.length === 0) {
+    return null;
+  }
+
+  // Find active category item
+  const currentCategory = categories.find((c) => c.slug === activeTab) || categories[0];
+
+  // Match products by category name or fallback to sareesData
+  const activeProducts = currentCategory
+    ? sareesData.filter(
+        (s) =>
+          s.category.toLowerCase().trim() === currentCategory.name.toLowerCase().trim() ||
+          s.category.toLowerCase().includes(currentCategory.slug.toLowerCase().replace(/-/g, " "))
+      )
+    : [];
+
+  const displayProducts = activeProducts.length > 0 ? activeProducts : sareesData.slice(0, 3);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -108,10 +166,10 @@ export default function CategoryTabs() {
             <div className="relative flex items-center justify-start md:justify-center gap-4 md:gap-6 overflow-x-auto no-scrollbar border-b border-[#1E3A2C]/10 w-full pb-4 whitespace-nowrap select-none px-4 md:px-0">
               {categories.map((tab) => (
                 <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  key={tab.id || tab.slug}
+                  onClick={() => setActiveTab(tab.slug)}
                   className={`relative px-4 py-2 text-xs md:text-sm font-semibold tracking-wide transition-all duration-300 cursor-pointer flex-shrink-0 ${
-                    activeTab === tab.id
+                    activeTab === tab.slug
                       ? "text-[#1E3A2C] font-bold"
                       : "text-[#1E3A2C]/50 hover:text-[#1E3A2C]"
                   }`}
@@ -121,7 +179,7 @@ export default function CategoryTabs() {
                   {/* Local expanding growing active line underline */}
                   <span
                     className={`absolute bottom-[-17px] left-0 right-0 h-[2px] bg-[#0c2b1c] rounded-full transition-transform duration-300 origin-center ${
-                      activeTab === tab.id ? "scale-x-100" : "scale-x-0"
+                      activeTab === tab.slug ? "scale-x-100" : "scale-x-0"
                     }`}
                   />
                 </button>
@@ -131,7 +189,7 @@ export default function CategoryTabs() {
 
           {/* Product Card Grid (Using the CategoryCard component) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10 mb-12">
-            {categoryProducts[activeTab]?.map((product, idx) => {
+            {displayProducts.map((product, idx) => {
               const col = idx % 3;
               const cardVariant = col === 0 ? leftVariant : col === 2 ? rightVariant : centerVariant;
               return (

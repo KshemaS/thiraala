@@ -5,12 +5,12 @@ import Image, { StaticImageData } from "next/image";
 import { useWishlist } from "@/context/WishlistContext";
 
 export interface CategoryProduct {
-  id: number;
+  id: number | string;
   name: string;
   price: string;
-  foldedImg?: StaticImageData;
-  wornImg?: StaticImageData;
-  img?: StaticImageData;
+  foldedImg?: StaticImageData | string;
+  wornImg?: StaticImageData | string;
+  img?: StaticImageData | string;
   altFolded?: string;
   altWorn?: string;
   alt?: string;
@@ -64,11 +64,12 @@ export default function CategoryCard({ product, actionLabel = "Shop Now" }: Cate
         </button>
         {imageSrc && (
           <Image
-            src={imageSrc.src || imageSrc}
+            src={typeof imageSrc === "string" ? imageSrc : imageSrc.src}
             alt={imageAlt}
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
             className="object-cover transition-transform duration-500 group-hover:scale-105 pointer-events-none"
+            unoptimized={typeof imageSrc === "string" && imageSrc.startsWith("data:")}
           />
         )}
       </div>

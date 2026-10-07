@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 
 export interface CartItem {
-  id: number;
+  id: number | string;
   name: string;
   price: string;
   foldedImg?: any;
@@ -14,8 +14,8 @@ export interface CartItem {
 interface CartContextType {
   cart: CartItem[];
   addToCart: (product: any, quantity?: number) => void;
-  removeFromCart: (id: number) => void;
-  updateQuantity: (id: number, quantity: number) => void;
+  removeFromCart: (id: number | string) => void;
+  updateQuantity: (id: number | string, quantity: number) => void;
   clearCart: () => void;
   cartCount: number;
   cartTotal: number;
@@ -65,9 +65,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     showToast(`${quantity} x ${product.name} added to cart`);
   };
 
-  const removeFromCart = (id: number) => {
-    const itemToRemove = cart.find((item) => item.id === id);
-    const updated = cart.filter((item) => item.id !== id);
+  const removeFromCart = (id: number | string) => {
+    const itemToRemove = cart.find((item) => String(item.id) === String(id));
+    const updated = cart.filter((item) => String(item.id) !== String(id));
     setCart(updated);
     localStorage.setItem("thiraala_cart", JSON.stringify(updated));
     if (itemToRemove) {
@@ -75,12 +75,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateQuantity = (id: number, quantity: number) => {
+  const updateQuantity = (id: number | string, quantity: number) => {
     if (quantity <= 0) {
       removeFromCart(id);
       return;
     }
-    const updated = cart.map((item) => (item.id === id ? { ...item, quantity } : item));
+    const updated = cart.map((item) => (String(item.id) === String(id) ? { ...item, quantity } : item));
     setCart(updated);
     localStorage.setItem("thiraala_cart", JSON.stringify(updated));
   };

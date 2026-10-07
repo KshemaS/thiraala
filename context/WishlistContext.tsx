@@ -1,9 +1,10 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 
 export interface SareeProduct {
-  id: number;
+  id: number | string;
+  productId?: number | string;
   name: string;
   price: string;
   foldedImg?: any;
@@ -12,56 +13,202 @@ export interface SareeProduct {
   altFolded?: string;
   altWorn?: string;
   category?: string;
+  createdAt?: string;
 }
 
 interface WishlistContextType {
   wishlist: SareeProduct[];
-  toggleWishlist: (product: SareeProduct) => void;
-  isInWishlist: (id: number) => boolean;
+  isLoading: boolean;
+  addToWishlist: (product: SareeProduct) => Promise<void>;
+  removeFromWishlist: (id: number | string) => Promise<void>;
+  clearWishlist: () => Promise<void>;
+  toggleWishlist: (product: SareeProduct) => Promise<void>;
+  isInWishlist: (id: number | string) => boolean;
+  refreshWishlist: () => Promise<void>;
 }
 
 const WishlistContext = createContext<WishlistContextType | undefined>(undefined);
 
+const STORAGE_KEY = "thiraala_wishlist";
+
 export function WishlistProvider({ children }: { children: React.ReactNode }) {
   const [wishlist, setWishlist] = useState<SareeProduct[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [toast, setToast] = useState<{ message: string; show: boolean }>({ message: "", show: false });
-
-  // Load wishlist from localStorage on mount
-  useEffect(() => {
-    const stored = localStorage.getItem("thiraala_wishlist");
-    if (stored) {
-      try {
-        setWishlist(JSON.parse(stored));
-      } catch (e) {
-        console.error("Failed to load wishlist", e);
-      }
-    }
-  }, []);
-
-  const toggleWishlist = (product: SareeProduct) => {
-    let updated: SareeProduct[];
-    const exists = wishlist.some((item) => item.id === product.id);
-
-    if (exists) {
-      updated = wishlist.filter((item) => item.id !== product.id);
-      showToast(`${product.name} removed from wishlist`);
-    } else {
-      updated = [...wishlist, product];
-      showToast(`${product.name} added to wishlist`);
-    }
-
-    setWishlist(updated);
-    localStorage.setItem("thiraala_wishlist", JSON.stringify(updated));
-  };
-
-  const isInWishlist = (id: number) => {
-    return wishlist.some((item) => item.id === id);
-  };
 
   const showToast = (message: string) => {
     setToast({ message, show: true });
   };
 
+  // Helper to get active user ID / email if logged in
+  const getUserId = (): string | null => {
+    try {
+      const stored = localStorage.getItem("thiraala_user");
+      if (stored) {
+        const u = JSON.parse(stored);
+        return u?.id || u?.email || null;
+      }
+    } catch {
+      // Ignore
+    }
+    return null;
+  };
+
+  // Fetch wishlist from API (READ)
+  const refreshWishlist = useCallback(async () => {
+    try {
+      const userId = getUserId();
+      const url = userId ? `/api/wishlist?userId=${encodeURIComponent(userId)}` : "/api/wishlist";
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.items)) {
+          // Normalize items format
+          const formatted: SareeProduct[] = data.items.map((it: any) => ({
+            id: it.productId !== undefined ? it.productId : it.id,
+            productId: it.productId,
+            name: it.name,
+            price: it.price,
+            foldedImg: it.foldedImg || it.img,
+            wornImg: it.wornImg || it.img,
+            img: it.img || it.foldedImg || it.wornImg,
+            altFolded: it.altFolded || it.name,
+            altWorn: it.altWorn || it.name,
+            category: it.category,
+            createdAt: it.createdAt,
+          }));
+
+          setWishlist(formatted);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(formatted));
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch wishlist from API:", e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Initial load: Fast optimistic localStorage restore, then fetch from API
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setWishlist(parsed);
+        }
+      } catch (e) {
+        console.error("Failed to load wishlist from localStorage", e);
+      }
+    }
+
+    refreshWishlist();
+  }, [refreshWishlist]);
+
+  // CREATE: Add item to wishlist
+  const addToWishlist = async (product: SareeProduct) => {
+    const exists = wishlist.some((item) => String(item.id) === String(product.id));
+    if (exists) {
+      showToast(`${product.name} is already in your wishlist`);
+      return;
+    }
+
+    // Optimistic UI update
+    const updated = [product, ...wishlist];
+    setWishlist(updated);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    showToast(`${product.name} added to wishlist`);
+
+    // API call (POST /api/wishlist)
+    try {
+      const userId = getUserId();
+      await fetch("/api/wishlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: product.id,
+          name: product.name,
+          price: product.price,
+          foldedImg: typeof product.foldedImg === "string" ? product.foldedImg : null,
+          wornImg: typeof product.wornImg === "string" ? product.wornImg : null,
+          img: typeof product.img === "string" ? product.img : null,
+          altFolded: product.altFolded || product.name,
+          altWorn: product.altWorn || product.name,
+          category: product.category,
+          userId,
+        }),
+      });
+    } catch (err) {
+      console.error("Failed to sync add to wishlist API:", err);
+    }
+  };
+
+  // DELETE: Remove item from wishlist
+  const removeFromWishlist = async (id: number | string) => {
+    const itemToRemove = wishlist.find((item) => String(item.id) === String(id));
+    const updated = wishlist.filter((item) => String(item.id) !== String(id));
+
+    // Optimistic UI update
+    setWishlist(updated);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    if (itemToRemove) {
+      showToast(`${itemToRemove.name} removed from wishlist`);
+    }
+
+    // API call (DELETE /api/wishlist?productId=...)
+    try {
+      const userId = getUserId();
+      const params = new URLSearchParams({ productId: String(id) });
+      if (userId) params.append("userId", userId);
+
+      await fetch(`/api/wishlist?${params.toString()}`, {
+        method: "DELETE",
+      });
+    } catch (err) {
+      console.error("Failed to sync remove from wishlist API:", err);
+    }
+  };
+
+  // DELETE ALL: Clear entire wishlist
+  const clearWishlist = async () => {
+    if (wishlist.length === 0) return;
+
+    // Optimistic UI update
+    setWishlist([]);
+    localStorage.removeItem(STORAGE_KEY);
+    showToast("Wishlist cleared");
+
+    // API call (DELETE /api/wishlist?clearAll=true)
+    try {
+      const userId = getUserId();
+      const params = new URLSearchParams({ clearAll: "true" });
+      if (userId) params.append("userId", userId);
+
+      await fetch(`/api/wishlist?${params.toString()}`, {
+        method: "DELETE",
+      });
+    } catch (err) {
+      console.error("Failed to sync clear wishlist API:", err);
+    }
+  };
+
+  // TOGGLE: Add or Remove
+  const toggleWishlist = async (product: SareeProduct) => {
+    const exists = wishlist.some((item) => String(item.id) === String(product.id));
+    if (exists) {
+      await removeFromWishlist(product.id);
+    } else {
+      await addToWishlist(product);
+    }
+  };
+
+  // Check if item is in wishlist
+  const isInWishlist = (id: number | string) => {
+    return wishlist.some((item) => String(item.id) === String(id));
+  };
+
+  // Toast timer auto-dismiss
   useEffect(() => {
     if (toast.show) {
       const timer = setTimeout(() => {
@@ -72,7 +219,18 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
   }, [toast.show]);
 
   return (
-    <WishlistContext.Provider value={{ wishlist, toggleWishlist, isInWishlist }}>
+    <WishlistContext.Provider
+      value={{
+        wishlist,
+        isLoading,
+        addToWishlist,
+        removeFromWishlist,
+        clearWishlist,
+        toggleWishlist,
+        isInWishlist,
+        refreshWishlist,
+      }}
+    >
       {children}
       {/* Premium Toast Notification */}
       <div

@@ -15,8 +15,10 @@ export default async function ProductDetailPage({
   const { id } = await params;
   const productId = parseInt(id, 10);
 
-  // Find target product
-  const product = sareesData.find((item) => item.id === productId) || sareesData[0];
+  // Find target product by id (matches either number or string or fallback)
+  const product =
+    sareesData.find((item) => String(item.id) === String(id) || item.id === productId) ||
+    sareesData[0];
 
   return (
     <div className="min-h-screen flex flex-col justify-between selection:bg-[#DAA87C]/20 selection:text-[#DAA87C] bg-[#fcfbfa]">

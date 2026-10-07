@@ -4,15 +4,9 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Container from "@/components/Container";
-import RegisterModal from "@/components/RegisterModal";
+import RegisterModal, { UserData } from "@/components/RegisterModal";
 import { useWishlist } from "@/context/WishlistContext";
 import { useCart } from "@/context/CartContext";
-
-interface UserData {
-  firstName: string;
-  lastName: string;
-  email: string;
-}
 
 export default function Header() {
   const [isVisible, setIsVisible] = useState(true);

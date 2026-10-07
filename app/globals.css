@@ -144,7 +144,16 @@ body {
 
 /* Image container styling */
 .image-card {
-  box-shadow: 0 20px 40px rgba(30, 58, 44, 0.06);
+  box-shadow: 0 20px 40px rgba(30, 58, 44, 0.08);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.image-card img {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 /* Animated border for buttons (Border Flow Effect) */

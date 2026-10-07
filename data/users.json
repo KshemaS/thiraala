@@ -1,0 +1,35 @@
+[
+  {
+    "id": "usr_1791392689617_e822d987",
+    "firstName": "Kshema",
+    "lastName": "Shankar",
+    "email": "kshema@thiraala.com",
+    "passwordHash": "4ef2a03664bdd5128829d819c69f032e:a72b66a2c293f5f97386a01f6d8aa8cbef84355b9a6ef675d467d67404050a8ed71b8a969a636ad90a72580dcaaf0a619dfa291ee94e4587ff0b1521ca2cf1a9",
+    "phone": null,
+    "role": "customer",
+    "createdAt": "2026-10-07T17:04:49.609Z",
+    "updatedAt": "2026-10-07T17:04:49.609Z"
+  },
+  {
+    "id": "usr_1791392707806_26fa16da",
+    "firstName": "Ananya",
+    "lastName": "Nair",
+    "email": "ananya@thiraala.com",
+    "passwordHash": "c033e2e86404f5854f4515ad55f840ff:5654c57a6098fdb2d4a7452ed761f73ed298f12b5c9b4c1fc4132256e87d8477233035b04fc897d441f21f6ef0a619745aae57bf7cbcc7f0e8106f59cb27e409",
+    "phone": null,
+    "role": "customer",
+    "createdAt": "2026-10-07T17:05:07.803Z",
+    "updatedAt": "2026-10-07T17:05:07.803Z"
+  },
+  {
+    "id": "usr_1791392970542_eb2d15cb",
+    "firstName": "kshema",
+    "lastName": "shylan",
+    "email": "kshemashylan@gmail.com",
+    "passwordHash": "eff163dccc102647ff67f2faae0db1f2:43627f33865220322e53189597b7b4edd02373125b607fd9366b5ed8582aad761309e67588dd500768d9b3d8d71de8f1bc0d6ca5fe509a56666388a854a3d82c",
+    "phone": null,
+    "role": "customer",
+    "createdAt": "2026-10-07T17:09:30.539Z",
+    "updatedAt": "2026-10-07T17:09:30.539Z"
+  }
+]

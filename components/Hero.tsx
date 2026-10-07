@@ -4,15 +4,55 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import Container from "@/components/Container";
-import honey from '@/public/images/honey.jpeg';
-import kshe from '@/public/images/kshe.jpeg';
-import swa from '@/public/images/swa.jpeg';
 
 export default function Hero() {
   const [scrollY, setScrollY] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
+  const [bannerImages, setBannerImages] = useState({
+    image1: "",
+    image2: "",
+    image3: "",
+  });
 
   useEffect(() => {
+    const fetchBanners = async () => {
+      try {
+        // Read client cache if available
+        const saved = localStorage.getItem("thiraala_hero_banners");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setBannerImages({
+            image1: parsed.image1 || "",
+            image2: parsed.image2 || "",
+            image3: parsed.image3 || "",
+          });
+        }
+
+        // Fetch authoritative configuration from dashboard API
+        const res = await fetch("/api/banners");
+        if (res.ok) {
+          const data = await res.json();
+          if (data) {
+            setBannerImages({
+              image1: data.image1 || "",
+              image2: data.image2 || "",
+              image3: data.image3 || "",
+            });
+            localStorage.setItem("thiraala_hero_banners", JSON.stringify(data));
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load hero banners from dashboard", e);
+      }
+    };
+
+    fetchBanners();
+
+    // Listen for real-time updates when saved in dashboard
+    const handleUpdate = () => fetchBanners();
+    window.addEventListener("thiraala-banners-updated", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
+
     // Handle scroll positions for interactive parallax effect
     const handleScroll = () => {
       setScrollY(window.scrollY);
@@ -27,6 +67,8 @@ export default function Hero() {
     window.addEventListener("resize", handleResize);
 
     return () => {
+      window.removeEventListener("thiraala-banners-updated", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
       window.removeEventListener("scroll", handleScroll);
       window.removeEventListener("resize", handleResize);
     };
@@ -259,72 +301,84 @@ export default function Hero() {
               </div>
             </div>
 
-            {/* Card 1: Small left (Cream gold saree) */}
-            <motion.div
-              className="w-[75px] sm:w-[150px] lg:w-[180px] h-[75px] sm:h-[150px] lg:h-[180px] self-end flex-shrink-0"
-              variants={cardVariants1}
-              initial="hidden"
-              animate="show"
-              style={{
-                transform: !isMobile ? `translateY(${scrollY * 0.07}px)` : "none"
-              }}
-            >
-              <div className="w-full h-full rounded-[16px] sm:rounded-[32px] overflow-hidden image-card animate-float-slow-1 relative">
-                <Image
-                  src={honey.src}
-                  alt="Elegant cream saree"
-                  fill
-                  sizes="(max-width: 768px) 75px, 180px"
-                  className="object-cover pointer-events-none"
-                  priority
-                />
-              </div>
-            </motion.div>
+            {/* Card 1: Small left (Hero Slot 1) */}
+            {Boolean(bannerImages.image1) && (
+              <motion.div
+                className="w-[75px] sm:w-[150px] lg:w-[180px] h-[75px] sm:h-[150px] lg:h-[180px] self-end flex-shrink-0"
+                variants={cardVariants1}
+                initial="hidden"
+                animate="show"
+                style={{
+                  transform: !isMobile ? `translateY(${scrollY * 0.07}px)` : "none"
+                }}
+              >
+                <div className="w-full h-full rounded-[16px] sm:rounded-[32px] overflow-hidden image-card animate-float-slow-1 relative">
+                  <Image
+                    src={bannerImages.image1}
+                    alt="Hero Banner Slot 1"
+                    fill
+                    sizes="(max-width: 640px) 150px, (max-width: 1024px) 300px, 400px"
+                    className="object-cover pointer-events-none"
+                    priority
+                    quality={95}
+                    unoptimized={typeof bannerImages.image1 === "string" && bannerImages.image1.startsWith("data:")}
+                  />
+                </div>
+              </motion.div>
+            )}
 
-            {/* Card 2: Medium center (Green gold saree) */}
-            <motion.div
-              className="w-[75px] sm:w-[150px] lg:w-[180px] h-[120px] sm:h-[230px] lg:h-[280px] self-end flex-shrink-0"
-              variants={cardVariants2}
-              initial="hidden"
-              animate="show"
-              style={{
-                transform: !isMobile ? `translateY(${scrollY * 0.03}px)` : "none"
-              }}
-            >
-              <div className="w-full h-full rounded-[16px] sm:rounded-[32px] overflow-hidden image-card animate-float-slow-2 relative">
-                <Image
-                  src={kshe.src}
-                  alt="Elegant green saree"
-                  fill
-                  sizes="(max-width: 768px) 75px, 180px"
-                  className="object-cover pointer-events-none"
-                  priority
-                />
-              </div>
-            </motion.div>
+            {/* Card 2: Medium center (Hero Slot 2) */}
+            {Boolean(bannerImages.image2) && (
+              <motion.div
+                className="w-[75px] sm:w-[150px] lg:w-[180px] h-[120px] sm:h-[230px] lg:h-[280px] self-end flex-shrink-0"
+                variants={cardVariants2}
+                initial="hidden"
+                animate="show"
+                style={{
+                  transform: !isMobile ? `translateY(${scrollY * 0.03}px)` : "none"
+                }}
+              >
+                <div className="w-full h-full rounded-[16px] sm:rounded-[32px] overflow-hidden image-card animate-float-slow-2 relative">
+                  <Image
+                    src={bannerImages.image2}
+                    alt="Hero Banner Slot 2"
+                    fill
+                    sizes="(max-width: 640px) 200px, (max-width: 1024px) 450px, 600px"
+                    className="object-cover pointer-events-none"
+                    priority
+                    quality={95}
+                    unoptimized={typeof bannerImages.image2 === "string" && bannerImages.image2.startsWith("data:")}
+                  />
+                </div>
+              </motion.div>
+            )}
 
-            {/* Card 3: Large right (Emerald designer saree) */}
-            <motion.div
-              className="w-[145px] sm:w-[300px] lg:w-[360px] h-[210px] sm:h-[420px] lg:h-[520px] self-end flex-shrink-0"
-              variants={cardVariants3}
-              initial="hidden"
-              animate="show"
-              style={{
-                transform: !isMobile ? `translateY(${scrollY * -0.03}px)` : "none"
-              }}
-            >
-              <div className="w-full h-full rounded-[20px] sm:rounded-[32px] overflow-hidden image-card animate-float-slow-3 relative">
-                <Image
-                  src={swa.src}
-                  alt="Beautiful designer saree"
-                  fill
-                  sizes="(max-width: 768px) 145px, 360px"
-                  className="object-cover pointer-events-none"
-                  priority
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent pointer-events-none" />
-              </div>
-            </motion.div>
+            {/* Card 3: Large right (Hero Slot 3) */}
+            {Boolean(bannerImages.image3) && (
+              <motion.div
+                className="w-[145px] sm:w-[300px] lg:w-[360px] h-[210px] sm:h-[420px] lg:h-[520px] self-end flex-shrink-0"
+                variants={cardVariants3}
+                initial="hidden"
+                animate="show"
+                style={{
+                  transform: !isMobile ? `translateY(${scrollY * -0.03}px)` : "none"
+                }}
+              >
+                <div className="w-full h-full rounded-[20px] sm:rounded-[32px] overflow-hidden image-card animate-float-slow-3 relative">
+                  <Image
+                    src={bannerImages.image3}
+                    alt="Hero Banner Slot 3"
+                    fill
+                    sizes="(max-width: 640px) 300px, (max-width: 1024px) 720px, 1000px"
+                    className="object-cover pointer-events-none"
+                    priority
+                    quality={95}
+                    unoptimized={typeof bannerImages.image3 === "string" && bannerImages.image3.startsWith("data:")}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent pointer-events-none" />
+                </div>
+              </motion.div>
+            )}
 
           </div>
         </div>

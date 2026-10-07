@@ -1,0 +1,152 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  image       String?
+  status      String    @default("active")
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("categories")
+}
+
+model Collection {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  image       String?
+  status      String    @default("active")
+  featured    Boolean   @default(false)
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("collections")
+}
+
+model Product {
+  id               String      @id @default(cuid())
+  sku              String      @unique
+  name             String
+  subtitle         String?
+  slug             String      @unique
+  price            String
+  priceValue       Int
+  mrp              Int?
+  rating           Float?      @default(4.8)
+  ratingCount      Int?        @default(85)
+  selectedColor    String?
+  categoryName     String
+  categoryId       String?
+  category         Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  collectionName   String?
+  collectionId     String?
+  collection       Collection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+  stock            Int         @default(0)
+  fabric           String?
+  sareeFabric      String?
+  color            String?
+  pattern          String?
+  border           String?
+  blouse           String?
+  occasion         String?
+  sareeLength      String?     @default("5.5 metres")
+  blouseLength     String?     @default("0.8 metres")
+  careInstructions String?     @db.Text
+  highlights       String?     @db.Text
+  description      String?
+  foldedImg        String?
+  wornImg          String?
+  altFolded        String?
+  altWorn          String?
+  status           String      @default("active")
+  featured         Boolean     @default(false)
+  isNewArrival     Boolean     @default(false)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@map("products")
+}
+
+model HeroBanner {
+  id        String   @id @default(cuid())
+  imageKey  String   @unique
+  imageUrl  String   @db.Text
+  title     String?
+  subtitle  String?
+  link      String?
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("hero_banners")
+}
+
+model EditorialPhoto {
+  id        String   @id @default(cuid())
+  title     String
+  url       String   @db.Text
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("editorial_photos")
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  name         String
+  role         String   @default("admin")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("admin_users")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  firstName    String
+  lastName     String?
+  email        String   @unique
+  passwordHash String?
+  phone        String?
+  role         String   @default("customer")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("users")
+}
+
+model WishlistItem {
+  id         String   @id @default(cuid())
+  userId     String?
+  productId  String
+  name       String
+  price      String
+  foldedImg  String?  @db.Text
+  wornImg    String?  @db.Text
+  category   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("wishlist_items")
+}
+
+

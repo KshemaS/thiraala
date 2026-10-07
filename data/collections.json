@@ -1,0 +1,38 @@
+[
+  {
+    "id": "col-1",
+    "name": "Onam Collection",
+    "slug": "onam-collection",
+    "description": "Festive celebration sarees crafted with rich golden kasavu weaves and traditional Kerala motifs.",
+    "image": "/images/folded-gopuram.jpeg",
+    "status": "active",
+    "featured": true
+  },
+  {
+    "id": "col-2",
+    "name": "Wedding & Bridal Kasavu",
+    "slug": "wedding-bridal-kasavu",
+    "description": "Grand bridal and festive sets adorned with opulent Gold Zari and auspicious temple drapes.",
+    "image": "/images/gopura.jpeg",
+    "status": "active",
+    "featured": true
+  },
+  {
+    "id": "col-3",
+    "name": "Cotton Classics",
+    "slug": "cotton-classics",
+    "description": "Pure handloom cotton and mul-mul drapes tailored for lightweight breathability and timeless charm.",
+    "image": "/images/shoot.png",
+    "status": "active",
+    "featured": false
+  },
+  {
+    "id": "col-4",
+    "name": "Festive Specials",
+    "slug": "festive-specials",
+    "description": "Vibrant celebratory sarees styled for weddings, temple ceremonies, and cultural gatherings.",
+    "image": "/images/folded-gopuram.jpeg",
+    "status": "active",
+    "featured": false
+  }
+]

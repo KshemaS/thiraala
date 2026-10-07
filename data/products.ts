@@ -1,6 +1,4 @@
 import { StaticImageData } from "next/image";
-
-// Import local fallback image assets statically
 import foldedGopuram from "@/public/images/folded-gopuram.jpeg";
 import gopura from "@/public/images/gopura.jpeg";
 
@@ -8,40 +6,84 @@ export interface SareeProduct {
   id: number;
   sku: string;
   name: string;
+  subtitle?: string;
+  slug?: string;
   price: string;
   priceValue: number;
+  mrp?: number;
+  discountPercent?: number;
+  rating?: number;
+  ratingCount?: number;
+  selectedColor?: string;
   category: string;
-  foldedImg: StaticImageData;
-  wornImg: StaticImageData;
+  foldedImg: StaticImageData | string;
+  wornImg: StaticImageData | string;
   altFolded: string;
   altWorn: string;
   fabric: string;
+  sareeFabric?: string;
   color: string;
   pattern?: string;
+  border?: string;
+  blouse?: string;
+  occasion?: string;
+  sareeLength?: string;
+  blouseLength?: string;
+  careInstructions?: string;
+  highlights?: string[] | string;
+  description?: string;
   stock?: number;
+  status?: string;
+  collection?: string;
+  featured?: boolean;
+  isNewArrival?: boolean;
+  priority?: boolean;
 }
 
 export const sareesData: SareeProduct[] = [
   {
     id: 1,
-    sku: "SAR_TIS_01",
-    name: "Thumba Saree",
-    price: "₹1,350",
-    priceValue: 1350,
-    category: "Tissue Set Saree",
+    sku: "THR-1042",
+    name: "Painted Lily Motif Kerala Cotton Saree",
+    subtitle: "Painted Lily Motif Kerala Cotton Saree with Blouse Piece",
+    slug: "painted-lily-motif-kerala-cotton-saree",
+    price: "₹1,499",
+    priceValue: 1499,
+    mrp: 4997,
+    rating: 4.8,
+    ratingCount: 85,
+    selectedColor: "Wine Lily",
+    category: "Cotton Saree",
     foldedImg: foldedGopuram,
     wornImg: gopura,
-    altFolded: "Folded Thumba Saree",
-    altWorn: "Model wearing Thumba Saree",
-    fabric: "Golden Tissue Set Saree",
-    color: "Green and Golden",
-    pattern: "Gold Zari",
-    stock: 0,
+    altFolded: "Folded Painted Lily Motif Kerala Cotton Saree",
+    altWorn: "Model wearing Painted Lily Motif Kerala Cotton Saree",
+    fabric: "Cotton",
+    sareeFabric: "Kerala Cotton",
+    color: "Wine Lily",
+    pattern: "Floral",
+    border: "Solid",
+    blouse: "Running blouse",
+    occasion: "Festive",
+    sareeLength: "5.5 metres",
+    blouseLength: "0.8 metres",
+    careInstructions: "Care: [confirm care instructions]",
+    highlights: [
+      "Off-white saree with painted lily motifs",
+      "Contrast wine border on both edges",
+      "Comes with a matching blouse piece",
+    ],
+    description:
+      "An off-white Kerala cotton saree with deep wine lilies painted across the pallu and pleats, framed by a slim contrast border. Light enough for long festive days, rooted in the coast it comes from.",
+    stock: 15,
+    status: "active",
+    collection: "Onam Collection",
   },
   {
     id: 2,
     sku: "SAR_COT_002",
     name: "Puliyilakkara",
+    slug: "puliyilakkara",
     price: "₹499",
     priceValue: 499,
     category: "Cotton Set Saree",
@@ -51,13 +93,17 @@ export const sareesData: SareeProduct[] = [
     altWorn: "Model wearing Puliyilakkara Saree",
     fabric: "Cotton Set Saree",
     color: "Brown Line",
-    pattern: "",
-    stock: 1,
+    pattern: "Classic Kerala Border",
+    stock: 12,
+    description:
+      "Authentic Puliyilakkara fine cotton set saree featuring classic earthy border tones and breathable weave.",
+    status: "active",
   },
   {
     id: 3,
     sku: "SAR_MUL_003",
     name: "Mul Cotton White",
+    slug: "mul-cotton-white",
     price: "₹1,090",
     priceValue: 1090,
     category: "Mul Mul Cotton",
@@ -67,13 +113,17 @@ export const sareesData: SareeProduct[] = [
     altWorn: "Model wearing Mul Cotton White Saree",
     fabric: "Mul Mul Cotton",
     color: "White and Golden",
-    pattern: "",
-    stock: 2,
+    pattern: "Subtle Kasavu Accents",
+    stock: 8,
+    description:
+      "Ultra-soft Mul Mul Cotton saree in pristine white with delicate golden kasavu touches.",
+    status: "active",
   },
   {
     id: 4,
     sku: "SAR_TIS_04",
     name: "Vaka Saree",
+    slug: "vaka-saree",
     price: "₹1,250",
     priceValue: 1250,
     category: "Tissue Set Saree",
@@ -84,12 +134,16 @@ export const sareesData: SareeProduct[] = [
     fabric: "Golden Tissue Set Saree",
     color: "Green and Golden",
     pattern: "Gold Zari",
-    stock: 0,
+    stock: 5,
+    description:
+      "Lustrous golden tissue saree adorned with rich woven zari motifs for festive occasions.",
+    status: "active",
   },
   {
     id: 5,
     sku: "SAR_CHA_005",
     name: "Chanderi Fire",
+    slug: "chanderi-fire",
     price: "₹1,950",
     priceValue: 1950,
     category: "Mul Chanderi",
@@ -100,12 +154,16 @@ export const sareesData: SareeProduct[] = [
     fabric: "Mul Chanderi",
     color: "Golden And White",
     pattern: "Plain with Golden Embroidery work",
-    stock: 0,
+    stock: 3,
+    description:
+      "Exclusive Mul Chanderi fabric with opulent golden embroidery and shimmering drape.",
+    status: "active",
   },
   {
     id: 6,
     sku: "SAR_COT_006",
     name: "Chemparuthi Saree",
+    slug: "chemparuthi-saree",
     price: "₹899",
     priceValue: 899,
     category: "Cotton Saree",
@@ -116,12 +174,16 @@ export const sareesData: SareeProduct[] = [
     fabric: "Cotton Saree",
     color: "White",
     pattern: "White plain saree with Chemparuthy design printed",
-    stock: 1,
+    stock: 7,
+    description:
+      "Graceful pure cotton saree featuring vibrant floral Chemparuthi (Hibiscus) motif prints.",
+    status: "active",
   },
   {
     id: 7,
     sku: "SAR_COT_036",
     name: "Green Leaf Set Saree",
+    slug: "green-leaf-set-saree",
     price: "₹1,399",
     priceValue: 1399,
     category: "Cotton Set Saree",
@@ -132,12 +194,16 @@ export const sareesData: SareeProduct[] = [
     fabric: "Cotton Set Saree",
     color: "White and light green",
     pattern: "White set saree with green leaves digital printed",
-    stock: 0,
+    stock: 4,
+    description:
+      "Nature-inspired botanical print saree with hand-finished borders on fine combed cotton.",
+    status: "active",
   },
   {
     id: 8,
     sku: "SAR_COT_037",
     name: "Red line set saree",
+    slug: "red-line-set-saree",
     price: "₹950",
     priceValue: 950,
     category: "Cotton Set Saree",
@@ -148,7 +214,10 @@ export const sareesData: SareeProduct[] = [
     fabric: "Cotton Set Saree",
     color: "White and red",
     pattern: "White set saree with golden zari line",
-    stock: 0,
+    stock: 6,
+    description:
+      "Traditional off-white cotton saree highlighted by a striking crimson edge and fine golden zari line.",
+    status: "active",
   },
   {
     id: 9,
@@ -327,3 +396,5 @@ export const sareesData: SareeProduct[] = [
     stock: 1,
   },
 ];
+
+export default sareesData;
