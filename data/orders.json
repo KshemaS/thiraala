@@ -1,0 +1,342 @@
+[
+  {
+    "id": "THR-1087",
+    "customerName": "Gouri Shankar",
+    "phone": "9876543210",
+    "email": "gouri@example.com",
+    "address": "Kalyan Nagar, Kozhikode, Kerala",
+    "city": "",
+    "pincode": "",
+    "items": [
+      {
+        "id": "1",
+        "productId": "1",
+        "sku": "THR-SKU-1",
+        "name": "Painted Lily Motif Kerala Cotton Saree",
+        "price": "₹1,499",
+        "priceValue": 1499,
+        "quantity": 1,
+        "foldedImg": "/images/folded-gopuram.jpeg",
+        "wornImg": "/images/gopura.jpeg",
+        "category": "Handloom Saree",
+        "selectedColor": ""
+      }
+    ],
+    "total": 1499,
+    "subtotal": 1499,
+    "deliveryFee": 0,
+    "discount": 0,
+    "paymentMethod": "COD",
+    "paymentStatus": "Pending",
+    "status": "Shipped",
+    "trackingNumber": "DLV-448201",
+    "courierName": "Delhivery",
+    "notes": "",
+    "trackingTimeline": [
+      {
+        "title": "Order Placed",
+        "description": "Order placed successfully via Cash on Delivery.",
+        "timestamp": "2026-10-10T09:18:30.351Z",
+        "completed": true
+      },
+      {
+        "title": "Order Confirmed & Packing",
+        "description": "Artisanal handloom drape undergoing inspection and heritage packaging.",
+        "timestamp": "2026-10-10T09:18:55.863Z",
+        "completed": true
+      },
+      {
+        "title": "Handed to Courier",
+        "description": "Dispatched via Delhivery (Tracking: DLV-448201).",
+        "timestamp": "2026-10-10T09:18:55.863Z",
+        "completed": true
+      },
+      {
+        "title": "Out for Delivery",
+        "description": "Courier agent will arrive at your shipping address.",
+        "timestamp": "",
+        "completed": false
+      },
+      {
+        "title": "Delivered",
+        "description": "Order completed and delivered to customer.",
+        "timestamp": "",
+        "completed": false
+      }
+    ],
+    "createdAt": "2026-10-10T09:18:30.351Z",
+    "updatedAt": "2026-10-10T09:18:55.863Z"
+  },
+  {
+    "id": "THR-1081",
+    "customerName": "Ananya Nair",
+    "email": "ananya.nair@gmail.com",
+    "phone": "9847123456",
+    "address": "Flat 4B, Skyview Palms, MG Road, Ernakulam, Kerala - 682016",
+    "city": "Kochi",
+    "pincode": "682016",
+    "total": 1350,
+    "subtotal": 1350,
+    "deliveryFee": 0,
+    "discount": 0,
+    "paymentMethod": "UPI",
+    "paymentStatus": "Paid",
+    "status": "Delivered",
+    "trackingNumber": "DTDC-88492019",
+    "courierName": "DTDC Express",
+    "notes": "Hand-delivered at residence. Customer accepted package.",
+    "items": [
+      {
+        "id": "1",
+        "productId": "1",
+        "sku": "SAR_TIS_01",
+        "name": "Thumba Golden Tissue Saree",
+        "price": "₹1,350",
+        "priceValue": 1350,
+        "quantity": 1,
+        "foldedImg": "/images/folded-gopuram.jpeg",
+        "wornImg": "/images/gopura.jpeg",
+        "category": "Tissue Saree",
+        "selectedColor": "Gold"
+      }
+    ],
+    "trackingTimeline": [
+      {
+        "title": "Order Placed",
+        "description": "Order received and confirmed via UPI payment.",
+        "timestamp": "2026-08-28T09:30:00Z",
+        "completed": true
+      },
+      {
+        "title": "Quality Checked & Packed",
+        "description": "Fabric quality verified, carefully packed in artisanal eco-box.",
+        "timestamp": "2026-08-28T14:15:00Z",
+        "completed": true
+      },
+      {
+        "title": "Dispatched with DTDC",
+        "description": "Consignment dispatched via DTDC Express (Tracking: DTDC-88492019).",
+        "timestamp": "2026-08-29T10:00:00Z",
+        "completed": true
+      },
+      {
+        "title": "Out for Delivery",
+        "description": "Courier executive out for final mile delivery in Kochi.",
+        "timestamp": "2026-08-30T09:00:00Z",
+        "completed": true
+      },
+      {
+        "title": "Delivered",
+        "description": "Package handed over directly to recipient.",
+        "timestamp": "2026-08-30T13:45:00Z",
+        "completed": true
+      }
+    ],
+    "createdAt": "2026-08-28T09:30:00.000Z",
+    "updatedAt": "2026-08-30T13:45:00.000Z"
+  },
+  {
+    "id": "THR-1082",
+    "customerName": "Rahul Krishnan",
+    "email": "rahul.k@yahoo.com",
+    "phone": "9446012345",
+    "address": "TC 14/892, Kowdiar Post, Thiruvananthapuram, Kerala - 695003",
+    "city": "Thiruvananthapuram",
+    "pincode": "695003",
+    "total": 499,
+    "subtotal": 499,
+    "deliveryFee": 0,
+    "discount": 0,
+    "paymentMethod": "COD",
+    "paymentStatus": "Pending",
+    "status": "Shipped",
+    "trackingNumber": "DLV-9938201",
+    "courierName": "Delhivery",
+    "notes": "Call customer before arrival.",
+    "items": [
+      {
+        "id": "2",
+        "productId": "2",
+        "sku": "SAR_COT_002",
+        "name": "Puliyilakkara Cotton Set Saree",
+        "price": "₹499",
+        "priceValue": 499,
+        "quantity": 1,
+        "foldedImg": "/images/folded-gopuram.jpeg",
+        "wornImg": "/images/gopura.jpeg",
+        "category": "Cotton Set Saree",
+        "selectedColor": "Brown Line"
+      }
+    ],
+    "trackingTimeline": [
+      {
+        "title": "Order Placed",
+        "description": "Order placed using Cash on Delivery (COD).",
+        "timestamp": "2026-08-29T11:20:00Z",
+        "completed": true
+      },
+      {
+        "title": "Quality Checked & Packed",
+        "description": "Traditional handloom drape verified and safely packed.",
+        "timestamp": "2026-08-29T16:00:00Z",
+        "completed": true
+      },
+      {
+        "title": "In Transit via Delhivery",
+        "description": "In transit towards Thiruvananthapuram regional hub (AWB: DLV-9938201).",
+        "timestamp": "2026-08-30T08:30:00Z",
+        "completed": true
+      },
+      {
+        "title": "Out for Delivery",
+        "description": "Package scheduled for door delivery.",
+        "timestamp": "",
+        "completed": false
+      },
+      {
+        "title": "Delivered",
+        "description": "Pending final cash collection and delivery.",
+        "timestamp": "",
+        "completed": false
+      }
+    ],
+    "createdAt": "2026-08-29T11:20:00.000Z",
+    "updatedAt": "2026-08-30T08:30:00.000Z"
+  },
+  {
+    "id": "THR-1083",
+    "customerName": "Divya Menon",
+    "email": "divya.menon@outlook.com",
+    "phone": "9895054321",
+    "address": "House #23, Lakeview Residency, Thevara, Kochi, Kerala - 682013",
+    "city": "Kochi",
+    "pincode": "682013",
+    "total": 2180,
+    "subtotal": 2180,
+    "deliveryFee": 0,
+    "discount": 0,
+    "paymentMethod": "UPI",
+    "paymentStatus": "Paid",
+    "status": "Confirmed",
+    "trackingNumber": "",
+    "courierName": "",
+    "notes": "Gift wrap requested for festival occasion.",
+    "items": [
+      {
+        "id": "3",
+        "productId": "3",
+        "sku": "SAR_MUL_003",
+        "name": "Mul Cotton White Artisan Drape",
+        "price": "₹1,090",
+        "priceValue": 1090,
+        "quantity": 2,
+        "foldedImg": "/images/folded-gopuram.jpeg",
+        "wornImg": "/images/gopura.jpeg",
+        "category": "Mul Cotton",
+        "selectedColor": "Pure White"
+      }
+    ],
+    "trackingTimeline": [
+      {
+        "title": "Order Placed",
+        "description": "Order placed and paid via UPI QR.",
+        "timestamp": "2026-08-30T10:15:00Z",
+        "completed": true
+      },
+      {
+        "title": "Order Confirmed",
+        "description": "Order accepted and queued for packing at handloom warehouse.",
+        "timestamp": "2026-08-30T11:00:00Z",
+        "completed": true
+      },
+      {
+        "title": "Handed to Courier",
+        "description": "Awaiting courier pickup.",
+        "timestamp": "",
+        "completed": false
+      },
+      {
+        "title": "Out for Delivery",
+        "description": "In transit to recipient address.",
+        "timestamp": "",
+        "completed": false
+      },
+      {
+        "title": "Delivered",
+        "description": "Pending final delivery.",
+        "timestamp": "",
+        "completed": false
+      }
+    ],
+    "createdAt": "2026-08-30T10:15:00.000Z",
+    "updatedAt": "2026-08-30T11:00:00.000Z"
+  },
+  {
+    "id": "THR-1084",
+    "customerName": "Meera Pillai",
+    "email": "meera.pillai@gmail.com",
+    "phone": "9745123890",
+    "address": "Sree Nilayam, Near Temple Gate, Vaikom, Kottayam, Kerala - 686141",
+    "city": "Kottayam",
+    "pincode": "686141",
+    "total": 1250,
+    "subtotal": 1250,
+    "deliveryFee": 0,
+    "discount": 0,
+    "paymentMethod": "COD",
+    "paymentStatus": "Pending",
+    "status": "Pending",
+    "trackingNumber": "",
+    "courierName": "",
+    "notes": "Customer requested delivery between 2 PM and 5 PM.",
+    "items": [
+      {
+        "id": "4",
+        "productId": "4",
+        "sku": "SAR_TIS_04",
+        "name": "Vaka Festive Saree",
+        "price": "₹1,250",
+        "priceValue": 1250,
+        "quantity": 1,
+        "foldedImg": "/images/folded-gopuram.jpeg",
+        "wornImg": "/images/gopura.jpeg",
+        "category": "Tissue Saree",
+        "selectedColor": "Kasavu Gold"
+      }
+    ],
+    "trackingTimeline": [
+      {
+        "title": "Order Placed",
+        "description": "New order received. Awaiting order confirmation from merchant.",
+        "timestamp": "2026-08-30T14:40:00Z",
+        "completed": true
+      },
+      {
+        "title": "Order Confirmed",
+        "description": "Pending store confirmation.",
+        "timestamp": "",
+        "completed": false
+      },
+      {
+        "title": "Handed to Courier",
+        "description": "Pending dispatch.",
+        "timestamp": "",
+        "completed": false
+      },
+      {
+        "title": "Out for Delivery",
+        "description": "Pending courier arrival.",
+        "timestamp": "",
+        "completed": false
+      },
+      {
+        "title": "Delivered",
+        "description": "Pending delivery.",
+        "timestamp": "",
+        "completed": false
+      }
+    ],
+    "createdAt": "2026-08-30T14:40:00.000Z",
+    "updatedAt": "2026-08-30T14:40:00.000Z"
+  }
+]

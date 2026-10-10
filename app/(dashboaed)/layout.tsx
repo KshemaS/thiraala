@@ -18,6 +18,7 @@ import {
   Package,
   Plus,
   Layers,
+  ShoppingBag,
 } from "lucide-react";
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
@@ -110,6 +111,21 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
             </svg>
             Overview Console
+          </Link>
+
+          {/* Orders & Tracking Navigation */}
+          <Link
+            href="/dashboard/orders"
+            className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+              pathname.startsWith("/dashboard/orders")
+                ? "bg-[#FAF8F5]/15 text-white shadow-xs"
+                : "text-[#FAF8F5]/70 hover:text-white hover:bg-[#FAF8F5]/5"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <ShoppingBag className="w-5 h-5 text-[#DAA87C]" />
+              <span>Orders & Tracking</span>
+            </div>
           </Link>
 
           {/* Products Section with Submenus */}
@@ -312,6 +328,22 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
             </svg>
             Overview Console
+          </Link>
+
+          {/* Mobile Orders & Tracking Navigation */}
+          <Link
+            href="/dashboard/orders"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+              pathname.startsWith("/dashboard/orders")
+                ? "bg-[#FAF8F5]/15 text-white shadow-xs"
+                : "text-[#FAF8F5]/70 hover:text-white hover:bg-[#FAF8F5]/5"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <ShoppingBag className="w-5 h-5 text-[#DAA87C]" />
+              <span>Orders & Tracking</span>
+            </div>
           </Link>
 
           {/* Mobile Products Section */}

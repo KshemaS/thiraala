@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { sareesData, SareeProduct } from "@/data/products";
 
@@ -101,6 +102,38 @@ export default function DashboardPage() {
       status: "Delivered",
     },
   ]);
+
+  // Sync with live orders from API
+  useEffect(() => {
+    const fetchLiveOrders = async () => {
+      try {
+        const res = await fetch("/api/orders");
+        const data = await res.json();
+        if (data.success && Array.isArray(data.orders) && data.orders.length > 0) {
+          const mapped: Order[] = data.orders.map((o: any) => ({
+            id: o.id,
+            customerName: o.customerName,
+            email: o.email || o.phone,
+            date: new Date(o.createdAt).toISOString().split("T")[0],
+            sku: o.items?.[0]?.sku || "SAR_DRP",
+            productName: o.items?.[0]?.name || "Handloom Saree",
+            quantity: o.items?.reduce((sum: number, it: any) => sum + (it.quantity || 1), 0) || 1,
+            total: o.total,
+            status: (o.status === "Confirmed" ? "Pending" : o.status) as any,
+          }));
+          setOrders(mapped);
+        }
+      } catch (err) {
+        console.error("Failed to load live orders for overview:", err);
+      }
+    };
+
+    fetchLiveOrders();
+    window.addEventListener("thiraala-orders-updated", fetchLiveOrders);
+    return () => {
+      window.removeEventListener("thiraala-orders-updated", fetchLiveOrders);
+    };
+  }, []);
 
   const [messages, setMessages] = useState<CustomerMessage[]>([
     {
@@ -529,7 +562,16 @@ export default function DashboardPage() {
                   <p className="text-[11px] text-[#1E3A2C]/50">Search, track, and update customer order fulfillment statuses</p>
                 </div>
 
-                <div className="flex flex-wrap gap-2.5">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <Link
+                    href="/dashboard/orders"
+                    className="px-3.5 py-1.5 bg-[#1E3A2C] hover:bg-[#0c2b1c] text-white rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-2xs"
+                  >
+                    <span>Full Orders & Tracking Console</span>
+                    <svg className="w-3.5 h-3.5 text-[#DAA87C]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </Link>
                   {/* Search */}
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#1E3A2C]/10 bg-[#FAF8F5] text-xs">
                     <svg className="w-4 h-4 text-[#1E3A2C]/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">

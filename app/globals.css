@@ -36,6 +36,7 @@
   --animate-saree-wave-2: sareeWave2 26s ease-in-out infinite;
   --animate-saree-wave-3: sareeWave3 30s ease-in-out infinite;
   --animate-spin-slow: spin 45s linear infinite;
+  --animate-scan-laser: scan-laser 2.5s ease-in-out infinite;
 }
 
 @keyframes scrollWheel {
@@ -125,6 +126,19 @@
   50% {
     transform: translate(8px, -6px) rotate(0.5deg) scale(1.01);
   }
+}
+
+@keyframes scan-laser {
+  0%, 100% {
+    transform: translateY(-70px);
+  }
+  50% {
+    transform: translateY(70px);
+  }
+}
+
+.animate-scan-laser {
+  animation: scan-laser 2.5s ease-in-out infinite;
 }
 
 body {

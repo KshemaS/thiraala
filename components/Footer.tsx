@@ -53,6 +53,9 @@ export default function Footer() {
             <h4 className="text-[#1E3A2C] font-bold text-sm tracking-wide">Customer Support</h4>
             <ul className="flex flex-col gap-2.5 text-[#1E3A2C]/70 text-xs md:text-sm">
               <li>
+                <Link href="/track-order" className="hover:text-[#0c2b1c] font-bold text-[#DAA87C] transition-colors">Track Your Order</Link>
+              </li>
+              <li>
                 <a href="#" className="hover:text-[#0c2b1c] transition-colors">Boutique Heritage</a>
               </li>
               <li>

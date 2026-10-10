@@ -14,23 +14,66 @@ export default function CartPage() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isOrderPlaced, setIsOrderPlaced] = useState(false);
   const [orderTotal, setOrderTotal] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdOrder, setCreatedOrder] = useState<any>(null);
 
   // Checkout Form State
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"COD" | "UPI">("COD");
 
-  const handlePlaceOrder = (e: React.FormEvent) => {
+  const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    setOrderTotal(cartTotal);
-    setIsOrderPlaced(true);
-    setIsCheckoutOpen(false);
-    clearCart();
+    if (cart.length === 0) return;
 
-    // Reset Form
-    setName("");
-    setPhone("");
-    setAddress("");
+    setIsSubmitting(true);
+    const finalTotal = cartTotal;
+    setOrderTotal(finalTotal);
+
+    try {
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerName: name,
+          phone,
+          email,
+          address,
+          paymentMethod,
+          total: finalTotal,
+          subtotal: finalTotal,
+          items: cart,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success && data.order) {
+        setCreatedOrder(data.order);
+        setIsOrderPlaced(true);
+        setIsCheckoutOpen(false);
+        clearCart();
+
+        // Notify dashboard / other listeners in case an admin tab is open
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("thiraala-orders-updated"));
+        }
+
+        // Reset form
+        setName("");
+        setPhone("");
+        setEmail("");
+        setAddress("");
+      } else {
+        alert(data.error || "Failed to place order. Please try again.");
+      }
+    } catch (error) {
+      console.error("Order placement error:", error);
+      alert("Something went wrong while placing your order. Please check your connection.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -51,53 +94,76 @@ export default function CartPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-[#1E3A2C]">Order Placed Successfully!</h2>
-              <p className="text-xs text-[#1E3A2C]/65 mt-3 leading-relaxed font-semibold">
-                Thank you for your order. We are preparing your handwoven drapes. A confirmation message will be sent to your number shortly.
-              </p>
 
-              {/* UPI Payment QR Code Section */}
-              <div className="mt-8 p-6 bg-white border border-[#1E3A2C]/10 rounded-3xl shadow-sm flex flex-col items-center max-w-sm w-full mx-auto">
-                <span className="text-[10px] font-bold text-[#DAA87C] uppercase tracking-wider mb-2">Scan to Pay via UPI</span>
-                
-                {/* QR Image with scanner lines */}
-                <div className="relative w-44 h-44 border border-[#1E3A2C]/5 rounded-2xl p-2 bg-[#fcfbfa] flex items-center justify-center overflow-hidden">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-                      `upi://pay?pa=thiraala@okaxis&pn=thiraala&am=${orderTotal}&cu=INR`
-                    )}&color=1e3a2c`}
-                    alt="UPI QR Code"
-                    className="w-40 h-40 object-contain rounded-xl select-none"
-                  />
-                  {/* Scanner laser line animation */}
-                  <div
-                    className="absolute left-0 right-0 h-[2.5px] bg-[#DAA87C] opacity-60 shadow-[0_0_8px_#DAA87C]"
-                    style={{ animation: 'scan-laser 2.5s ease-in-out infinite' }}
-                  />
-                  <style>{`
-                    @keyframes scan-laser {
-                      0%, 100% { transform: translateY(-70px); }
-                      50% { transform: translateY(70px); }
-                    }
-                  `}</style>
-                </div>
-                
-                <span className="text-xs font-extrabold text-[#1E3A2C] mt-4">Amount: Rs. {orderTotal.toLocaleString()}</span>
-                <p className="text-[10px] text-[#1E3A2C]/50 mt-1.5 font-semibold text-center leading-relaxed">
-                  Scan this QR code using GPAY, PhonePe, Paytm, or any UPI app to complete payment.
-                </p>
+              <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[#1E3A2C]/5 border border-[#1E3A2C]/10 text-xs font-bold text-[#1E3A2C] mb-2">
+                <span>Order ID:</span>
+                <span className="text-[#DAA87C] font-extrabold">{createdOrder?.id || "THR-1087"}</span>
               </div>
 
-              <Link
-                href="/products"
-                onClick={() => setIsOrderPlaced(false)}
-                className="mt-8 px-8 py-3.5 text-xs font-bold btn-animate-border btn-animate-border-dark rounded-full shadow-md shadow-[#1E3A2C]/10 transition-all hover:scale-[1.02] inline-flex items-center gap-1.5 group cursor-pointer text-white"
-              >
-                Continue Shopping
-                <svg className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                </svg>
-              </Link>
+              <h2 className="text-2xl font-bold text-[#1E3A2C]">Order Placed Successfully!</h2>
+              <p className="text-xs text-[#1E3A2C]/65 mt-2 leading-relaxed font-semibold">
+                Thank you for your order. We are preparing your handwoven drapes. You can track its live fulfillment journey right here.
+              </p>
+
+              {/* UPI Payment QR Code Section (if UPI) or COD info */}
+              {createdOrder?.paymentMethod === "UPI" ? (
+                <div className="mt-8 p-6 bg-white border border-[#1E3A2C]/10 rounded-3xl shadow-sm flex flex-col items-center max-w-sm w-full mx-auto">
+                  <span className="text-[10px] font-bold text-[#DAA87C] uppercase tracking-wider mb-2">Scan to Pay via UPI</span>
+                  
+                  {/* QR Image with scanner lines */}
+                  <div className="relative w-44 h-44 border border-[#1E3A2C]/5 rounded-2xl p-2 bg-[#fcfbfa] flex items-center justify-center overflow-hidden">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+                        `upi://pay?pa=thiraala@okaxis&pn=thiraala&am=${orderTotal}&cu=INR`
+                      )}&color=1e3a2c`}
+                      alt="UPI QR Code"
+                      className="w-40 h-40 object-contain rounded-xl select-none"
+                    />
+                    {/* Scanner laser line animation */}
+                    <div className="absolute left-0 right-0 h-[2.5px] bg-[#DAA87C] opacity-60 shadow-[0_0_8px_#DAA87C] animate-scan-laser" />
+                  </div>
+                  
+                  <span className="text-xs font-extrabold text-[#1E3A2C] mt-4">Amount: Rs. {orderTotal.toLocaleString()}</span>
+                  <p className="text-[10px] text-[#1E3A2C]/50 mt-1.5 font-semibold text-center leading-relaxed">
+                    Scan this QR code using GPAY, PhonePe, Paytm, or any UPI app to complete payment.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-6 p-4 bg-emerald-50/60 border border-emerald-100 rounded-2xl flex items-center gap-3 text-left max-w-sm w-full">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-800 flex-shrink-0">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-emerald-950">Cash on Delivery Confirmed</h4>
+                    <p className="text-[11px] text-emerald-800 font-medium mt-0.5">
+                      Pay <span className="font-bold">₹{orderTotal.toLocaleString()}</span> in cash to the courier upon delivery.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons: Track Order & Continue Shopping */}
+              <div className="mt-8 flex flex-col sm:flex-row items-center gap-3 w-full max-w-sm">
+                <Link
+                  href={`/track-order?id=${createdOrder?.id || "THR-1087"}`}
+                  className="w-full sm:flex-1 py-3 px-5 text-xs font-bold bg-[#1E3A2C] hover:bg-[#0c2b1c] text-white rounded-full shadow-md transition-all hover:scale-[1.02] flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <svg className="w-4 h-4 text-[#DAA87C]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                  </svg>
+                  <span>Track Live Order</span>
+                </Link>
+
+                <Link
+                  href="/products"
+                  onClick={() => setIsOrderPlaced(false)}
+                  className="w-full sm:flex-1 py-3 px-5 text-xs font-bold border border-[#1E3A2C]/20 hover:border-[#1E3A2C] text-[#1E3A2C] rounded-full transition-all hover:bg-[#1E3A2C]/5 flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <span>Continue Shopping</span>
+                </Link>
+              </div>
             </motion.div>
           ) : cart.length === 0 ? (
             /* Empty Cart Screen */
@@ -287,7 +353,7 @@ export default function CartPage() {
               <div className="text-center select-none">
                 <h3 className="text-2xl font-bold text-[#1E3A2C] tracking-tight">Checkout</h3>
                 <p className="text-xs text-[#1E3A2C]/65 mt-1 font-semibold">
-                  Complete your purchase via Cash on Delivery
+                  Provide delivery details to complete your order
                 </p>
                 <div className="w-10 h-0.5 bg-[#DAA87C] mx-auto mt-3 rounded-full"></div>
               </div>
@@ -296,7 +362,7 @@ export default function CartPage() {
               <form onSubmit={handlePlaceOrder} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
-                    Full Name
+                    Full Name *
                   </label>
                   <input
                     type="text"
@@ -308,32 +374,85 @@ export default function CartPage() {
                   />
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
-                    Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="Enter your 10-digit number"
-                    className="w-full h-12 px-4 rounded-xl border border-[#DAA87C]/50 text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#1E3A2C] focus:ring-1 focus:ring-[#1E3A2C] outline-none bg-white transition-all"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                      Phone Number *
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="10-digit mobile"
+                      className="w-full h-12 px-4 rounded-xl border border-[#DAA87C]/50 text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#1E3A2C] focus:ring-1 focus:ring-[#1E3A2C] outline-none bg-white transition-all"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="For tracking receipt"
+                      className="w-full h-12 px-4 rounded-xl border border-[#DAA87C]/50 text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#1E3A2C] focus:ring-1 focus:ring-[#1E3A2C] outline-none bg-white transition-all"
+                    />
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
-                    Delivery Address
+                    Delivery Address *
                   </label>
                   <textarea
                     required
-                    rows={3}
+                    rows={2}
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
-                    placeholder="House/Plot No, Street Name, Pincode, City, State"
+                    placeholder="House/Flat No, Street, City, Pincode"
                     className="w-full p-4 rounded-xl border border-[#DAA87C]/50 text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#1E3A2C] focus:ring-1 focus:ring-[#1E3A2C] outline-none bg-white transition-all resize-none"
                   />
+                </div>
+
+                {/* Payment Option Selector */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                    Payment Method
+                  </label>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod("COD")}
+                      className={`p-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition-all cursor-pointer ${
+                        paymentMethod === "COD"
+                          ? "bg-[#1E3A2C] text-white border-[#1E3A2C] shadow-sm"
+                          : "bg-white text-[#1E3A2C]/70 border-[#1E3A2C]/10 hover:border-[#1E3A2C]/30"
+                      }`}
+                    >
+                      <span>Cash on Delivery</span>
+                      <span className={`text-[10px] font-medium ${paymentMethod === "COD" ? "text-[#DAA87C]" : "text-[#1E3A2C]/50"}`}>
+                        Pay when delivered
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod("UPI")}
+                      className={`p-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition-all cursor-pointer ${
+                        paymentMethod === "UPI"
+                          ? "bg-[#1E3A2C] text-white border-[#1E3A2C] shadow-sm"
+                          : "bg-white text-[#1E3A2C]/70 border-[#1E3A2C]/10 hover:border-[#1E3A2C]/30"
+                      }`}
+                    >
+                      <span>UPI QR Payment</span>
+                      <span className={`text-[10px] font-medium ${paymentMethod === "UPI" ? "text-[#DAA87C]" : "text-[#1E3A2C]/50"}`}>
+                        GPay, PhonePe, Paytm
+                      </span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Mode description banner */}
@@ -341,17 +460,31 @@ export default function CartPage() {
                   <svg className="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
-                  <span>Paying Cash on Delivery. Zero extra charges.</span>
+                  <span>
+                    {paymentMethod === "COD"
+                      ? "Pay via Cash on Delivery upon doorstep inspection."
+                      : "Instant verification via BHIM UPI QR Code."}
+                  </span>
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full h-12 mt-2 text-xs font-bold btn-animate-border btn-animate-border-dark rounded-full shadow-md shadow-[#1E3A2C]/10 transition-all hover:scale-[1.01] flex items-center justify-center gap-1 group cursor-pointer text-white"
+                  disabled={isSubmitting}
+                  className="w-full h-12 mt-2 text-xs font-bold btn-animate-border btn-animate-border-dark rounded-full shadow-md shadow-[#1E3A2C]/10 transition-all hover:scale-[1.01] flex items-center justify-center gap-2 group cursor-pointer text-white disabled:opacity-50"
                 >
-                  Place Order (COD)
-                  <svg className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                  </svg>
+                  {isSubmitting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Placing Order...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Place Order · ₹{cartTotal.toLocaleString()}</span>
+                      <svg className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </>
+                  )}
                 </button>
               </form>
             </motion.div>
