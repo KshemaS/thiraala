@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import prisma from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth/guard";
 
 const dataFilePath = path.join(process.cwd(), "data", "hero-banners.json");
 const BANNER_KEYS = ["image1", "image2", "image3"] as const;
@@ -43,6 +44,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const unauthorized = await requireAdmin();
+  if (unauthorized) return unauthorized;
+
   try {
     const body = await request.json();
 

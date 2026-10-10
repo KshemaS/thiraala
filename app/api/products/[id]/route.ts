@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import prisma from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth/guard";
 import { ProductItem } from "../route";
 
 const dataFilePath = path.join(process.cwd(), "data", "products.json");
@@ -101,6 +102,9 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const unauthorized = await requireAdmin();
+  if (unauthorized) return unauthorized;
+
   try {
     const { id } = await params;
     const body = await request.json();
@@ -186,6 +190,9 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const unauthorized = await requireAdmin();
+  if (unauthorized) return unauthorized;
+
   try {
     const { id } = await params;
 

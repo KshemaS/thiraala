@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import fs from "fs";
 import path from "path";
+import { seedAdminUser } from "./seed-admin";
 
 const prisma = new PrismaClient();
 
@@ -186,21 +187,8 @@ async function main() {
     console.log(`✅ Seeded ${photos.length} editorial photos`);
   }
 
-  // 6. Seed Default Admin User
-  await prisma.adminUser.upsert({
-    where: { username: "admin" },
-    update: {
-      name: "Thiraala Admin",
-      role: "admin",
-    },
-    create: {
-      username: "admin",
-      passwordHash: "thiraala@2025",
-      name: "Thiraala Admin",
-      role: "admin",
-    },
-  });
-  console.log("✅ Seeded default admin user");
+  // 6. Seed Admin User (credentials from ADMIN_USERNAME / ADMIN_PASSWORD)
+  await seedAdminUser(prisma);
 
   console.log("🎉 Database seeding complete!");
 }
