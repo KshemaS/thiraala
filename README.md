@@ -20,6 +20,24 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Admin authentication
+
+The dashboard (`/dashboard`) and all admin write APIs require a signed-in admin. Sessions are an httpOnly cookie signed with `AUTH_SECRET`; admin accounts live in the `admin_users` table with scrypt password hashes.
+
+Environment variables:
+
+| Variable | Where | Purpose |
+| --- | --- | --- |
+| `AUTH_SECRET` | App (local + Vercel) | Random string, 32+ chars, used to sign session cookies. Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`. Changing it signs everyone out. |
+| `ADMIN_PASSWORD` | Seed only | Password for the admin account (12+ chars). Without it the seed skips the admin user. |
+| `ADMIN_USERNAME` | Seed only | Optional, defaults to `admin`. |
+
+Create or reset the admin login (runs only the admin part of the seed, against whatever `DATABASE_URL` points to):
+
+```bash
+ADMIN_PASSWORD='choose-a-long-password' npx tsx prisma/seed-admin.ts
+```
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

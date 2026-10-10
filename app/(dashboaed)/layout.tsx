@@ -3,9 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { AdminAuthProvider, useAdminAuth } from "@/context/AdminAuthContext";
-import AdminLoginForm from "@/components/AdminLoginForm";
 import {
   LogOut,
   Loader2,
@@ -23,7 +22,8 @@ import {
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { isAuthenticated, isLoading, logout, user } = useAdminAuth();
+  const router = useRouter();
+  const { isAuthenticated, isLoading, logout: endSession, user } = useAdminAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isHomeOpen, setIsHomeOpen] = useState(true);
   const [isProductsOpen, setIsProductsOpen] = useState(true);
@@ -47,8 +47,21 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     }
   }, [pathname, isCategoriesRoute]);
 
-  // While restoring auth session from localStorage, render a refined brand loader
-  if (isLoading) {
+  // proxy.ts redirects unauthenticated requests; this covers a session that
+  // expires or is cleared while the dashboard is already open.
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace("/login");
+    }
+  }, [isLoading, isAuthenticated, router]);
+
+  const logout = async () => {
+    await endSession();
+    router.replace("/login");
+  };
+
+  // While checking the server session (or redirecting to /login), render a refined brand loader
+  if (isLoading || !isAuthenticated) {
     return (
       <div className="min-h-screen w-screen flex flex-col items-center justify-center bg-[#FAF8F5] select-none">
         <div className="relative w-32 h-10 mb-4 animate-pulse">
@@ -65,11 +78,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         </div>
       </div>
     );
-  }
-
-  // If not authenticated, present the login page
-  if (!isAuthenticated) {
-    return <AdminLoginForm />;
   }
 
   // Once authenticated, render full dashboard

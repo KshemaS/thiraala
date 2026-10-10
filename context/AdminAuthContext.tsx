@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 
 interface AdminUser {
   username: string;
@@ -13,92 +13,72 @@ interface AdminAuthContextType {
   isLoading: boolean;
   user: AdminUser | null;
   login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefined);
 
-const STORAGE_KEY = "thiraala_admin_session";
-
+// The session lives in an httpOnly cookie set by /api/admin/login; this context
+// only mirrors it for the UI. Authorization is enforced server-side.
 export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [user, setUser] = useState<AdminUser | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Restore session from localStorage on client mount
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && parsed.username) {
-          setIsAuthenticated(true);
-          setUser(parsed);
-        }
-      }
-    } catch (e) {
-      console.error("Failed to restore admin session", e);
-    } finally {
-      setIsLoading(false);
-    }
+    let cancelled = false;
+    fetch("/api/admin/session", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled) setUser(data?.authenticated ? data.user : null);
+      })
+      .catch((e) => console.error("Failed to load admin session", e))
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const login = async (
-    usernameInput: string,
-    passwordInput: string
-  ): Promise<{ success: boolean; error?: string }> => {
-    // Artificial small delay for realistic UX and transition
-    await new Promise((res) => setTimeout(res, 600));
-
-    const username = usernameInput.trim();
-    const password = passwordInput.trim();
-
-    if (!username || !password) {
-      return { success: false, error: "Please enter both username and password." };
-    }
-
-    // Standard credential check (admin / admin123) or allows admin user
-    if (
-      (username.toLowerCase() === "admin" && password === "admin123") ||
-      (username.toLowerCase() === "director" && password === "thiraala2025")
-    ) {
-      const sessionUser: AdminUser = {
-        username: username,
-        name: username.toLowerCase() === "admin" ? "Administrator" : "Managing Director",
-        role: "Super Admin",
-      };
-
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionUser));
-      } catch (e) {
-        console.warn("Unable to save session to localStorage", e);
+  const login = useCallback(
+    async (usernameInput: string, passwordInput: string): Promise<{ success: boolean; error?: string }> => {
+      const username = usernameInput.trim();
+      if (!username || !passwordInput) {
+        return { success: false, error: "Please enter both username and password." };
       }
 
-      setUser(sessionUser);
-      setIsAuthenticated(true);
-      return { success: true };
-    }
+      try {
+        const res = await fetch("/api/admin/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password: passwordInput }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.success) {
+          return { success: false, error: data?.error || "Invalid username or password." };
+        }
+        setUser(data.user);
+        return { success: true };
+      } catch {
+        return { success: false, error: "Unable to reach the server. Please try again." };
+      }
+    },
+    []
+  );
 
-    return {
-      success: false,
-      error: "Invalid username or password. (Hint: use admin / admin123)",
-    };
-  };
-
-  const logout = () => {
+  const logout = useCallback(async () => {
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      await fetch("/api/admin/logout", { method: "POST" });
     } catch (e) {
-      console.warn("Unable to clear localStorage session", e);
+      console.warn("Logout request failed", e);
     }
     setUser(null);
-    setIsAuthenticated(false);
-  };
+  }, []);
 
   return (
     <AdminAuthContext.Provider
       value={{
-        isAuthenticated,
+        isAuthenticated: user !== null,
         isLoading,
         user,
         login,

@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import { useAdminAuth } from "@/context/AdminAuthContext";
-import { User, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, AlertCircle, ArrowLeft, Loader2, Sparkles } from "lucide-react";
+import { User, Lock, Eye, EyeOff, ArrowRight, AlertCircle, Loader2 } from "lucide-react";
 
 interface AdminLoginFormProps {
   onSuccess?: () => void;
@@ -35,12 +35,6 @@ export default function AdminLoginForm({ onSuccess }: AdminLoginFormProps) {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleFillDemo = () => {
-    setUsername("admin");
-    setPassword("admin123");
-    setError(null);
   };
 
   return (
@@ -98,7 +92,7 @@ export default function AdminLoginForm({ onSuccess }: AdminLoginFormProps) {
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter username (e.g. admin)"
+                placeholder="Enter username"
                 className="w-full pl-10 pr-4 py-3 bg-[#FAF8F5] border border-[#1E3A2C]/15 rounded-xl text-sm text-[#1E3A2C] placeholder-[#1E3A2C]/35 outline-none transition-all focus:border-[#1E3A2C] focus:bg-white focus:ring-2 focus:ring-[#1E3A2C]/10"
               />
             </div>

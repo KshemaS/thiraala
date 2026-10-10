@@ -7,13 +7,20 @@ import AdminLoginForm from "@/components/AdminLoginForm";
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
 
+// proxy.ts sends ?from=/dashboard/... ; only follow it within the dashboard.
+function getRedirectTarget() {
+  const from = new URLSearchParams(window.location.search).get("from");
+  return from && /^\/dashboard(\/|$)/.test(from) ? from : "/dashboard";
+}
+
 function LoginContent() {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAdminAuth();
 
+  // Also fires right after a successful login, since login() sets the user.
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.replace("/dashboard");
+      router.replace(getRedirectTarget());
     }
   }, [isAuthenticated, isLoading, router]);
 
@@ -40,7 +47,7 @@ function LoginContent() {
     return null;
   }
 
-  return <AdminLoginForm onSuccess={() => router.push("/dashboard")} />;
+  return <AdminLoginForm />;
 }
 
 export default function LoginPage() {
