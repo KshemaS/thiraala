@@ -20,6 +20,8 @@
     "seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@neon/config": "^1.8.6",
+    "@neon/env": "^1.5.3",
     "@prisma/client": "^6.19.3",
     "framer-motion": "^12.42.2",
     "lucide-react": "^1.25.0",
