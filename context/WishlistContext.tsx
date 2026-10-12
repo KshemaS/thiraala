@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { useAuth } from "@/context/AuthContext";
 
 export interface SareeProduct {
   id: number | string;
@@ -29,9 +30,8 @@ interface WishlistContextType {
 
 const WishlistContext = createContext<WishlistContextType | undefined>(undefined);
 
-const STORAGE_KEY = "thiraala_wishlist";
-
 export function WishlistProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [wishlist, setWishlist] = useState<SareeProduct[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [toast, setToast] = useState<{ message: string; show: boolean }>({ message: "", show: false });
@@ -41,18 +41,9 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Helper to get active user ID / email if logged in
-  const getUserId = (): string | null => {
-    try {
-      const stored = localStorage.getItem("thiraala_user");
-      if (stored) {
-        const u = JSON.parse(stored);
-        return u?.id || u?.email || null;
-      }
-    } catch {
-      // Ignore
-    }
-    return null;
-  };
+  const getUserId = useCallback((): string | null => {
+    return user?.id || user?.email || null;
+  }, [user]);
 
   // Fetch wishlist from API (READ)
   const refreshWishlist = useCallback(async () => {
@@ -79,7 +70,6 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
           }));
 
           setWishlist(formatted);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(formatted));
         }
       }
     } catch (e) {
@@ -87,22 +77,10 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [getUserId]);
 
-  // Initial load: Fast optimistic localStorage restore, then fetch from API
+  // Initial load: Fetch from API
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          setWishlist(parsed);
-        }
-      } catch (e) {
-        console.error("Failed to load wishlist from localStorage", e);
-      }
-    }
-
     refreshWishlist();
   }, [refreshWishlist]);
 
@@ -117,7 +95,6 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
     // Optimistic UI update
     const updated = [product, ...wishlist];
     setWishlist(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     showToast(`${product.name} added to wishlist`);
 
     // API call (POST /api/wishlist)
@@ -151,7 +128,6 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
 
     // Optimistic UI update
     setWishlist(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     if (itemToRemove) {
       showToast(`${itemToRemove.name} removed from wishlist`);
     }
@@ -176,7 +152,6 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
 
     // Optimistic UI update
     setWishlist([]);
-    localStorage.removeItem(STORAGE_KEY);
     showToast("Wishlist cleared");
 
     // API call (DELETE /api/wishlist?clearAll=true)

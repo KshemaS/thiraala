@@ -85,11 +85,11 @@ export async function GET(
       });
     }
   } catch (err) {
-    // Database offline - fallback to JSON
+    // Database offline - fallback to file/memory
   }
 
-  const products = getProducts();
-  const product = products.find((p) => String(p.id) === String(id));
+  const { getProductById } = await import("@/lib/products");
+  const product = await getProductById(id);
 
   if (!product) {
     return NextResponse.json({ error: "Product not found" }, { status: 404 });

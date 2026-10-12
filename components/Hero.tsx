@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import Container from "@/components/Container";
 
@@ -17,17 +18,6 @@ export default function Hero() {
   useEffect(() => {
     const fetchBanners = async () => {
       try {
-        // Read client cache if available
-        const saved = localStorage.getItem("thiraala_hero_banners");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          setBannerImages({
-            image1: parsed.image1 || "",
-            image2: parsed.image2 || "",
-            image3: parsed.image3 || "",
-          });
-        }
-
         // Fetch authoritative configuration from dashboard API
         const res = await fetch("/api/banners");
         if (res.ok) {
@@ -38,7 +28,6 @@ export default function Hero() {
               image2: data.image2 || "",
               image3: data.image3 || "",
             });
-            localStorage.setItem("thiraala_hero_banners", JSON.stringify(data));
           }
         }
       } catch (e) {
@@ -51,7 +40,6 @@ export default function Hero() {
     // Listen for real-time updates when saved in dashboard
     const handleUpdate = () => fetchBanners();
     window.addEventListener("thiraala-banners-updated", handleUpdate);
-    window.addEventListener("storage", handleUpdate);
 
     // Handle scroll positions for interactive parallax effect
     const handleScroll = () => {
@@ -256,6 +244,27 @@ export default function Hero() {
               >
                 Welcome to thiraala. Discover our curated collection of beautiful sarees for every occasion—blending simple elegance, comfort, and premium quality to make your everyday and special moments look effortless.
               </motion.p>
+
+              {/* Call to Action Button */}
+              <motion.div
+                className="pt-2 flex flex-wrap items-center justify-center lg:justify-start gap-4 select-none"
+                variants={itemVariants}
+              >
+                <Link
+                  href="/products"
+                  className="inline-flex items-center justify-center btn-animate-border btn-animate-border-dark px-8 py-3.5 rounded-full font-bold text-xs tracking-wider uppercase transition-all duration-300 hover:scale-[1.03] cursor-pointer shadow-md shadow-[#1E3A2C]/10 text-white group"
+                >
+                  Explore Collections
+                  <svg
+                    className="w-3.5 h-3.5 ml-2 group-hover:translate-x-1 transition-transform"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+              </motion.div>
             </div>
           </motion.div>
 

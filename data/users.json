@@ -31,5 +31,16 @@
     "role": "customer",
     "createdAt": "2026-10-07T17:09:30.539Z",
     "updatedAt": "2026-10-07T17:09:30.539Z"
+  },
+  {
+    "id": "usr_1791823536595_ddd94e80",
+    "firstName": "kshema",
+    "lastName": "shylan",
+    "email": "kshem23@gmail.com",
+    "passwordHash": "289d42575f051489ae9c4fb3850c1c23:8a27bed3cd4afe80ed5cddb12127eebc447f18878cb2b58a00675c53a2f26a8f7eee97d78210e60bdc972b7e36b063147cd2499cf326e6266b22b3a0423d5d55",
+    "phone": "7306522881",
+    "role": "customer",
+    "createdAt": "2026-10-12T16:45:36.591Z",
+    "updatedAt": "2026-10-12T16:45:36.591Z"
   }
 ]

@@ -19,28 +19,16 @@ interface CategoryItem {
 export default function CategoryTabs() {
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [activeTab, setActiveTab] = useState("");
+  const [allProducts, setAllProducts] = useState<any[]>(sareesData);
 
   const fetchCategories = useCallback(async () => {
     try {
-      const saved = localStorage.getItem("thiraala_categories");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          const active = parsed.filter((c: CategoryItem) => c.status !== "inactive");
-          setCategories(active);
-          if (active.length > 0 && !active.some((c: CategoryItem) => c.slug === activeTab)) {
-            setActiveTab(active[0].slug);
-          }
-        }
-      }
-
       const res = await fetch("/api/categories");
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
           const active = data.filter((c: CategoryItem) => c.status !== "inactive");
           setCategories(active);
-          localStorage.setItem("thiraala_categories", JSON.stringify(data));
           if (active.length > 0 && !active.some((c: CategoryItem) => c.slug === activeTab)) {
             setActiveTab(active[0].slug);
           }
@@ -51,18 +39,36 @@ export default function CategoryTabs() {
     }
   }, [activeTab]);
 
+  const fetchProducts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/products/filter?limit=all");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.products) && data.products.length > 0) {
+          setAllProducts(data.products);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load products for categories:", e);
+    }
+  }, []);
+
   useEffect(() => {
     fetchCategories();
+    fetchProducts();
 
-    const handleUpdate = () => fetchCategories();
+    const handleUpdate = () => {
+      fetchCategories();
+      fetchProducts();
+    };
     window.addEventListener("thiraala-categories-updated", handleUpdate);
-    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("thiraala-products-updated", handleUpdate);
 
     return () => {
       window.removeEventListener("thiraala-categories-updated", handleUpdate);
-      window.removeEventListener("storage", handleUpdate);
+      window.removeEventListener("thiraala-products-updated", handleUpdate);
     };
-  }, [fetchCategories]);
+  }, [fetchCategories, fetchProducts]);
 
   if (categories.length === 0) {
     return null;
@@ -71,16 +77,16 @@ export default function CategoryTabs() {
   // Find active category item
   const currentCategory = categories.find((c) => c.slug === activeTab) || categories[0];
 
-  // Match products by category name or fallback to sareesData
+  // Match products by category name or fallback to allProducts
   const activeProducts = currentCategory
-    ? sareesData.filter(
+    ? allProducts.filter(
         (s) =>
-          s.category.toLowerCase().trim() === currentCategory.name.toLowerCase().trim() ||
-          s.category.toLowerCase().includes(currentCategory.slug.toLowerCase().replace(/-/g, " "))
+          (s.category || "").toLowerCase().trim() === currentCategory.name.toLowerCase().trim() ||
+          (s.category || "").toLowerCase().includes(currentCategory.slug.toLowerCase().replace(/-/g, " "))
       )
     : [];
 
-  const displayProducts = activeProducts.length > 0 ? activeProducts : sareesData.slice(0, 3);
+  const displayProducts = activeProducts.length > 0 ? activeProducts : allProducts.slice(0, 3);
 
   const containerVariants = {
     hidden: { opacity: 0 },

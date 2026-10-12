@@ -22,8 +22,6 @@ export interface EditorialPhoto {
   title: string;
 }
 
-const STORAGE_KEY = "thiraala_editorial_photos";
-
 export default function EditorialPage() {
   const [photos, setPhotos] = useState<EditorialPhoto[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -36,24 +34,15 @@ export default function EditorialPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load photos from localStorage and API
+  // Load photos from API
   useEffect(() => {
     const loadPhotos = async () => {
       try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            setPhotos(parsed);
-          }
-        }
-
         const res = await fetch("/api/editorial");
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data)) {
             setPhotos(data);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
           }
         }
       } catch (e) {
@@ -105,7 +94,6 @@ export default function EditorialPage() {
 
     setPhotos(updated);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       await fetch("/api/editorial", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -125,7 +113,6 @@ export default function EditorialPage() {
     const updated = photos.filter((p) => p.id !== id);
     setPhotos(updated);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       await fetch("/api/editorial", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

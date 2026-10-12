@@ -3,6 +3,7 @@ import { Open_Sans } from "next/font/google";
 import "./globals.css";
 import { WishlistProvider } from "@/context/WishlistContext";
 import { CartProvider } from "@/context/CartContext";
+import { AuthProvider } from "@/context/AuthContext";
 
 const openSans = Open_Sans({
   variable: "--font-open-sans",
@@ -26,9 +27,11 @@ export default function RootLayout({
       className={`${openSans.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <WishlistProvider>
-          <CartProvider>{children}</CartProvider>
-        </WishlistProvider>
+        <AuthProvider>
+          <WishlistProvider>
+            <CartProvider>{children}</CartProvider>
+          </WishlistProvider>
+        </AuthProvider>
       </body>
     </html>
   );

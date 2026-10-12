@@ -1,32 +1,43 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth, UserData } from "@/context/AuthContext";
 
-export interface UserData {
-  id?: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone?: string;
-  role?: string;
-  createdAt?: string;
-}
+export type { UserData };
 
 interface RegisterModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onRegisterSuccess: (user: UserData) => void;
+  initialMode?: "login" | "register";
+  onRegisterSuccess?: (user: UserData) => void;
 }
 
-export default function RegisterModal({ isOpen, onClose, onRegisterSuccess }: RegisterModalProps) {
+export default function RegisterModal({
+  isOpen,
+  onClose,
+  initialMode = "login",
+  onRegisterSuccess,
+}: RegisterModalProps) {
+  const { login, signup } = useAuth();
+  const [mode, setMode] = useState<"login" | "register">(initialMode);
+
+  // Form states
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setMode(initialMode);
+      setErrorMessage(null);
+    }
+  }, [isOpen, initialMode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,44 +45,48 @@ export default function RegisterModal({ isOpen, onClose, onRegisterSuccess }: Re
     setErrorMessage(null);
 
     try {
-      const res = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
-          email: email.trim(),
-          password: password.trim() || undefined,
-        }),
-      });
+      if (mode === "login") {
+        const res = await login(email, password);
+        if (!res.success || !res.user) {
+          setErrorMessage(res.error || "Failed to sign in. Please check your credentials.");
+          setIsSubmitting(false);
+          return;
+        }
 
-      const data = await res.json().catch(() => null);
+        if (onRegisterSuccess) {
+          onRegisterSuccess(res.user);
+        }
+      } else {
+        const res = await signup({
+          firstName,
+          lastName,
+          email,
+          password: password || undefined,
+          phone: phone || undefined,
+        });
 
-      if (!res.ok || !data?.success) {
-        setErrorMessage(data?.error || "Registration failed. Please check your information.");
-        setIsSubmitting(false);
-        return;
+        if (!res.success || !res.user) {
+          setErrorMessage(res.error || "Failed to register. Please check your details.");
+          setIsSubmitting(false);
+          return;
+        }
+
+        if (onRegisterSuccess) {
+          onRegisterSuccess(res.user);
+        }
       }
-
-      const registeredUser: UserData = data.user || {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        email: email.trim(),
-      };
-
-      localStorage.setItem("thiraala_user", JSON.stringify(registeredUser));
-      onRegisterSuccess(registeredUser);
 
       // Reset form fields
       setFirstName("");
       setLastName("");
       setEmail("");
       setPassword("");
+      setPhone("");
       setErrorMessage(null);
       onClose();
     } catch (err: any) {
-      console.error("Signup request error:", err);
-      setErrorMessage("Network error occurred. Please try again.");
+      console.error("Auth submit error:", err);
+      setErrorMessage("A network error occurred. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -96,7 +111,7 @@ export default function RegisterModal({ isOpen, onClose, onRegisterSuccess }: Re
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 20 }}
             transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            className="relative w-full max-w-md bg-[#fcfbfa] p-8 rounded-3xl border border-[#1E3A2C]/10 shadow-2xl z-10 flex flex-col gap-6"
+            className="relative w-full max-w-md bg-[#fcfbfa] p-8 sm:p-10 rounded-3xl border border-[#1E3A2C]/10 shadow-2xl z-10 flex flex-col gap-5 max-h-[92vh] overflow-y-auto scrollbar-none"
           >
             {/* Close Button */}
             <button
@@ -109,13 +124,49 @@ export default function RegisterModal({ isOpen, onClose, onRegisterSuccess }: Re
               </svg>
             </button>
 
+            {/* Mode Switcher Tabs */}
+            <div className="flex bg-[#1E3A2C]/5 p-1 rounded-2xl border border-[#1E3A2C]/10 select-none">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("login");
+                  setErrorMessage(null);
+                }}
+                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                  mode === "login"
+                    ? "bg-white text-[#1E3A2C] shadow-sm font-extrabold"
+                    : "text-[#1E3A2C]/60 hover:text-[#1E3A2C]"
+                }`}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("register");
+                  setErrorMessage(null);
+                }}
+                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                  mode === "register"
+                    ? "bg-white text-[#1E3A2C] shadow-sm font-extrabold"
+                    : "text-[#1E3A2C]/60 hover:text-[#1E3A2C]"
+                }`}
+              >
+                Create Account
+              </button>
+            </div>
+
             {/* Header */}
             <div className="text-center select-none">
-              <h3 className="text-2xl font-bold text-[#1E3A2C] tracking-tight">Create Account</h3>
+              <h3 className="text-2xl font-bold text-[#1E3A2C] tracking-tight">
+                {mode === "login" ? "Welcome Back" : "Create Account"}
+              </h3>
               <p className="text-xs text-[#1E3A2C]/65 mt-1 font-semibold">
-                Register to save your drapes and customize collections
+                {mode === "login"
+                  ? "Sign in to proceed seamlessly with your order"
+                  : "Register to save your drapes and customize collections"}
               </p>
-              <div className="w-10 h-0.5 bg-[#DAA87C] mx-auto mt-3 rounded-full"></div>
+              <div className="w-10 h-0.5 bg-[#DAA87C] mx-auto mt-2.5 rounded-full"></div>
             </div>
 
             {/* Error Message Alert */}
@@ -129,40 +180,42 @@ export default function RegisterModal({ isOpen, onClose, onRegisterSuccess }: Re
             )}
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
-                    First Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    placeholder="First name"
-                    className="w-full h-11 px-3.5 rounded-xl border border-[#DAA87C]/50 text-xs font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#1E3A2C] focus:ring-1 focus:ring-[#1E3A2C] outline-none bg-white transition-all"
-                  />
-                </div>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+              {mode === "register" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                      First Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      placeholder="First name"
+                      className="w-full h-11 px-3.5 rounded-xl border border-[#DAA87C]/50 text-xs font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#1E3A2C] focus:ring-1 focus:ring-[#1E3A2C] outline-none bg-white transition-all"
+                    />
+                  </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
-                    Last Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    placeholder="Last name"
-                    className="w-full h-11 px-3.5 rounded-xl border border-[#DAA87C]/50 text-xs font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#1E3A2C] focus:ring-1 focus:ring-[#1E3A2C] outline-none bg-white transition-all"
-                  />
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                      Last Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      placeholder="Last name"
+                      className="w-full h-11 px-3.5 rounded-xl border border-[#DAA87C]/50 text-xs font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#1E3A2C] focus:ring-1 focus:ring-[#1E3A2C] outline-none bg-white transition-all"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
-                  Email Address
+                  Email Address *
                 </label>
                 <input
                   type="email"
@@ -174,19 +227,35 @@ export default function RegisterModal({ isOpen, onClose, onRegisterSuccess }: Re
                 />
               </div>
 
+              {mode === "register" && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                    Phone Number (Optional)
+                  </label>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="10-digit mobile number"
+                    className="w-full h-11 px-4 rounded-xl border border-[#DAA87C]/50 text-xs font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#1E3A2C] focus:ring-1 focus:ring-[#1E3A2C] outline-none bg-white transition-all"
+                  />
+                </div>
+              )}
+
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
-                    Password
+                    Password *
                   </label>
                   <span className="text-[10px] text-[#1E3A2C]/40 font-medium">Min 6 characters</span>
                 </div>
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
+                    required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Create a password"
+                    placeholder={mode === "login" ? "Enter your password" : "Create a password"}
                     className="w-full h-11 pl-4 pr-10 rounded-xl border border-[#DAA87C]/50 text-xs font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#1E3A2C] focus:ring-1 focus:ring-[#1E3A2C] outline-none bg-white transition-all"
                   />
                   <button
@@ -220,11 +289,11 @@ export default function RegisterModal({ isOpen, onClose, onRegisterSuccess }: Re
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    <span>Creating account...</span>
+                    <span>{mode === "login" ? "Signing In..." : "Creating Account..."}</span>
                   </>
                 ) : (
                   <>
-                    <span>Register</span>
+                    <span>{mode === "login" ? "Sign In" : "Register"}</span>
                     <svg className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                     </svg>
@@ -232,6 +301,39 @@ export default function RegisterModal({ isOpen, onClose, onRegisterSuccess }: Re
                 )}
               </button>
             </form>
+
+            {/* Bottom Toggle Footer */}
+            <div className="text-center pt-2 border-t border-[#1E3A2C]/10 text-xs font-semibold text-[#1E3A2C]/60 select-none">
+              {mode === "login" ? (
+                <p>
+                  Don&apos;t have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode("register");
+                      setErrorMessage(null);
+                    }}
+                    className="text-[#DAA87C] font-bold hover:underline cursor-pointer ml-1"
+                  >
+                    Create Account
+                  </button>
+                </p>
+              ) : (
+                <p>
+                  Already have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode("login");
+                      setErrorMessage(null);
+                    }}
+                    className="text-[#DAA87C] font-bold hover:underline cursor-pointer ml-1"
+                  >
+                    Sign In
+                  </button>
+                </p>
+              )}
+            </div>
           </motion.div>
         </div>
       )}

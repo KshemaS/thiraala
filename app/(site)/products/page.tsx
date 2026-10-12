@@ -1,5 +1,4 @@
-"use client";
-
+import { Suspense } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ProductBanner from "@/components/ProductBanner";
@@ -12,7 +11,15 @@ export default function ProductsListingPage() {
 
       <main className="flex-1 w-full bg-[#fcfbfa]">
         <ProductBanner />
-        <ProductListing />
+        <Suspense
+          fallback={
+            <div className="w-full py-20 flex justify-center items-center">
+              <div className="w-8 h-8 border-2 border-[#DAA87C] border-t-transparent rounded-full animate-spin" />
+            </div>
+          }
+        >
+          <ProductListing />
+        </Suspense>
       </main>
 
       <div className="w-full border-b border-[#1E3A2C]/15"></div>

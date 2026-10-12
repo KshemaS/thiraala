@@ -5,7 +5,8 @@ import ProductBreadcrumbs from "@/components/ProductBreadcrumbs";
 import ProductGallery from "@/components/ProductGallery";
 import ProductInfo from "@/components/ProductInfo";
 import RelatedProducts from "@/components/RelatedProducts";
-import { sareesData } from "@/data/products";
+import { getProductById, getAllUnifiedProducts } from "@/lib/products";
+import { notFound } from "next/navigation";
 
 export default async function ProductDetailPage({
   params,
@@ -13,12 +14,13 @@ export default async function ProductDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const productId = parseInt(id, 10);
 
-  // Find target product by id (matches either number or string or fallback)
-  const product =
-    sareesData.find((item) => String(item.id) === String(id) || item.id === productId) ||
-    sareesData[0];
+  // Find target product dynamically from DB / products.json / sareesData
+  const product = await getProductById(id);
+
+  if (!product) {
+    notFound();
+  }
 
   return (
     <div className="min-h-screen flex flex-col justify-between selection:bg-[#DAA87C]/20 selection:text-[#DAA87C] bg-[#fcfbfa]">

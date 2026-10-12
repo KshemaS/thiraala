@@ -94,7 +94,7 @@ export default function ProductCard({ saree }: ProductCardProps) {
             {saree.name}
           </h3>
           <p className="text-[#1E3A2C]/50 text-xs mt-1">
-            Free Delivery & Cash on Delivery Available
+            Free Express Delivery Across India
           </p>
         </div>
 

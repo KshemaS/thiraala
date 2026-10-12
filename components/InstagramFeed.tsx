@@ -13,25 +13,25 @@ const instagramPosts = [
     id: 801,
     img: honey,
     alt: "Purple saree draped next to a stone temple pillar",
-    link: "https://instagram.com",
+    link: "https://www.instagram.com/thiraala?srtk=Z3hjZnhlemw0NDhr&utm_source=qr",
   },
   {
     id: 802,
     img: kalippattam,
     alt: "Royal blue sequined saree next to a wooden side table",
-    link: "https://instagram.com",
+    link: "https://www.instagram.com/thiraala?srtk=Z3hjZnhlemw0NDhr&utm_source=qr",
   },
   {
     id: 803,
     img: mulcotton,
     alt: "Lavender pink embroidered saree next to a green plant",
-    link: "https://instagram.com",
+    link: "https://www.instagram.com/thiraala?srtk=Z3hjZnhlemw0NDhr&utm_source=qr",
   },
   {
     id: 804,
     img: swa,
     alt: "Black traditional saree with gold borders in an outdoor park setting",
-    link: "https://instagram.com",
+    link: "https://www.instagram.com/thiraala?srtk=Z3hjZnhlemw0NDhr&utm_source=qr",
   },
 ];
 
@@ -94,7 +94,7 @@ export default function InstagramFeed() {
       {/* Centered 'Explore More' button */}
       <div className="text-center mt-12">
         <a
-          href="https://instagram.com"
+          href="https://www.instagram.com/thiraala?srtk=Z3hjZnhlemw0NDhr&utm_source=qr"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center justify-center btn-animate-border btn-animate-border-light px-8 py-3 rounded-full font-bold text-xs tracking-wider uppercase transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-sm shadow-[#1E3A2C]/5"

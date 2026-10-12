@@ -60,8 +60,30 @@ const newArrivals = [
 ];
 
 export default function NewArrivals() {
+  const [items, setItems] = useState<any[]>(newArrivals);
   const [visibleSlides, setVisibleSlides] = useState(3);
   const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Dynamically load newest arrivals from API
+  useEffect(() => {
+    const fetchNewArrivals = async () => {
+      try {
+        const res = await fetch("/api/products/filter?sort=newest&limit=6");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.products) && data.products.length > 0) {
+            setItems(data.products);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load dynamic new arrivals:", err);
+      }
+    };
+
+    fetchNewArrivals();
+    window.addEventListener("thiraala-products-updated", fetchNewArrivals);
+    return () => window.removeEventListener("thiraala-products-updated", fetchNewArrivals);
+  }, []);
 
   // Monitor screen size dynamically to determine active slide counts
   useEffect(() => {
@@ -80,7 +102,7 @@ export default function NewArrivals() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const maxIndex = Math.max(0, newArrivals.length - visibleSlides);
+  const maxIndex = Math.max(0, items.length - visibleSlides);
 
   const nextSlide = () => {
     if (currentIndex < maxIndex) {
@@ -204,9 +226,15 @@ export default function NewArrivals() {
                   transform: `translateX(-${currentIndex * (100 / visibleSlides)}%)`,
                 }}
               >
-                {newArrivals.map((saree, idx) => {
+                {items.map((saree, idx) => {
                   const col = idx % 3;
                   const cardVariant = col === 0 ? leftVariant : col === 2 ? rightVariant : centerVariant;
+                  const imgSrc =
+                    typeof saree.img === "string"
+                      ? saree.img
+                      : saree.img?.src || saree.wornImg || saree.foldedImg || "/images/gopura.jpeg";
+                  const imgAlt = saree.alt || saree.altWorn || saree.name;
+
                   return (
                     <motion.div
                       key={saree.id}
@@ -221,8 +249,8 @@ export default function NewArrivals() {
                         <div className="group relative aspect-[4/5] w-full rounded-2xl border border-[#1E3A2C]/5 overflow-hidden shadow-md cursor-pointer">
                           {/* Background Saree Image */}
                           <Image
-                            src={saree.img.src}
-                            alt={saree.alt}
+                            src={imgSrc}
+                            alt={imgAlt}
                             fill
                             sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                             className="object-cover transition-transform duration-700 group-hover:scale-105 pointer-events-none"

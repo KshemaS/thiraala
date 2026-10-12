@@ -17,22 +17,12 @@ export default function PhotoshootSlider() {
 
   const fetchSlides = useCallback(async () => {
     try {
-      // 1. Read from client local storage cache if available
-      const saved = localStorage.getItem("thiraala_editorial_photos");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setSlides(parsed);
-        }
-      }
-
-      // 2. Fetch authoritative configuration from API
+      // Fetch authoritative configuration from API
       const res = await fetch("/api/editorial");
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
           setSlides(data);
-          localStorage.setItem("thiraala_editorial_photos", JSON.stringify(data));
         }
       }
     } catch (e) {
@@ -46,11 +36,9 @@ export default function PhotoshootSlider() {
     // Listen for real-time changes saved in dashboard
     const handleUpdate = () => fetchSlides();
     window.addEventListener("thiraala-editorial-updated", handleUpdate);
-    window.addEventListener("storage", handleUpdate);
 
     return () => {
       window.removeEventListener("thiraala-editorial-updated", handleUpdate);
-      window.removeEventListener("storage", handleUpdate);
     };
   }, [fetchSlides]);
 

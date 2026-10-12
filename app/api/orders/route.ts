@@ -33,7 +33,11 @@ export interface Order {
   phone: string;
   email?: string;
   address: string;
+  houseOrFlat?: string;
+  street?: string;
   city?: string;
+  district?: string;
+  state?: string;
   pincode?: string;
   total: number;
   subtotal?: number;
@@ -88,8 +92,18 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const search = searchParams.get("search");
+    const email = searchParams.get("email")?.trim().toLowerCase();
+    const phone = searchParams.get("phone")?.trim();
 
     let orders = getOrdersFromFile();
+
+    if (email) {
+      orders = orders.filter((o) => (o.email || "").toLowerCase().trim() === email);
+    }
+
+    if (phone) {
+      orders = orders.filter((o) => (o.phone || "").includes(phone));
+    }
 
     if (status && status !== "All") {
       orders = orders.filter((o) => o.status.toLowerCase() === status.toLowerCase());
@@ -106,6 +120,14 @@ export async function GET(request: Request) {
           o.items.some((item) => item.name.toLowerCase().includes(q))
       );
     }
+
+    // Sort newest orders first
+    orders.sort((a, b) => {
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      if (timeA && timeB) return timeB - timeA;
+      return b.id.localeCompare(a.id);
+    });
 
     return NextResponse.json({ success: true, count: orders.length, orders });
   } catch (error: any) {
@@ -126,14 +148,18 @@ export async function POST(request: Request) {
       phone,
       email = "",
       address,
+      houseOrFlat = "",
+      street = "",
       city = "",
+      district = "",
+      state = "",
       pincode = "",
       items = [],
       total = 0,
       subtotal,
       deliveryFee = 0,
       discount = 0,
-      paymentMethod = "COD",
+      paymentMethod = "UPI",
       paymentStatus = "Pending",
       notes = "",
     } = body;
@@ -165,8 +191,12 @@ export async function POST(request: Request) {
       phone: phone.trim(),
       email: email.trim(),
       address: address.trim(),
-      city: city.trim(),
-      pincode: pincode.trim(),
+      houseOrFlat: houseOrFlat ? String(houseOrFlat).trim() : "",
+      street: street ? String(street).trim() : "",
+      city: city ? String(city).trim() : "",
+      district: district ? String(district).trim() : "",
+      state: state ? String(state).trim() : "",
+      pincode: pincode ? String(pincode).trim() : "",
       items: items.map((item: any, idx: number) => ({
         id: item.id || `item-${idx + 1}`,
         productId: item.productId || item.id,
@@ -184,8 +214,8 @@ export async function POST(request: Request) {
       subtotal: Number(subtotal !== undefined ? subtotal : total),
       deliveryFee: Number(deliveryFee) || 0,
       discount: Number(discount) || 0,
-      paymentMethod: (paymentMethod as PaymentMethod) || "COD",
-      paymentStatus: (paymentStatus as PaymentStatus) || (paymentMethod === "UPI" ? "Paid" : "Pending"),
+      paymentMethod: (paymentMethod as PaymentMethod) || "UPI",
+      paymentStatus: (paymentStatus as PaymentStatus) || (paymentMethod === "COD" ? "Pending" : "Paid"),
       status: "Pending",
       trackingNumber: "",
       courierName: "",

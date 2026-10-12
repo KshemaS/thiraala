@@ -26,8 +26,6 @@ const DEFAULT_IMAGES: BannerImages = {
   image3: "",
 };
 
-const STORAGE_KEY = "thiraala_hero_banners";
-
 // Quick pickable presets from the project images
 const PRESET_OPTIONS = [
   { label: "Honey Saree", path: "/images/honey.jpeg" },
@@ -50,24 +48,10 @@ export default function HomeBannerPage() {
   // File input ref for uploading
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load saved images from API and localStorage
+  // Load saved images from API
   useEffect(() => {
     const loadBanners = async () => {
       try {
-        // First check client localStorage for immediate display
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          const loaded = {
-            image1: parsed.image1 || "",
-            image2: parsed.image2 || "",
-            image3: parsed.image3 || "",
-          };
-          setImages(loaded);
-          setFormData(loaded);
-        }
-
-        // Fetch authoritative server data
         const res = await fetch("/api/banners");
         if (res.ok) {
           const data = await res.json();
@@ -79,7 +63,6 @@ export default function HomeBannerPage() {
             };
             setImages(loaded);
             setFormData(loaded);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(loaded));
           }
         }
       } catch (e) {
@@ -104,7 +87,6 @@ export default function HomeBannerPage() {
   const handleSave = async () => {
     setImages(formData);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
       await fetch("/api/banners", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -122,7 +104,6 @@ export default function HomeBannerPage() {
     if (confirm("Clear all banner images?")) {
       setImages(DEFAULT_IMAGES);
       setFormData(DEFAULT_IMAGES);
-      localStorage.removeItem(STORAGE_KEY);
       try {
         await fetch("/api/banners", {
           method: "POST",

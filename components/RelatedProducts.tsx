@@ -1,15 +1,19 @@
 import CategoryCard from "@/components/CategoryCard";
-import { sareesData, SareeProduct } from "@/data/products";
+import { getAllUnifiedProducts } from "@/lib/products";
 
-export default function RelatedProducts({ product }: { product: SareeProduct }) {
+export default async function RelatedProducts({ product }: { product: any }) {
+  const all = await getAllUnifiedProducts();
+
   // Filter related products (same category, up to 3 items)
-  const relatedProducts = sareesData
-    .filter((item) => item.category === product.category && item.id !== product.id)
+  let relatedProducts = all
+    .filter((item) => item.category === product.category && String(item.id) !== String(product.id))
     .slice(0, 3);
 
   // Fallback related products if count is low
   if (relatedProducts.length < 3) {
-    const additional = sareesData.filter((item) => item.id !== product.id && !relatedProducts.some((p) => p.id === item.id));
+    const additional = all.filter(
+      (item) => String(item.id) !== String(product.id) && !relatedProducts.some((p) => String(p.id) === String(item.id))
+    );
     relatedProducts.push(...additional.slice(0, 3 - relatedProducts.length));
   }
 
@@ -27,7 +31,19 @@ export default function RelatedProducts({ product }: { product: SareeProduct }) 
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10">
         {relatedProducts.map((item) => (
-          <CategoryCard key={item.id} product={item} />
+          <CategoryCard
+            key={item.id}
+            product={{
+              id: item.id,
+              name: item.name,
+              price: item.price,
+              foldedImg: item.foldedImg,
+              wornImg: item.wornImg,
+              img: item.img || item.wornImg,
+              altFolded: item.altFolded || item.name,
+              altWorn: item.altWorn || item.name,
+            }}
+          />
         ))}
       </div>
     </div>

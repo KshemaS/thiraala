@@ -53,7 +53,10 @@ export default function Footer() {
             <h4 className="text-[#1E3A2C] font-bold text-sm tracking-wide">Customer Support</h4>
             <ul className="flex flex-col gap-2.5 text-[#1E3A2C]/70 text-xs md:text-sm">
               <li>
-                <Link href="/track-order" className="hover:text-[#0c2b1c] font-bold text-[#DAA87C] transition-colors">Track Your Order</Link>
+                <Link href="/orders" className="hover:text-[#0c2b1c] font-bold text-[#DAA87C] transition-colors">My Orders</Link>
+              </li>
+              <li>
+                <Link href="/track-order" className="hover:text-[#0c2b1c] transition-colors">Track Your Order</Link>
               </li>
               <li>
                 <a href="#" className="hover:text-[#0c2b1c] transition-colors">Boutique Heritage</a>
@@ -77,12 +80,12 @@ export default function Footer() {
               <p>Email: <a href="mailto:hello@thiraala.com" className="hover:text-[#0c2b1c] font-semibold transition-colors">hello@thiraala.com</a></p>
               <p>Support: <a href="tel:+919876543210" className="hover:text-[#0c2b1c] font-semibold transition-colors">+91 98765 43210</a></p>
             </div>
-            
+
             {/* Social media icons (Instagram, WhatsApp) */}
             <div className="flex items-center gap-4 mt-2">
               {/* Instagram link */}
               <a
-                href="https://instagram.com"
+                href="https://www.instagram.com/thiraala?srtk=Z3hjZnhlemw0NDhr&utm_source=qr"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Instagram Profile"

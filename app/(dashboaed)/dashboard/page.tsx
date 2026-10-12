@@ -103,35 +103,60 @@ export default function DashboardPage() {
     },
   ]);
 
-  // Sync with live orders from API
+  const [customerCount, setCustomerCount] = useState<number>(0);
+
+  // Sync live data from APIs
   useEffect(() => {
-    const fetchLiveOrders = async () => {
+    const fetchDashboardData = async () => {
       try {
-        const res = await fetch("/api/orders");
-        const data = await res.json();
-        if (data.success && Array.isArray(data.orders) && data.orders.length > 0) {
-          const mapped: Order[] = data.orders.map((o: any) => ({
-            id: o.id,
-            customerName: o.customerName,
-            email: o.email || o.phone,
-            date: new Date(o.createdAt).toISOString().split("T")[0],
-            sku: o.items?.[0]?.sku || "SAR_DRP",
-            productName: o.items?.[0]?.name || "Handloom Saree",
-            quantity: o.items?.reduce((sum: number, it: any) => sum + (it.quantity || 1), 0) || 1,
-            total: o.total,
-            status: (o.status === "Confirmed" ? "Pending" : o.status) as any,
-          }));
-          setOrders(mapped);
+        const [ordersRes, prodRes, usersRes] = await Promise.all([
+          fetch("/api/orders"),
+          fetch("/api/products"),
+          fetch("/api/users"),
+        ]);
+
+        if (ordersRes.ok) {
+          const data = await ordersRes.json();
+          if (data.success && Array.isArray(data.orders) && data.orders.length > 0) {
+            const mapped: Order[] = data.orders.map((o: any) => ({
+              id: o.id,
+              customerName: o.customerName,
+              email: o.email || o.phone,
+              date: new Date(o.createdAt).toISOString().split("T")[0],
+              sku: o.items?.[0]?.sku || "SAR_DRP",
+              productName: o.items?.[0]?.name || "Handloom Saree",
+              quantity: o.items?.reduce((sum: number, it: any) => sum + (it.quantity || 1), 0) || 1,
+              total: o.total,
+              status: (o.status === "Confirmed" ? "Pending" : o.status) as any,
+            }));
+            setOrders(mapped);
+          }
+        }
+
+        if (prodRes.ok) {
+          const prodData = await prodRes.json();
+          if (Array.isArray(prodData) && prodData.length > 0) {
+            setProducts(prodData);
+          }
+        }
+
+        if (usersRes.ok) {
+          const userData = await usersRes.json();
+          if (userData.success && typeof userData.count === "number") {
+            setCustomerCount(userData.count);
+          }
         }
       } catch (err) {
-        console.error("Failed to load live orders for overview:", err);
+        console.error("Failed to load live dashboard data:", err);
       }
     };
 
-    fetchLiveOrders();
-    window.addEventListener("thiraala-orders-updated", fetchLiveOrders);
+    fetchDashboardData();
+    window.addEventListener("thiraala-orders-updated", fetchDashboardData);
+    window.addEventListener("thiraala-auth-updated", fetchDashboardData);
     return () => {
-      window.removeEventListener("thiraala-orders-updated", fetchLiveOrders);
+      window.removeEventListener("thiraala-orders-updated", fetchDashboardData);
+      window.removeEventListener("thiraala-auth-updated", fetchDashboardData);
     };
   }, []);
 
@@ -196,9 +221,9 @@ export default function DashboardPage() {
       orderCount: orders.length,
       outOfStockCount,
       lowStockCount,
-      customerCount: 142, // Simulated customer base
+      customerCount: customerCount > 0 ? customerCount : 3,
     };
-  }, [orders, products]);
+  }, [orders, products, customerCount]);
 
   // Product Categories
   const categories = useMemo(() => {

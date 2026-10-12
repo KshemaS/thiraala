@@ -1,36 +1,157 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Container from "@/components/Container";
+import RegisterModal from "@/components/RegisterModal";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function CartPage() {
   const { cart, removeFromCart, updateQuantity, cartTotal, clearCart } = useCart();
+  const { user } = useAuth();
+
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isOrderPlaced, setIsOrderPlaced] = useState(false);
   const [orderTotal, setOrderTotal] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdOrder, setCreatedOrder] = useState<any>(null);
 
-  // Checkout Form State
+  // Checkout Form State - Contact Info
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [address, setAddress] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"COD" | "UPI">("COD");
+
+  // Detailed Delivery Address State
+  const [houseOrFlat, setHouseOrFlat] = useState("");
+  const [street, setStreet] = useState("");
+  const [pincode, setPincode] = useState("");
+  const [city, setCity] = useState("");
+  const [district, setDistrict] = useState("");
+  const [state, setState] = useState("Kerala");
+  const [isPincodeSearching, setIsPincodeSearching] = useState(false);
+  const [pincodeStatus, setPincodeStatus] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+
+  const [paymentMethod] = useState<"UPI">("UPI");
+
+  // Sync user info into form state when user logs in
+  useEffect(() => {
+    if (user) {
+      if (!name) setName(`${user.firstName} ${user.lastName || ""}`.trim());
+      if (!email && user.email) setEmail(user.email);
+      if (!phone && user.phone) setPhone(user.phone);
+    }
+  }, [user]);
+
+  // Pincode Search & Auto-fill Handler
+  const handleSearchPincode = async (codeToSearch?: string) => {
+    const pin = (codeToSearch || pincode).trim();
+    if (pin.length !== 6 || !/^\d{6}$/.test(pin)) {
+      setPincodeStatus({
+        type: "error",
+        message: "Please enter a valid 6-digit Indian postal code.",
+      });
+      return;
+    }
+
+    setIsPincodeSearching(true);
+    setPincodeStatus(null);
+
+    try {
+      const res = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
+      const data = await res.json();
+
+      if (Array.isArray(data) && data[0]?.Status === "Success" && data[0]?.PostOffice?.length > 0) {
+        const offices = data[0].PostOffice;
+        const po = offices[0];
+        const detectedCity = po.Block && po.Block !== "NA" ? po.Block : po.Name || "";
+        const detectedDistrict = po.District || "";
+        const detectedState = po.State || "Kerala";
+
+        if (detectedCity) setCity(detectedCity);
+        if (detectedDistrict) setDistrict(detectedDistrict);
+        if (detectedState) setState(detectedState);
+
+        setPincodeStatus({
+          type: "success",
+          message: `Location verified: ${[detectedCity, detectedDistrict, detectedState].filter(Boolean).join(", ")}`,
+        });
+      } else {
+        setPincodeStatus({
+          type: "error",
+          message: "Pincode not found online. You can enter city, district, and state manually.",
+        });
+      }
+    } catch (err) {
+      console.warn("Pincode API lookup network notice:", err);
+      setPincodeStatus({
+        type: "error",
+        message: "Unable to verify online. Please enter city, district, and state manually.",
+      });
+    } finally {
+      setIsPincodeSearching(false);
+    }
+  };
+
+  // Proceed to Checkout button click handler
+  const handleProceedToCheckout = () => {
+    if (user) {
+      // If user is already logged in: no need to show login or reg modal, proceed directly with checkout
+      if (!name) setName(`${user.firstName} ${user.lastName || ""}`.trim());
+      if (!email && user.email) setEmail(user.email);
+      if (!phone && user.phone) setPhone(user.phone);
+      setIsCheckoutOpen(true);
+    } else {
+      // If user is not logged in: show the login or reg modal
+      setIsAuthModalOpen(true);
+    }
+  };
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0) return;
 
+    if (!houseOrFlat.trim()) {
+      alert("Please provide your house name or flat name & number.");
+      return;
+    }
+
+    if (!pincode.trim() || pincode.trim().length !== 6) {
+      alert("Please enter a valid 6-digit delivery pincode.");
+      return;
+    }
+
+    if (!city.trim()) {
+      alert("Please provide the city / town.");
+      return;
+    }
+
+    if (!district.trim()) {
+      alert("Please provide the district.");
+      return;
+    }
+
     setIsSubmitting(true);
     const finalTotal = cartTotal;
     setOrderTotal(finalTotal);
+
+    const fullAddress = [
+      houseOrFlat.trim(),
+      street.trim(),
+      city.trim(),
+      district.trim(),
+      state.trim() ? `${state.trim()} - ${pincode.trim()}` : pincode.trim(),
+    ]
+      .filter(Boolean)
+      .join(", ");
 
     try {
       const response = await fetch("/api/orders", {
@@ -40,7 +161,13 @@ export default function CartPage() {
           customerName: name,
           phone,
           email,
-          address,
+          address: fullAddress,
+          houseOrFlat: houseOrFlat.trim(),
+          street: street.trim(),
+          pincode: pincode.trim(),
+          city: city.trim(),
+          district: district.trim(),
+          state: state.trim(),
           paymentMethod,
           total: finalTotal,
           subtotal: finalTotal,
@@ -64,7 +191,13 @@ export default function CartPage() {
         setName("");
         setPhone("");
         setEmail("");
-        setAddress("");
+        setHouseOrFlat("");
+        setStreet("");
+        setPincode("");
+        setCity("");
+        setDistrict("");
+        setState("Kerala");
+        setPincodeStatus(null);
       } else {
         alert(data.error || "Failed to place order. Please try again.");
       }
@@ -105,44 +238,28 @@ export default function CartPage() {
                 Thank you for your order. We are preparing your handwoven drapes. You can track its live fulfillment journey right here.
               </p>
 
-              {/* UPI Payment QR Code Section (if UPI) or COD info */}
-              {createdOrder?.paymentMethod === "UPI" ? (
-                <div className="mt-8 p-6 bg-white border border-[#1E3A2C]/10 rounded-3xl shadow-sm flex flex-col items-center max-w-sm w-full mx-auto">
-                  <span className="text-[10px] font-bold text-[#DAA87C] uppercase tracking-wider mb-2">Scan to Pay via UPI</span>
-                  
-                  {/* QR Image with scanner lines */}
-                  <div className="relative w-44 h-44 border border-[#1E3A2C]/5 rounded-2xl p-2 bg-[#fcfbfa] flex items-center justify-center overflow-hidden">
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-                        `upi://pay?pa=thiraala@okaxis&pn=thiraala&am=${orderTotal}&cu=INR`
-                      )}&color=1e3a2c`}
-                      alt="UPI QR Code"
-                      className="w-40 h-40 object-contain rounded-xl select-none"
-                    />
-                    {/* Scanner laser line animation */}
-                    <div className="absolute left-0 right-0 h-[2.5px] bg-[#DAA87C] opacity-60 shadow-[0_0_8px_#DAA87C] animate-scan-laser" />
-                  </div>
-                  
-                  <span className="text-xs font-extrabold text-[#1E3A2C] mt-4">Amount: Rs. {orderTotal.toLocaleString()}</span>
-                  <p className="text-[10px] text-[#1E3A2C]/50 mt-1.5 font-semibold text-center leading-relaxed">
-                    Scan this QR code using GPAY, PhonePe, Paytm, or any UPI app to complete payment.
-                  </p>
+              {/* UPI Payment QR Code Section */}
+              <div className="mt-8 p-6 bg-white border border-[#1E3A2C]/10 rounded-3xl shadow-sm flex flex-col items-center max-w-sm w-full mx-auto">
+                <span className="text-[10px] font-bold text-[#DAA87C] uppercase tracking-wider mb-2">Scan to Pay via UPI</span>
+                
+                {/* QR Image with scanner lines */}
+                <div className="relative w-44 h-44 border border-[#1E3A2C]/5 rounded-2xl p-2 bg-[#fcfbfa] flex items-center justify-center overflow-hidden">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+                      `upi://pay?pa=thiraala@okaxis&pn=thiraala&am=${orderTotal}&cu=INR`
+                    )}&color=1e3a2c`}
+                    alt="UPI QR Code"
+                    className="w-40 h-40 object-contain rounded-xl select-none"
+                  />
+                  {/* Scanner laser line animation */}
+                  <div className="absolute left-0 right-0 h-[2.5px] bg-[#DAA87C] opacity-60 shadow-[0_0_8px_#DAA87C] animate-scan-laser" />
                 </div>
-              ) : (
-                <div className="mt-6 p-4 bg-emerald-50/60 border border-emerald-100 rounded-2xl flex items-center gap-3 text-left max-w-sm w-full">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-800 flex-shrink-0">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-emerald-950">Cash on Delivery Confirmed</h4>
-                    <p className="text-[11px] text-emerald-800 font-medium mt-0.5">
-                      Pay <span className="font-bold">₹{orderTotal.toLocaleString()}</span> in cash to the courier upon delivery.
-                    </p>
-                  </div>
-                </div>
-              )}
+                
+                <span className="text-xs font-extrabold text-[#1E3A2C] mt-4">Amount: Rs. {orderTotal.toLocaleString()}</span>
+                <p className="text-[10px] text-[#1E3A2C]/50 mt-1.5 font-semibold text-center leading-relaxed">
+                  Scan this QR code using GPAY, PhonePe, Paytm, or any UPI app to complete payment.
+                </p>
+              </div>
 
               {/* Action Buttons: Track Order & Continue Shopping */}
               <div className="mt-8 flex flex-col sm:flex-row items-center gap-3 w-full max-w-sm">
@@ -231,7 +348,7 @@ export default function CartPage() {
                                 {item.name}
                               </Link>
                               <p className="text-[10px] text-[#1E3A2C]/40 mt-1 font-semibold select-none">
-                                Free Delivery & COD Available
+                                Free Express Delivery Across India
                               </p>
                             </div>
                             
@@ -292,10 +409,6 @@ export default function CartPage() {
                     <span className="text-[#1E3A2C]/65">Shipping</span>
                     <span className="text-emerald-600 font-bold">FREE</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#1E3A2C]/65">Cash on Delivery</span>
-                    <span className="text-emerald-600 font-bold">FREE</span>
-                  </div>
                   <div className="border-t border-[#1E3A2C]/10 pt-3.5 flex justify-between text-sm font-extrabold text-[#0c2b1c]">
                     <span>Total Amount</span>
                     <span>Rs. {cartTotal.toLocaleString()}</span>
@@ -303,7 +416,7 @@ export default function CartPage() {
                 </div>
 
                 <button
-                  onClick={() => setIsCheckoutOpen(true)}
+                  onClick={handleProceedToCheckout}
                   className="w-full h-12 mt-2 text-xs font-bold btn-animate-border btn-animate-border-dark rounded-full shadow-md shadow-[#1E3A2C]/10 transition-all hover:scale-[1.01] flex items-center justify-center gap-1.5 group cursor-pointer text-white"
                 >
                   Proceed to Checkout
@@ -317,6 +430,21 @@ export default function CartPage() {
           )}
         </Container>
       </main>
+
+      {/* Login / Registration Modal (Shown only when not logged in) */}
+      <RegisterModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        initialMode="login"
+        onRegisterSuccess={(loggedInUser) => {
+          setIsAuthModalOpen(false);
+          // Auto-fill delivery form and open checkout
+          if (!name) setName(`${loggedInUser.firstName} ${loggedInUser.lastName || ""}`.trim());
+          if (!email && loggedInUser.email) setEmail(loggedInUser.email);
+          if (!phone && loggedInUser.phone) setPhone(loggedInUser.phone);
+          setIsCheckoutOpen(true);
+        }}
+      />
 
       {/* Checkout Drawer / Modal */}
       <AnimatePresence>
@@ -337,7 +465,7 @@ export default function CartPage() {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
               transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              className="relative w-full max-w-md bg-[#fcfbfa] p-8 sm:p-10 rounded-3xl border border-[#1E3A2C]/10 shadow-2xl z-10 flex flex-col gap-6 my-auto max-h-[92vh] overflow-y-auto scrollbar-none"
+              className="relative w-full max-w-lg bg-[#fcfbfa] p-7 sm:p-9 rounded-3xl border border-[#1E3A2C]/10 shadow-2xl z-10 flex flex-col gap-5 my-auto max-h-[92vh] overflow-y-auto scrollbar-none"
             >
               {/* Close button */}
               <button
@@ -353,105 +481,230 @@ export default function CartPage() {
               <div className="text-center select-none">
                 <h3 className="text-2xl font-bold text-[#1E3A2C] tracking-tight">Checkout</h3>
                 <p className="text-xs text-[#1E3A2C]/65 mt-1 font-semibold">
-                  Provide delivery details to complete your order
+                  Provide your contact & detailed delivery address
                 </p>
-                <div className="w-10 h-0.5 bg-[#DAA87C] mx-auto mt-3 rounded-full"></div>
+                <div className="w-10 h-0.5 bg-[#DAA87C] mx-auto mt-2.5 rounded-full"></div>
               </div>
 
               {/* Delivery info form */}
               <form onSubmit={handlePlaceOrder} className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
-                    Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Enter your full name"
-                    className="w-full h-12 px-4 rounded-xl border border-[#DAA87C]/50 text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#1E3A2C] focus:ring-1 focus:ring-[#1E3A2C] outline-none bg-white transition-all"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                
+                {/* Contact Information Section */}
+                <div className="flex flex-col gap-3">
                   <div className="flex flex-col gap-1.5">
                     <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
-                      Phone Number *
+                      Full Name *
                     </label>
                     <input
-                      type="tel"
+                      type="text"
                       required
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="10-digit mobile"
-                      className="w-full h-12 px-4 rounded-xl border border-[#DAA87C]/50 text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#1E3A2C] focus:ring-1 focus:ring-[#1E3A2C] outline-none bg-white transition-all"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Enter your full name"
+                      className="w-full h-11 px-4 rounded-xl border border-[#DAA87C]/50 text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#1E3A2C] focus:ring-1 focus:ring-[#1E3A2C] outline-none bg-white transition-all"
                     />
                   </div>
 
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                        Phone Number *
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="10-digit mobile"
+                        className="w-full h-11 px-4 rounded-xl border border-[#DAA87C]/50 text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#1E3A2C] focus:ring-1 focus:ring-[#1E3A2C] outline-none bg-white transition-all"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                        Email Address
+                      </label>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="For tracking receipt"
+                        className="w-full h-11 px-4 rounded-xl border border-[#DAA87C]/50 text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#1E3A2C] focus:ring-1 focus:ring-[#1E3A2C] outline-none bg-white transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Delivery Address Section (Split Fields with Pincode Search) */}
+                <div className="flex flex-col gap-3 pt-3 border-t border-[#1E3A2C]/10">
+                  <div className="flex items-center justify-between select-none">
+                    <span className="text-[10px] font-bold text-[#1E3A2C] uppercase tracking-wider">
+                      Delivery Address
+                    </span>
+                    <span className="text-[10px] text-[#DAA87C] font-semibold">
+                      Enter Pincode for auto-fill
+                    </span>
+                  </div>
+
+                  {/* 1. Pincode Search Row */}
                   <div className="flex flex-col gap-1.5">
                     <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
-                      Email Address
+                      Pincode *
+                    </label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          maxLength={6}
+                          required
+                          value={pincode}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, "");
+                            setPincode(val);
+                            if (val.length === 6) {
+                              handleSearchPincode(val);
+                            } else {
+                              setPincodeStatus(null);
+                            }
+                          }}
+                          placeholder="6-digit Pincode"
+                          className="w-full h-11 px-4 rounded-xl border border-[#DAA87C]/50 text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#1E3A2C] focus:ring-1 focus:ring-[#1E3A2C] outline-none bg-white transition-all tracking-wider"
+                        />
+                        {isPincodeSearching && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                            <div className="w-4 h-4 border-2 border-[#DAA87C] border-t-transparent rounded-full animate-spin" />
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={isPincodeSearching || pincode.length !== 6}
+                        onClick={() => handleSearchPincode(pincode)}
+                        className="px-4 h-11 rounded-xl bg-[#1E3A2C] hover:bg-[#0c2b1c] disabled:opacity-40 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm select-none"
+                      >
+                        <svg className="w-3.5 h-3.5 text-[#DAA87C]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <span>Search</span>
+                      </button>
+                    </div>
+
+                    {/* Pincode Search Status Banner */}
+                    {pincodeStatus && (
+                      <p
+                        className={`text-[11px] font-semibold mt-0.5 flex items-center gap-1.5 select-none ${
+                          pincodeStatus.type === "success" ? "text-emerald-700" : "text-amber-700"
+                        }`}
+                      >
+                        {pincodeStatus.type === "success" ? (
+                          <svg className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                          <svg className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                        )}
+                        <span>{pincodeStatus.message}</span>
+                      </p>
+                    )}
+                  </div>
+
+                  {/* 2. House Name or Flat Name & Number */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                      House / Flat Name & Number *
                     </label>
                     <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="For tracking receipt"
-                      className="w-full h-12 px-4 rounded-xl border border-[#DAA87C]/50 text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#1E3A2C] focus:ring-1 focus:ring-[#1E3A2C] outline-none bg-white transition-all"
+                      type="text"
+                      required
+                      value={houseOrFlat}
+                      onChange={(e) => setHouseOrFlat(e.target.value)}
+                      placeholder="e.g. Flat 4B, Emerald Heights / Rose Villa"
+                      className="w-full h-11 px-4 rounded-xl border border-[#DAA87C]/50 text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#1E3A2C] focus:ring-1 focus:ring-[#1E3A2C] outline-none bg-white transition-all"
+                    />
+                  </div>
+
+                  {/* 3. Street / Area / Landmark */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                      Street / Area / Landmark
+                    </label>
+                    <input
+                      type="text"
+                      value={street}
+                      onChange={(e) => setStreet(e.target.value)}
+                      placeholder="e.g. MG Road, Near North Railway Station"
+                      className="w-full h-11 px-4 rounded-xl border border-[#DAA87C]/50 text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#1E3A2C] focus:ring-1 focus:ring-[#1E3A2C] outline-none bg-white transition-all"
+                    />
+                  </div>
+
+                  {/* 4. City & District (2 Columns) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                        City / Town *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        placeholder="e.g. Kochi"
+                        className="w-full h-11 px-4 rounded-xl border border-[#DAA87C]/50 text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#1E3A2C] focus:ring-1 focus:ring-[#1E3A2C] outline-none bg-white transition-all"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                        District *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={district}
+                        onChange={(e) => setDistrict(e.target.value)}
+                        placeholder="e.g. Ernakulam"
+                        className="w-full h-11 px-4 rounded-xl border border-[#DAA87C]/50 text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#1E3A2C] focus:ring-1 focus:ring-[#1E3A2C] outline-none bg-white transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 5. State */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                      State *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={state}
+                      onChange={(e) => setState(e.target.value)}
+                      placeholder="e.g. Kerala"
+                      className="w-full h-11 px-4 rounded-xl border border-[#DAA87C]/50 text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#1E3A2C] focus:ring-1 focus:ring-[#1E3A2C] outline-none bg-white transition-all"
                     />
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
-                    Delivery Address *
-                  </label>
-                  <textarea
-                    required
-                    rows={2}
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="House/Flat No, Street, City, Pincode"
-                    className="w-full p-4 rounded-xl border border-[#DAA87C]/50 text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#1E3A2C] focus:ring-1 focus:ring-[#1E3A2C] outline-none bg-white transition-all resize-none"
-                  />
-                </div>
-
-                {/* Payment Option Selector */}
-                <div className="flex flex-col gap-1.5">
+                {/* Payment Option Selector (UPI QR Payment) */}
+                <div className="flex flex-col gap-1.5 pt-2 border-t border-[#1E3A2C]/10">
                   <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
                     Payment Method
                   </label>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod("COD")}
-                      className={`p-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition-all cursor-pointer ${
-                        paymentMethod === "COD"
-                          ? "bg-[#1E3A2C] text-white border-[#1E3A2C] shadow-sm"
-                          : "bg-white text-[#1E3A2C]/70 border-[#1E3A2C]/10 hover:border-[#1E3A2C]/30"
-                      }`}
-                    >
-                      <span>Cash on Delivery</span>
-                      <span className={`text-[10px] font-medium ${paymentMethod === "COD" ? "text-[#DAA87C]" : "text-[#1E3A2C]/50"}`}>
-                        Pay when delivered
+                  <div className="p-3.5 rounded-xl border border-[#1E3A2C] bg-[#1E3A2C] text-white flex items-center justify-between shadow-sm select-none">
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold">UPI QR Payment</span>
+                        <span className="px-1.5 py-0.5 text-[9px] font-bold bg-[#DAA87C] text-[#1E3A2C] rounded-full uppercase tracking-wider">Secure</span>
+                      </div>
+                      <span className="text-[10px] text-[#DAA87C] font-medium">
+                        GPay, PhonePe, Paytm, BHIM UPI
                       </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethod("UPI")}
-                      className={`p-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition-all cursor-pointer ${
-                        paymentMethod === "UPI"
-                          ? "bg-[#1E3A2C] text-white border-[#1E3A2C] shadow-sm"
-                          : "bg-white text-[#1E3A2C]/70 border-[#1E3A2C]/10 hover:border-[#1E3A2C]/30"
-                      }`}
-                    >
-                      <span>UPI QR Payment</span>
-                      <span className={`text-[10px] font-medium ${paymentMethod === "UPI" ? "text-[#DAA87C]" : "text-[#1E3A2C]/50"}`}>
-                        GPay, PhonePe, Paytm
-                      </span>
-                    </button>
+                    </div>
+                    <div className="w-5 h-5 rounded-full bg-emerald-400 text-[#1E3A2C] flex items-center justify-center font-bold text-xs shadow-inner">
+                      ✓
+                    </div>
                   </div>
                 </div>
 
@@ -460,11 +713,7 @@ export default function CartPage() {
                   <svg className="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
-                  <span>
-                    {paymentMethod === "COD"
-                      ? "Pay via Cash on Delivery upon doorstep inspection."
-                      : "Instant verification via BHIM UPI QR Code."}
-                  </span>
+                  <span>Instant verification via BHIM UPI QR Code. Scan using any UPI app.</span>
                 </div>
 
                 <button

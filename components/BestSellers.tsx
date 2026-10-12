@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -44,6 +45,28 @@ const bestSellers = [
 ];
 
 export default function BestSellers() {
+  const [items, setItems] = useState<any[]>(bestSellers);
+
+  useEffect(() => {
+    const fetchBestSellers = async () => {
+      try {
+        const res = await fetch("/api/products/filter?sort=rating&limit=4");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.products) && data.products.length > 0) {
+            setItems(data.products.slice(0, 4));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load best sellers:", err);
+      }
+    };
+
+    fetchBestSellers();
+    window.addEventListener("thiraala-products-updated", fetchBestSellers);
+    return () => window.removeEventListener("thiraala-products-updated", fetchBestSellers);
+  }, []);
+
   const containerVariants = {
     hidden: { opacity: 0 },
     show: {
@@ -125,9 +148,15 @@ export default function BestSellers() {
 
           {/* Grid listing section using unique Arch Card style */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10 sm:gap-4">
-            {bestSellers.map((saree, idx) => {
+            {items.map((saree, idx) => {
               const col = idx % 4;
               const cardVariant = col === 0 ? leftVariant : col === 3 ? rightVariant : centerVariant;
+              const wornSrc =
+                typeof saree.wornImg === "string"
+                  ? saree.wornImg
+                  : saree.wornImg?.src || saree.foldedImg || "/images/gopura.jpeg";
+              const altText = saree.altWorn || saree.alt || saree.name;
+
               return (
                 <motion.div
                   key={saree.id}
@@ -141,8 +170,8 @@ export default function BestSellers() {
                     {/* Arch-Shaped Image Container with Shadow */}
                     <div className="relative aspect-[2/3] w-[85%] sm:w-[100%] mx-auto overflow-hidden rounded-t-full shadow-md border border-[#1E3A2C]/5 bg-[#fbfaf8] transition-shadow duration-300 group-hover:shadow-lg">
                       <Image
-                        src={saree.wornImg.src}
-                        alt={saree.altWorn}
+                        src={wornSrc}
+                        alt={altText}
                         fill
                         sizes="(max-width: 768px) 80vw, (max-width: 1024px) 40vw, 25vw"
                         className="object-cover transition-transform duration-700 group-hover:scale-105 pointer-events-none"

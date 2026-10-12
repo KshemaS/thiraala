@@ -195,7 +195,7 @@ export async function POST(request: Request) {
       createdAt: newUser.createdAt,
     };
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         success: true,
         message: "Account created successfully!",
@@ -203,6 +203,14 @@ export async function POST(request: Request) {
       },
       { status: 201 }
     );
+
+    response.cookies.set("thiraala_user_id", newUser.id, {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+      sameSite: "lax",
+    });
+
+    return response;
   } catch (error: any) {
     console.error("Signup API error:", error);
     return NextResponse.json(

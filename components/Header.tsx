@@ -7,11 +7,12 @@ import Container from "@/components/Container";
 import RegisterModal, { UserData } from "@/components/RegisterModal";
 import { useWishlist } from "@/context/WishlistContext";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Header() {
   const [isVisible, setIsVisible] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
-  const [user, setUser] = useState<UserData | null>(null);
+  const { user, logout } = useAuth();
   
   const { wishlist } = useWishlist();
   const { cartCount } = useCart();
@@ -19,16 +20,6 @@ export default function Header() {
   const lastScrollY = useRef(0);
 
   useEffect(() => {
-    // Load user from localStorage on mount
-    const storedUser = localStorage.getItem("thiraala_user");
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (e) {
-        console.error("Failed to parse stored user", e);
-      }
-    }
-
     const threshold = 10; // Minimum scroll change to trigger a hide/show toggle
 
     const handleScroll = () => {
@@ -68,9 +59,8 @@ export default function Header() {
 
 
 
-  const handleLogout = () => {
-    localStorage.removeItem("thiraala_user");
-    setUser(null);
+  const handleLogout = async () => {
+    await logout();
   };
 
   return (
@@ -101,6 +91,9 @@ export default function Header() {
             </Link>
             <Link href="/products" className="px-4 py-1.5 text-[13px] font-semibold text-[#1E3A2C]/70 hover:text-[#DAA87C] transition-colors cursor-pointer">
               Products
+            </Link>
+            <Link href="/orders" className="px-4 py-1.5 text-[13px] font-semibold text-[#1E3A2C]/70 hover:text-[#DAA87C] transition-colors cursor-pointer">
+              Orders
             </Link>
             <Link href="/contact" className="px-4 py-1.5 text-[13px] font-semibold text-[#1E3A2C]/70 hover:text-[#DAA87C] transition-colors cursor-pointer">
               Contact
@@ -149,15 +142,36 @@ export default function Header() {
                   </svg>
                 </button>
                 {/* Dropdown Menu */}
-                <div className="absolute right-0 mt-2 w-48 bg-white border border-[#1E3A2C]/10 rounded-2xl shadow-xl py-2 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-300 z-50">
+                <div className="absolute right-0 mt-2 w-52 bg-white border border-[#1E3A2C]/10 rounded-2xl shadow-xl py-2 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-300 z-50">
                   <div className="px-4 py-2 border-b border-[#1E3A2C]/5 text-left">
                     <p className="text-[10px] font-bold text-[#DAA87C] uppercase tracking-wider">Account Info</p>
                     <p className="text-xs font-bold text-[#1E3A2C] truncate mt-1">{user.firstName} {user.lastName}</p>
                     <p className="text-[10px] font-semibold text-[#1E3A2C]/60 truncate">{user.email}</p>
                   </div>
+
+                  <Link
+                    href="/orders"
+                    className="w-full text-left px-4 py-2.5 text-xs font-bold text-[#1E3A2C] hover:bg-[#1E3A2C]/5 transition-colors flex items-center gap-2.5 cursor-pointer"
+                  >
+                    <svg className="w-3.5 h-3.5 text-[#DAA87C]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>
+                    My Orders
+                  </Link>
+
+                  <Link
+                    href="/track-order"
+                    className="w-full text-left px-4 py-2.5 text-xs font-bold text-[#1E3A2C] hover:bg-[#1E3A2C]/5 transition-colors flex items-center gap-2.5 cursor-pointer border-b border-[#1E3A2C]/5"
+                  >
+                    <svg className="w-3.5 h-3.5 text-[#DAA87C]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                    </svg>
+                    Track Shipment
+                  </Link>
+
                   <button
                     onClick={handleLogout}
-                    className="w-full text-left px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 cursor-pointer"
+                    className="w-full text-left px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 cursor-pointer mt-1"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -185,7 +199,6 @@ export default function Header() {
       <RegisterModal
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
-        onRegisterSuccess={(userData) => setUser(userData)}
       />
     </>
   );

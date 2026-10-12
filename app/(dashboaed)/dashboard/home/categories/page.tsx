@@ -28,8 +28,6 @@ export interface CategoryItem {
   status: "active" | "inactive";
 }
 
-const STORAGE_KEY = "thiraala_categories";
-
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -54,18 +52,10 @@ export default function CategoriesPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load categories from localStorage and API
+  // Load categories from API
   useEffect(() => {
     const loadCategories = async () => {
       try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            setCategories(parsed);
-          }
-        }
-
         const [catRes, prodRes] = await Promise.all([
           fetch("/api/categories"),
           fetch("/api/products"),
@@ -74,7 +64,6 @@ export default function CategoriesPage() {
           const data = await catRes.json();
           if (Array.isArray(data)) {
             setCategories(data);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
           }
         }
         if (prodRes.ok) {
@@ -184,7 +173,6 @@ export default function CategoriesPage() {
 
     setCategories(updated);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       await fetch("/api/categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -208,7 +196,6 @@ export default function CategoriesPage() {
     const updated = categories.filter((cat) => cat.id !== id);
     setCategories(updated);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       await fetch("/api/categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
