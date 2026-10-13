@@ -79,8 +79,12 @@ function TrackOrderContent() {
     switch (status) {
       case "Delivered":
         return "bg-emerald-50 text-emerald-700 border-emerald-200";
+      case "In Transit":
+        return "bg-indigo-50 text-indigo-700 border-indigo-200";
+      case "Dispatched":
       case "Shipped":
         return "bg-blue-50 text-blue-700 border-blue-200";
+      case "Order Confirmed":
       case "Confirmed":
         return "bg-amber-50 text-amber-700 border-amber-200";
       case "Cancelled":
@@ -222,8 +226,111 @@ function TrackOrderContent() {
                   </div>
                 </div>
 
+                {/* Horizontal Visual Progress Bar */}
+                {order.status !== "Cancelled" && (
+                  <div className="pt-8 pb-4 border-b border-[#1E3A2C]/10 mb-8">
+                    <div className="grid grid-cols-4 relative max-w-xl mx-auto">
+                      {/* Connected Line Background */}
+                      <div className="absolute top-4 left-[12%] right-[12%] h-1 bg-[#1E3A2C]/10 rounded-full -z-0" />
+
+                      {/* Active Connected Line */}
+                      {(() => {
+                        const stageIndex =
+                          order.status === "Delivered"
+                            ? 3
+                            : order.status === "In Transit"
+                            ? 2
+                            : order.status === "Dispatched" || order.status === "Shipped"
+                            ? 1
+                            : order.status === "Order Confirmed" || order.status === "Confirmed"
+                            ? 0
+                            : -1;
+                        const widthPct =
+                          stageIndex === 3
+                            ? "100%"
+                            : stageIndex === 2
+                            ? "66%"
+                            : stageIndex === 1
+                            ? "33%"
+                            : stageIndex === 0
+                            ? "5%"
+                            : "0%";
+                        return (
+                          <div
+                            style={{ width: `calc(${widthPct} * 0.76)` }}
+                            className="absolute top-4 left-[12%] h-1 bg-emerald-600 rounded-full transition-all duration-700 -z-0"
+                          />
+                        );
+                      })()}
+
+                      {[
+                        {
+                          title: "Confirmed",
+                          icon: CheckCircle2,
+                          statusMatch: [
+                            "Order Confirmed",
+                            "Confirmed",
+                            "Dispatched",
+                            "Shipped",
+                            "In Transit",
+                            "Delivered",
+                          ],
+                        },
+                        {
+                          title: "Dispatched",
+                          icon: Package,
+                          statusMatch: ["Dispatched", "Shipped", "In Transit", "Delivered"],
+                        },
+                        {
+                          title: "In Transit",
+                          icon: Truck,
+                          statusMatch: ["In Transit", "Delivered"],
+                        },
+                        {
+                          title: "Delivered",
+                          icon: Check,
+                          statusMatch: ["Delivered"],
+                        },
+                      ].map((st, i) => {
+                        const isReached = st.statusMatch.includes(order.status);
+                        const isCurrent =
+                          (st.title === "Confirmed" &&
+                            (order.status === "Order Confirmed" || order.status === "Confirmed")) ||
+                          (st.title === "Dispatched" &&
+                            (order.status === "Dispatched" || order.status === "Shipped")) ||
+                          (st.title === "In Transit" && order.status === "In Transit") ||
+                          (st.title === "Delivered" && order.status === "Delivered");
+                        const Icon = st.icon;
+
+                        return (
+                          <div key={i} className="flex flex-col items-center text-center z-10">
+                            <div
+                              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                                isCurrent
+                                  ? "bg-[#1E3A2C] text-white ring-4 ring-[#DAA87C]/30 shadow-md"
+                                  : isReached
+                                  ? "bg-emerald-600 text-white"
+                                  : "bg-white border-2 border-[#1E3A2C]/20 text-[#1E3A2C]/40"
+                              }`}
+                            >
+                              <Icon className="w-4 h-4 stroke-[2.5]" />
+                            </div>
+                            <span
+                              className={`text-[11px] font-bold mt-2 ${
+                                isReached ? "text-[#1E3A2C]" : "text-[#1E3A2C]/40"
+                              }`}
+                            >
+                              {st.title}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Progress Stepper Timeline */}
-                <div className="pt-8">
+                <div>
                   <h3 className="text-xs font-bold uppercase tracking-wider text-[#1E3A2C]/60 mb-6 select-none">
                     Tracking Timeline
                   </h3>

@@ -16,7 +16,15 @@ export interface OrderItem {
   selectedColor?: string;
 }
 
-export type OrderStatus = "Pending" | "Confirmed" | "Shipped" | "Delivered" | "Cancelled";
+export type OrderStatus =
+  | "Pending"
+  | "Order Confirmed"
+  | "Dispatched"
+  | "In Transit"
+  | "Delivered"
+  | "Cancelled"
+  | "Confirmed"
+  | "Shipped";
 export type PaymentStatus = "Pending" | "Paid" | "Failed" | "Refunded";
 export type PaymentMethod = "COD" | "UPI" | "Card" | "NetBanking";
 
@@ -223,31 +231,31 @@ export async function POST(request: Request) {
       trackingTimeline: [
         {
           title: "Order Placed",
-          description: `Order placed successfully via ${paymentMethod === "COD" ? "Cash on Delivery" : "UPI Payment"}.`,
+          description: `Order placed successfully via ${paymentMethod === "COD" ? "Cash on Delivery" : "Online Payment"}.`,
           timestamp: now,
           completed: true,
         },
         {
-          title: "Order Confirmed & Packing",
-          description: "Artisanal handloom drape undergoing inspection and heritage packaging.",
+          title: "Order Confirmed",
+          description: "Artisanal handloom drape inspected and confirmed by Thiraala boutique.",
           timestamp: "",
           completed: false,
         },
         {
-          title: "Handed to Courier",
-          description: "Consignment will be handed over to logistics partner.",
+          title: "Dispatched",
+          description: "Consignment packed and dispatched from Thiraala fulfillment center.",
           timestamp: "",
           completed: false,
         },
         {
-          title: "Out for Delivery",
-          description: "Courier agent will arrive at your shipping address.",
+          title: "In Transit",
+          description: "Package is on its way and in transit to your shipping address.",
           timestamp: "",
           completed: false,
         },
         {
           title: "Delivered",
-          description: "Order completed and delivered to customer.",
+          description: "Order completed and delivered to customer. Enjoy your drape!",
           timestamp: "",
           completed: false,
         },

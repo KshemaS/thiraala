@@ -117,15 +117,16 @@ export default function OrdersDashboardPage() {
   const metrics = useMemo(() => {
     const total = orders.length;
     const pending = orders.filter((o) => o.status === "Pending").length;
-    const confirmed = orders.filter((o) => o.status === "Confirmed").length;
-    const shipped = orders.filter((o) => o.status === "Shipped").length;
+    const confirmed = orders.filter((o) => o.status === "Order Confirmed" || o.status === "Confirmed").length;
+    const dispatched = orders.filter((o) => o.status === "Dispatched" || o.status === "Shipped").length;
+    const inTransit = orders.filter((o) => o.status === "In Transit").length;
     const delivered = orders.filter((o) => o.status === "Delivered").length;
     const cancelled = orders.filter((o) => o.status === "Cancelled").length;
     const revenue = orders
       .filter((o) => o.status !== "Cancelled")
       .reduce((sum, o) => sum + (o.total || 0), 0);
 
-    return { total, pending, confirmed, shipped, delivered, cancelled, revenue };
+    return { total, pending, confirmed, dispatched, inTransit, delivered, cancelled, revenue };
   }, [orders]);
 
   // Filtered orders
@@ -140,7 +141,11 @@ export default function OrdersDashboardPage() {
         (o.email && o.email.toLowerCase().includes(q)) ||
         o.items.some((i) => i.name.toLowerCase().includes(q));
 
-      const matchesStatus = statusFilter === "All" || o.status === statusFilter;
+      const matchesStatus =
+        statusFilter === "All" ||
+        o.status === statusFilter ||
+        (statusFilter === "Order Confirmed" && o.status === "Confirmed") ||
+        (statusFilter === "Dispatched" && o.status === "Shipped");
       const matchesPayment =
         paymentFilter === "All" ||
         (paymentFilter === "COD" && o.paymentMethod === "COD") ||
@@ -205,7 +210,14 @@ export default function OrdersDashboardPage() {
         setOrders((prev) =>
           prev.map((o) => (o.id === orderId ? data.order : o))
         );
+        if (selectedOrder && selectedOrder.id === orderId) {
+          setSelectedOrder(data.order);
+          setEditStatus(data.order.status);
+        }
         showToast(`Order #${orderId} moved to ${newStatus}`);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("thiraala-orders-updated"));
+        }
       }
     } catch (err) {
       console.error("Error updating status:", err);
@@ -216,8 +228,12 @@ export default function OrdersDashboardPage() {
     switch (status) {
       case "Delivered":
         return "bg-emerald-50 text-emerald-700 border-emerald-200";
+      case "In Transit":
+        return "bg-indigo-50 text-indigo-700 border-indigo-200";
+      case "Dispatched":
       case "Shipped":
         return "bg-blue-50 text-blue-700 border-blue-200";
+      case "Order Confirmed":
       case "Confirmed":
         return "bg-amber-50 text-amber-700 border-amber-200";
       case "Cancelled":
@@ -231,10 +247,14 @@ export default function OrdersDashboardPage() {
     switch (status) {
       case "Delivered":
         return <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />;
+      case "In Transit":
+        return <Truck className="w-3.5 h-3.5 text-indigo-600" />;
+      case "Dispatched":
       case "Shipped":
-        return <Truck className="w-3.5 h-3.5 text-blue-600" />;
+        return <Package className="w-3.5 h-3.5 text-blue-600" />;
+      case "Order Confirmed":
       case "Confirmed":
-        return <Package className="w-3.5 h-3.5 text-amber-600" />;
+        return <CheckCircle2 className="w-3.5 h-3.5 text-amber-600" />;
       case "Cancelled":
         return <XCircle className="w-3.5 h-3.5 text-red-600" />;
       default:
@@ -325,9 +345,9 @@ export default function OrdersDashboardPage() {
         </div>
 
         <div className="bg-white p-4 rounded-2xl border border-indigo-200/80 bg-indigo-50/20 shadow-2xs">
-          <span className="text-[10px] uppercase font-bold text-indigo-900 tracking-wider">Shipped In-Transit</span>
-          <p className="text-xl font-extrabold text-indigo-950 mt-1 font-mono">{metrics.shipped}</p>
-          <span className="text-[10px] text-indigo-800/70 mt-0.5 block">On the road</span>
+          <span className="text-[10px] uppercase font-bold text-indigo-900 tracking-wider">Dispatched / In-Transit</span>
+          <p className="text-xl font-extrabold text-indigo-950 mt-1 font-mono">{metrics.dispatched + metrics.inTransit}</p>
+          <span className="text-[10px] text-indigo-800/70 mt-0.5 block">{metrics.inTransit} active in transit</span>
         </div>
 
         <div className="bg-white p-4 rounded-2xl border border-emerald-200/80 bg-emerald-50/20 shadow-2xs">
@@ -368,12 +388,20 @@ export default function OrdersDashboardPage() {
         {/* Status Pill Tabs & Payment Dropdown */}
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1 bg-[#FAF8F5] p-1 rounded-xl border border-[#1E3A2C]/10 text-xs font-semibold overflow-x-auto">
-            {["All", "Pending", "Confirmed", "Shipped", "Delivered", "Cancelled"].map((status) => (
+            {[
+              "All",
+              "Pending",
+              "Order Confirmed",
+              "Dispatched",
+              "In Transit",
+              "Delivered",
+              "Cancelled",
+            ].map((status) => (
               <button
                 key={status}
                 type="button"
                 onClick={() => setStatusFilter(status)}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer text-xs ${
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer text-xs whitespace-nowrap ${
                   statusFilter === status
                     ? "bg-[#1E3A2C] text-white font-bold shadow-2xs"
                     : "text-[#1E3A2C]/70 hover:text-[#1E3A2C] hover:bg-white/60"
@@ -538,8 +566,9 @@ export default function OrdersDashboardPage() {
                             title="Quick change status"
                           >
                             <option value="Pending">Pending</option>
-                            <option value="Confirmed">Confirmed</option>
-                            <option value="Shipped">Shipped</option>
+                            <option value="Order Confirmed">Order Confirmed</option>
+                            <option value="Dispatched">Dispatched</option>
+                            <option value="In Transit">In Transit</option>
                             <option value="Delivered">Delivered</option>
                             <option value="Cancelled">Cancelled</option>
                           </select>
@@ -725,6 +754,71 @@ export default function OrdersDashboardPage() {
                   </div>
                 </div>
 
+                {/* One-Click Quick Status Actions */}
+                <div className="bg-[#FAF8F5] p-4 rounded-2xl border border-[#1E3A2C]/10 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-[#1E3A2C]">
+                      Quick Update Stage
+                    </span>
+                    <span className="text-[10px] text-[#1E3A2C]/50 font-medium">
+                      One-click update to advance the tracking journey
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleQuickStatusChange(selectedOrder.id, "Order Confirmed")}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-1.5 cursor-pointer ${
+                        selectedOrder.status === "Order Confirmed" || selectedOrder.status === "Confirmed"
+                          ? "bg-amber-600 text-white border-amber-600 shadow-sm"
+                          : "bg-white text-amber-900 border-amber-200 hover:bg-amber-50"
+                      }`}
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Order Confirmed</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleQuickStatusChange(selectedOrder.id, "Dispatched")}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-1.5 cursor-pointer ${
+                        selectedOrder.status === "Dispatched" || selectedOrder.status === "Shipped"
+                          ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                          : "bg-white text-blue-900 border-blue-200 hover:bg-blue-50"
+                      }`}
+                    >
+                      <Package className="w-3.5 h-3.5" />
+                      <span>Dispatched</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleQuickStatusChange(selectedOrder.id, "In Transit")}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-1.5 cursor-pointer ${
+                        selectedOrder.status === "In Transit"
+                          ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                          : "bg-white text-indigo-900 border-indigo-200 hover:bg-indigo-50"
+                      }`}
+                    >
+                      <Truck className="w-3.5 h-3.5" />
+                      <span>In Transit</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleQuickStatusChange(selectedOrder.id, "Delivered")}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-1.5 cursor-pointer ${
+                        selectedOrder.status === "Delivered"
+                          ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                          : "bg-white text-emerald-900 border-emerald-200 hover:bg-emerald-50"
+                      }`}
+                    >
+                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                      <span>Delivered</span>
+                    </button>
+                  </div>
+                </div>
+
                 {/* Status Update Form Card */}
                 <form
                   onSubmit={handleUpdateOrder}
@@ -750,9 +844,10 @@ export default function OrdersDashboardPage() {
                         onChange={(e) => setEditStatus(e.target.value as OrderStatus)}
                         className="h-10 px-3 bg-[#FAF8F5] border border-[#1E3A2C]/15 rounded-xl text-xs font-bold text-[#1E3A2C] outline-none"
                       >
-                        <option value="Pending">Pending</option>
-                        <option value="Confirmed">Confirmed & Packing</option>
-                        <option value="Shipped">Shipped / Dispatched</option>
+                        <option value="Pending">Pending (Order Placed)</option>
+                        <option value="Order Confirmed">Order Confirmed</option>
+                        <option value="Dispatched">Dispatched</option>
+                        <option value="In Transit">In Transit</option>
                         <option value="Delivered">Delivered</option>
                         <option value="Cancelled">Cancelled</option>
                       </select>

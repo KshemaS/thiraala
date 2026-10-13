@@ -31,10 +31,10 @@
     "deliveryFee": 0,
     "discount": 0,
     "paymentMethod": "UPI",
-    "paymentStatus": "Pending",
-    "status": "Pending",
-    "trackingNumber": "",
-    "courierName": "",
+    "paymentStatus": "Paid",
+    "status": "Delivered",
+    "trackingNumber": "PC-8829103",
+    "courierName": "Professional Courier",
     "notes": "",
     "trackingTimeline": [
       {
@@ -44,32 +44,32 @@
         "completed": true
       },
       {
-        "title": "Order Confirmed & Packing",
+        "title": "Order Confirmed",
         "description": "Artisanal handloom drape undergoing inspection and heritage packaging.",
-        "timestamp": "",
-        "completed": false
+        "timestamp": "2026-10-13T19:08:50.613Z",
+        "completed": true
       },
       {
-        "title": "Handed to Courier",
-        "description": "Consignment will be handed over to logistics partner.",
-        "timestamp": "",
-        "completed": false
+        "title": "Dispatched",
+        "description": "Dispatched via Professional Courier (Tracking ID: PC-8829103).",
+        "timestamp": "2026-10-13T19:09:49.683Z",
+        "completed": true
       },
       {
-        "title": "Out for Delivery",
+        "title": "In Transit",
         "description": "Courier agent will arrive at your shipping address.",
-        "timestamp": "",
-        "completed": false
+        "timestamp": "2026-10-13T19:09:57.546Z",
+        "completed": true
       },
       {
         "title": "Delivered",
         "description": "Order completed and delivered to customer.",
-        "timestamp": "",
-        "completed": false
+        "timestamp": "2026-10-13T19:27:59.488Z",
+        "completed": true
       }
     ],
     "createdAt": "2026-10-12T17:45:55.767Z",
-    "updatedAt": "2026-10-12T17:45:55.767Z"
+    "updatedAt": "2026-10-13T19:27:59.488Z"
   },
   {
     "id": "THR-1088",

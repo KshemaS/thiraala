@@ -3,11 +3,25 @@
 import { useState } from "react";
 import Image from "next/image";
 import { SareeProduct } from "@/data/products";
+import { UnifiedProduct } from "@/lib/products";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
-import { ShoppingBag, Heart, Truck } from "lucide-react";
+import { ShoppingBag, Heart, Truck, CheckCircle2, AlertCircle, MapPin, Loader2 } from "lucide-react";
 
-export default function ProductInfo({ product }: { product: SareeProduct }) {
+export interface PincodeCheckResult {
+  valid: boolean;
+  message: string;
+  carrier?: string;
+  location?: string;
+  postOffice?: string;
+  district?: string;
+  state?: string;
+  estimatedDays?: string;
+  estimatedDate?: string;
+  hasDirectDelivery?: boolean;
+}
+
+export default function ProductInfo({ product }: { product: SareeProduct | UnifiedProduct | any }) {
   const { addToCart } = useCart();
   const { toggleWishlist, isInWishlist } = useWishlist();
 
@@ -16,10 +30,8 @@ export default function ProductInfo({ product }: { product: SareeProduct }) {
     product.selectedColor || product.color || "Wine Lily"
   );
   const [pincode, setPincode] = useState("");
-  const [pincodeStatus, setPincodeStatus] = useState<{
-    valid: boolean;
-    message: string;
-  } | null>(null);
+  const [isCheckingPincode, setIsCheckingPincode] = useState(false);
+  const [pincodeStatus, setPincodeStatus] = useState<PincodeCheckResult | null>(null);
   const [buyNowNotice, setBuyNowNotice] = useState<string | null>(null);
 
   const isWishlisted = isInWishlist(product.id);
@@ -66,19 +78,50 @@ export default function ProductInfo({ product }: { product: SareeProduct }) {
     },
   ];
 
-  // Delivery check handler
-  const handleCheckPincode = () => {
-    if (!pincode.trim() || pincode.trim().length !== 6) {
+  // India Post Delivery check handler
+  const handleCheckPincode = async () => {
+    const pin = pincode.trim();
+    if (!pin || pin.length !== 6 || !/^\d{6}$/.test(pin)) {
       setPincodeStatus({
         valid: false,
-        message: "Please enter a valid 6-digit Kerala pincode.",
+        message: "Please enter a valid 6-digit Indian PIN code.",
       });
       return;
     }
-    setPincodeStatus({
-      valid: true,
-      message: `Delivery available to ${pincode}! Expected delivery within 2-3 business days.`,
-    });
+
+    setIsCheckingPincode(true);
+    try {
+      const res = await fetch(`/api/pincode/check?pincode=${pin}`);
+      const data = await res.json();
+
+      if (data.available) {
+        setPincodeStatus({
+          valid: true,
+          message: data.message,
+          carrier: data.carrier || "India Post (Speed Post)",
+          location: data.location,
+          postOffice: data.postOffice,
+          district: data.district,
+          state: data.state,
+          estimatedDays: data.estimatedDays,
+          estimatedDate: data.estimatedDate,
+          hasDirectDelivery: data.hasDirectDelivery !== false,
+        });
+      } else {
+        setPincodeStatus({
+          valid: false,
+          message: "Delivery Unavailable",
+        });
+      }
+    } catch (err) {
+      console.error("Failed to check pincode:", err);
+      setPincodeStatus({
+        valid: false,
+        message: "Delivery Unavailable",
+      });
+    } finally {
+      setIsCheckingPincode(false);
+    }
   };
 
   // Buy Now handler
@@ -227,50 +270,91 @@ export default function ProductInfo({ product }: { product: SareeProduct }) {
       {/* Divider */}
       <div className="w-full border-b border-neutral-200" />
 
-      {/* 7. DELIVERY OPTIONS */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-neutral-900 uppercase tracking-wider">
-            DELIVERY OPTIONS
+      {/* 7. DELIVERY & INDIA POST PINCODE CHECK */}
+      <div className="space-y-3.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Truck className="w-4 h-4 text-[#1E3A2C]" />
+            <span className="text-xs font-bold text-neutral-900 uppercase tracking-wider">
+              DELIVERY OPTIONS
+            </span>
+          </div>
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#b45309] bg-amber-50 px-2 py-0.5 rounded border border-amber-200/60">
+            India Post Service
           </span>
-          <Truck className="w-4 h-4 text-neutral-800" />
         </div>
 
-        <div className="flex items-center max-w-xs rounded border border-neutral-300 px-3 py-2 bg-white focus-within:border-neutral-800 transition-colors">
+        <div className="flex items-center max-w-sm rounded-lg border border-neutral-300 px-3 py-2 bg-white focus-within:border-[#1E3A2C] focus-within:ring-1 focus-within:ring-[#1E3A2C]/20 transition-all shadow-xs">
+          <MapPin className="w-4 h-4 text-neutral-400 mr-2 flex-shrink-0" />
           <input
             type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
             maxLength={6}
             value={pincode}
             onChange={(e) => setPincode(e.target.value.replace(/[^0-9]/g, ""))}
-            placeholder="Enter pincode"
-            className="w-full text-xs text-neutral-900 focus:outline-none placeholder:text-neutral-400"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleCheckPincode();
+              }
+            }}
+            placeholder="Enter 6-digit PIN code"
+            className="w-full text-xs text-neutral-900 focus:outline-none placeholder:text-neutral-400 font-medium tracking-wide"
           />
           <button
             type="button"
             onClick={handleCheckPincode}
-            className="text-xs font-bold text-[#b45309] hover:text-[#92400e] cursor-pointer pl-3 flex-shrink-0"
+            disabled={isCheckingPincode}
+            className="text-xs font-bold text-[#b45309] hover:text-[#92400e] disabled:opacity-50 cursor-pointer pl-3 flex-shrink-0 flex items-center gap-1.5 transition-colors"
           >
-            Check
+            {isCheckingPincode ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Checking...</span>
+              </>
+            ) : pincodeStatus?.valid ? (
+              "Change"
+            ) : (
+              "Check"
+            )}
           </button>
         </div>
 
+        {/* Status result card */}
         {pincodeStatus && (
-          <p
-            className={`text-xs font-medium ${pincodeStatus.valid ? "text-emerald-700" : "text-rose-600"
-              }`}
+          <div
+            className={`px-3 py-2.5 rounded-lg border text-xs flex items-center gap-2.5 transition-all ${
+              pincodeStatus.valid
+                ? "bg-emerald-50/70 border-emerald-200/80 text-emerald-950"
+                : "bg-rose-50/70 border-rose-200/80 text-rose-950"
+            }`}
           >
-            {pincodeStatus.message}
-          </p>
+            {pincodeStatus.valid ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+            )}
+            <p className="font-semibold text-[13px]">
+              {pincodeStatus.valid ? "Delivery Available" : "Delivery Unavailable"}
+            </p>
+          </div>
         )}
 
-        <p className="text-[11px] text-neutral-500">
-          We deliver across Kerala. Enter your pincode to check.
-        </p>
-
+        {/* Feature list */}
         <div className="space-y-1.5 pt-1 text-xs text-neutral-600">
-          <p>100% original Thiraala products</p>
-          <p>Delivery available across all of Kerala</p>
-          <p>Easy returns and exchanges available</p>
+          <p className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#1E3A2C]/60" />
+            <span>Delivered via <strong>India Post Speed Post & Parcel</strong> service</span>
+          </p>
+          <p className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#1E3A2C]/60" />
+            <span>Expected in 2–4 days across Kerala, 4–7 days all-India</span>
+          </p>
+          <p className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#1E3A2C]/60" />
+            <span>Real-time India Post tracking ID shared after dispatch</span>
+          </p>
         </div>
       </div>
 

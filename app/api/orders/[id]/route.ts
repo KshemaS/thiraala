@@ -62,52 +62,110 @@ export async function PATCH(
       timelineUpdate,
     } = body;
 
-    // Update fields if provided
+    // Update field values if provided
+    if (trackingNumber !== undefined) order.trackingNumber = trackingNumber;
+    if (courierName !== undefined) order.courierName = courierName;
+    if (paymentStatus !== undefined) order.paymentStatus = paymentStatus;
+    if (notes !== undefined) order.notes = notes;
+
+    // Update status and synchronize timeline if provided
     if (status !== undefined) {
       order.status = status as OrderStatus;
 
-      // Update timeline automatically based on status progression
-      if (Array.isArray(order.trackingTimeline)) {
-        if (status === "Confirmed") {
-          if (order.trackingTimeline[1]) {
-            order.trackingTimeline[1].completed = true;
-            if (!order.trackingTimeline[1].timestamp) order.trackingTimeline[1].timestamp = now;
+      // Ensure 5 standard tracking steps exist
+      const STANDARD_STEPS = [
+        {
+          title: "Order Placed",
+          description: `Order placed successfully via ${order.paymentMethod === "COD" ? "Cash on Delivery" : "Online Payment"}.`,
+        },
+        {
+          title: "Order Confirmed",
+          description: "Artisanal handloom drape inspected and confirmed by Thiraala boutique.",
+        },
+        {
+          title: "Dispatched",
+          description: "Consignment packed and dispatched from Thiraala fulfillment center.",
+        },
+        {
+          title: "In Transit",
+          description: "Package is on its way and in transit to your shipping address.",
+        },
+        {
+          title: "Delivered",
+          description: "Order completed and delivered to customer. Enjoy your drape!",
+        },
+      ];
+
+      // Normalize timeline if needed
+      if (!Array.isArray(order.trackingTimeline) || order.trackingTimeline.length < 5) {
+        order.trackingTimeline = STANDARD_STEPS.map((step, idx) => {
+          const existing = order.trackingTimeline?.[idx];
+          return {
+            title: step.title,
+            description: existing?.description || step.description,
+            timestamp: existing?.timestamp || (idx === 0 ? order.createdAt || now : ""),
+            completed: existing ? existing.completed : idx === 0,
+          };
+        });
+      } else {
+        // Ensure standard titles
+        STANDARD_STEPS.forEach((step, idx) => {
+          if (order.trackingTimeline[idx]) {
+            order.trackingTimeline[idx].title = step.title;
           }
-        } else if (status === "Shipped") {
-          if (order.trackingTimeline[1]) {
-            order.trackingTimeline[1].completed = true;
-            if (!order.trackingTimeline[1].timestamp) order.trackingTimeline[1].timestamp = now;
-          }
-          if (order.trackingTimeline[2]) {
-            order.trackingTimeline[2].completed = true;
-            if (!order.trackingTimeline[2].timestamp) order.trackingTimeline[2].timestamp = now;
-            if (courierName || trackingNumber) {
-              order.trackingTimeline[2].description = `Dispatched via ${courierName || "Courier"}${
-                trackingNumber ? ` (Tracking: ${trackingNumber})` : ""
-              }.`;
-            }
-          }
-        } else if (status === "Delivered") {
-          order.trackingTimeline.forEach((t) => {
+        });
+      }
+
+      // Determine completion level based on status
+      let completeUpToIndex = 0; // 0: Placed
+      if (status === "Order Confirmed" || status === "Confirmed") {
+        completeUpToIndex = 1;
+      } else if (status === "Dispatched" || status === "Shipped") {
+        completeUpToIndex = 2;
+      } else if (status === "In Transit") {
+        completeUpToIndex = 3;
+      } else if (status === "Delivered") {
+        completeUpToIndex = 4;
+        order.paymentStatus = "Paid";
+      }
+
+      if (status !== "Cancelled") {
+        // Remove any prior cancellation step if transitioning back to active
+        order.trackingTimeline = order.trackingTimeline.filter(
+          (t) => t.title !== "Order Cancelled"
+        );
+
+        order.trackingTimeline.forEach((t, idx) => {
+          if (idx <= completeUpToIndex) {
             t.completed = true;
-            if (!t.timestamp) t.timestamp = now;
-          });
-          order.paymentStatus = "Paid";
-        } else if (status === "Cancelled") {
+            if (!t.timestamp) {
+              t.timestamp = now;
+            }
+          } else {
+            t.completed = false;
+            t.timestamp = "";
+          }
+        });
+
+        // Add custom courier details to Dispatched step
+        if (completeUpToIndex >= 2 && (courierName || trackingNumber)) {
+          order.trackingTimeline[2].description = `Dispatched via ${courierName || order.courierName || "Courier"}${
+            trackingNumber || order.trackingNumber ? ` (Tracking ID: ${trackingNumber || order.trackingNumber})` : ""
+          }.`;
+        }
+      } else {
+        // Order Cancelled
+        const hasCancelStep = order.trackingTimeline.some((t) => t.title === "Order Cancelled");
+        if (!hasCancelStep) {
           order.trackingTimeline.push({
             title: "Order Cancelled",
-            description: "The order has been cancelled.",
+            description: notes || "The order was cancelled by administrator.",
             timestamp: now,
             completed: true,
           });
         }
       }
     }
-
-    if (trackingNumber !== undefined) order.trackingNumber = trackingNumber;
-    if (courierName !== undefined) order.courierName = courierName;
-    if (paymentStatus !== undefined) order.paymentStatus = paymentStatus;
-    if (notes !== undefined) order.notes = notes;
 
     if (timelineUpdate && Array.isArray(timelineUpdate)) {
       order.trackingTimeline = timelineUpdate;

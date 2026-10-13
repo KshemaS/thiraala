@@ -30,9 +30,9 @@ import {
 
 const STATUS_FILTERS = [
   { label: "All Orders", value: "All" },
-  { label: "Pending", value: "Pending" },
-  { label: "Processing", value: "Processing" },
-  { label: "Shipped", value: "Shipped" },
+  { label: "Order Confirmed", value: "Order Confirmed" },
+  { label: "Dispatched", value: "Dispatched" },
+  { label: "In Transit", value: "In Transit" },
   { label: "Delivered", value: "Delivered" },
   { label: "Cancelled", value: "Cancelled" },
 ];
@@ -106,15 +106,23 @@ function OrdersContent() {
           bg: "bg-emerald-50 text-emerald-800 border-emerald-200",
           icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />,
         };
+      case "in transit":
+        return {
+          bg: "bg-indigo-50 text-indigo-800 border-indigo-200",
+          icon: <Truck className="w-3.5 h-3.5 text-indigo-600" />,
+        };
+      case "dispatched":
       case "shipped":
         return {
-          bg: "bg-purple-50 text-purple-800 border-purple-200",
-          icon: <Truck className="w-3.5 h-3.5 text-purple-600" />,
+          bg: "bg-blue-50 text-blue-800 border-blue-200",
+          icon: <Package className="w-3.5 h-3.5 text-blue-600" />,
         };
+      case "order confirmed":
+      case "confirmed":
       case "processing":
         return {
-          bg: "bg-blue-50 text-blue-800 border-blue-200",
-          icon: <Clock className="w-3.5 h-3.5 text-blue-600" />,
+          bg: "bg-amber-50 text-amber-800 border-amber-200",
+          icon: <Clock className="w-3.5 h-3.5 text-amber-600" />,
         };
       case "cancelled":
         return {
@@ -123,8 +131,8 @@ function OrdersContent() {
         };
       default:
         return {
-          bg: "bg-amber-50 text-amber-800 border-amber-200",
-          icon: <Clock className="w-3.5 h-3.5 text-amber-600" />,
+          bg: "bg-slate-50 text-slate-800 border-slate-200",
+          icon: <Clock className="w-3.5 h-3.5 text-slate-600" />,
         };
     }
   };

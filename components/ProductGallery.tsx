@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { SareeProduct } from "@/data/products";
+import { UnifiedProduct } from "@/lib/products";
 
 const getImgSrc = (img: any): string => {
   if (!img) return "/images/folded-gopuram.jpeg";
@@ -10,7 +11,7 @@ const getImgSrc = (img: any): string => {
   return img.src || "/images/folded-gopuram.jpeg";
 };
 
-export default function ProductGallery({ product }: { product: SareeProduct }) {
+export default function ProductGallery({ product }: { product: SareeProduct | UnifiedProduct | any }) {
   const [activeImage, setActiveImage] = useState(product.wornImg);
 
   // Sync active image when product changes
