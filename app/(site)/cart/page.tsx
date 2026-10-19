@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import Script from "next/script";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Container from "@/components/Container";
@@ -40,7 +41,7 @@ export default function CartPage() {
     message: string;
   } | null>(null);
 
-  const [paymentMethod] = useState<"UPI">("UPI");
+  const [isRazorpayReady, setIsRazorpayReady] = useState(false);
 
   // Sync user info into form state when user logs in
   useEffect(() => {
@@ -153,8 +154,37 @@ export default function CartPage() {
       .filter(Boolean)
       .join(", ");
 
+    if (!isRazorpayReady || typeof (window as any).Razorpay === "undefined") {
+      alert("Payment is still loading. Please wait a moment and try again.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    const finishUp = () => {
+      setIsCheckoutOpen(false);
+      clearCart();
+
+      // Notify dashboard / other listeners in case an admin tab is open
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("thiraala-orders-updated"));
+      }
+
+      // Reset form
+      setName("");
+      setPhone("");
+      setEmail("");
+      setHouseOrFlat("");
+      setStreet("");
+      setPincode("");
+      setCity("");
+      setDistrict("");
+      setState("Kerala");
+      setPincodeStatus(null);
+    };
+
     try {
-      const response = await fetch("/api/orders", {
+      // Step 1: create the app order, Pending/Pending — durable even if payment is abandoned.
+      const orderResponse = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -168,49 +198,100 @@ export default function CartPage() {
           city: city.trim(),
           district: district.trim(),
           state: state.trim(),
-          paymentMethod,
+          paymentMethod: "Razorpay",
           total: finalTotal,
           subtotal: finalTotal,
           items: cart,
         }),
       });
 
-      const data = await response.json();
-      if (data.success && data.order) {
-        setCreatedOrder(data.order);
-        setIsOrderPlaced(true);
-        setIsCheckoutOpen(false);
-        clearCart();
-
-        // Notify dashboard / other listeners in case an admin tab is open
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new Event("thiraala-orders-updated"));
-        }
-
-        // Reset form
-        setName("");
-        setPhone("");
-        setEmail("");
-        setHouseOrFlat("");
-        setStreet("");
-        setPincode("");
-        setCity("");
-        setDistrict("");
-        setState("Kerala");
-        setPincodeStatus(null);
-      } else {
-        alert(data.error || "Failed to place order. Please try again.");
+      const orderData = await orderResponse.json();
+      if (!orderData.success || !orderData.order) {
+        alert(orderData.error || "Failed to place order. Please try again.");
+        setIsSubmitting(false);
+        return;
       }
+
+      const pendingOrder = orderData.order;
+
+      // Step 2: create a Razorpay order against it.
+      const razorpayOrderResponse = await fetch("/api/payments/razorpay/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: pendingOrder.id }),
+      });
+      const razorpayOrderData = await razorpayOrderResponse.json();
+
+      if (!razorpayOrderData.success) {
+        alert(
+          razorpayOrderData.error ||
+            "Could not start payment. Your order is saved — please try again or contact us."
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Step 3: open Razorpay Checkout.
+      const razorpay = new (window as any).Razorpay({
+        key: razorpayOrderData.keyId,
+        amount: razorpayOrderData.amount,
+        currency: razorpayOrderData.currency,
+        order_id: razorpayOrderData.razorpayOrderId,
+        name: "thiraala",
+        description: `Order ${pendingOrder.id}`,
+        prefill: { name, email, contact: phone },
+        theme: { color: "#1E3A2C" },
+        handler: async (response: {
+          razorpay_order_id: string;
+          razorpay_payment_id: string;
+          razorpay_signature: string;
+        }) => {
+          try {
+            const verifyResponse = await fetch("/api/payments/razorpay/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(response),
+            });
+            const verifyData = await verifyResponse.json();
+
+            if (verifyData.success && verifyData.order) {
+              setOrderTotal(finalTotal);
+              setCreatedOrder(verifyData.order);
+              setIsOrderPlaced(true);
+              finishUp();
+            } else {
+              alert(
+                "Payment was received but could not be verified. Please contact us with your order id " +
+                  pendingOrder.id +
+                  "."
+              );
+            }
+          } finally {
+            setIsSubmitting(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setIsSubmitting(false);
+          },
+        },
+      });
+
+      razorpay.open();
     } catch (error) {
       console.error("Order placement error:", error);
       alert("Something went wrong while placing your order. Please check your connection.");
-    } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
     <div className="min-h-screen flex flex-col justify-between selection:bg-[#DAA87C]/20 selection:text-[#DAA87C] bg-[#fcfbfa]">
+      <Script
+        src="https://checkout.razorpay.com/v1/checkout.js"
+        strategy="afterInteractive"
+        onLoad={() => setIsRazorpayReady(true)}
+      />
       <Header />
 
       <main className="flex-1 py-12 sm:py-16 lg:py-20">
@@ -238,27 +319,11 @@ export default function CartPage() {
                 Thank you for your order. We are preparing your handwoven drapes. You can track its live fulfillment journey right here.
               </p>
 
-              {/* UPI Payment QR Code Section */}
-              <div className="mt-8 p-6 bg-white border border-[#1E3A2C]/10 rounded-3xl shadow-sm flex flex-col items-center max-w-sm w-full mx-auto">
-                <span className="text-[10px] font-bold text-[#DAA87C] uppercase tracking-wider mb-2">Scan to Pay via UPI</span>
-                
-                {/* QR Image with scanner lines */}
-                <div className="relative w-44 h-44 border border-[#1E3A2C]/5 rounded-2xl p-2 bg-[#fcfbfa] flex items-center justify-center overflow-hidden">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-                      `upi://pay?pa=thiraala@okaxis&pn=thiraala&am=${orderTotal}&cu=INR`
-                    )}&color=1e3a2c`}
-                    alt="UPI QR Code"
-                    className="w-40 h-40 object-contain rounded-xl select-none"
-                  />
-                  {/* Scanner laser line animation */}
-                  <div className="absolute left-0 right-0 h-[2.5px] bg-[#DAA87C] opacity-60 shadow-[0_0_8px_#DAA87C] animate-scan-laser" />
-                </div>
-                
-                <span className="text-xs font-extrabold text-[#1E3A2C] mt-4">Amount: Rs. {orderTotal.toLocaleString()}</span>
-                <p className="text-[10px] text-[#1E3A2C]/50 mt-1.5 font-semibold text-center leading-relaxed">
-                  Scan this QR code using GPAY, PhonePe, Paytm, or any UPI app to complete payment.
-                </p>
+              <div className="mt-8 p-4 px-5 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-2.5 text-xs font-bold text-emerald-800 select-none max-w-sm w-full mx-auto">
+                <svg className="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                <span>Payment of Rs. {orderTotal.toLocaleString()} received via Razorpay.</span>
               </div>
 
               {/* Action Buttons: Track Order & Continue Shopping */}
@@ -687,7 +752,7 @@ export default function CartPage() {
                   </div>
                 </div>
 
-                {/* Payment Option Selector (UPI QR Payment) */}
+                {/* Payment Option Selector (Razorpay) */}
                 <div className="flex flex-col gap-1.5 pt-2 border-t border-[#1E3A2C]/10">
                   <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
                     Payment Method
@@ -695,11 +760,11 @@ export default function CartPage() {
                   <div className="p-3.5 rounded-xl border border-[#1E3A2C] bg-[#1E3A2C] text-white flex items-center justify-between shadow-sm select-none">
                     <div className="flex flex-col gap-0.5">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold">UPI QR Payment</span>
+                        <span className="text-xs font-bold">Pay via Razorpay</span>
                         <span className="px-1.5 py-0.5 text-[9px] font-bold bg-[#DAA87C] text-[#1E3A2C] rounded-full uppercase tracking-wider">Secure</span>
                       </div>
                       <span className="text-[10px] text-[#DAA87C] font-medium">
-                        GPay, PhonePe, Paytm, BHIM UPI
+                        Cards, UPI, Net Banking, Wallets
                       </span>
                     </div>
                     <div className="w-5 h-5 rounded-full bg-emerald-400 text-[#1E3A2C] flex items-center justify-center font-bold text-xs shadow-inner">
@@ -713,7 +778,7 @@ export default function CartPage() {
                   <svg className="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
-                  <span>Instant verification via BHIM UPI QR Code. Scan using any UPI app.</span>
+                  <span>Pay securely online via Razorpay — a Razorpay window will open after you place your order.</span>
                 </div>
 
                 <button

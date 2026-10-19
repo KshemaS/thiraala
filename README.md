@@ -31,6 +31,9 @@ Environment variables:
 | `AUTH_SECRET` | App (local + Vercel) | Random string, 32+ chars, used to sign session cookies. Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`. Changing it signs everyone out. |
 | `ADMIN_PASSWORD` | Seed only | Password for the admin account (12+ chars). Without it the seed skips the admin user. |
 | `ADMIN_USERNAME` | Seed only | Optional, defaults to `admin`. |
+| `RAZORPAY_KEY_ID` | App (local + Vercel) | From the Razorpay dashboard (Test Mode while developing). Used server-side to create orders and returned transiently to the client right before opening Checkout.js. |
+| `RAZORPAY_KEY_SECRET` | App (local + Vercel) | Server-only. Used to create Razorpay orders and to verify the checkout success signature. Never exposed to the client. |
+| `RAZORPAY_WEBHOOK_SECRET` | App (local + Vercel) | Server-only. Configure a webhook in the Razorpay dashboard pointing at `/api/payments/razorpay/webhook` and paste its secret here — this is the authoritative source of truth for payment capture, independent of the customer's browser. |
 
 Create or reset the admin login (runs only the admin part of the seed, against whatever `DATABASE_URL` points to):
 
