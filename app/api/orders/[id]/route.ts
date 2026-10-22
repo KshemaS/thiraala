@@ -31,7 +31,7 @@ export async function GET(
   } catch (error: any) {
     console.error("Error fetching order:", error);
     return NextResponse.json(
-      { success: false, error: "Internal server error" },
+      { success: false, error: error?.message || "Internal server error" },
       { status: 500 }
     );
   }

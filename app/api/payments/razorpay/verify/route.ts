@@ -71,7 +71,7 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error("Error verifying Razorpay payment:", error);
     return NextResponse.json(
-      { success: false, error: "Internal server error" },
+      { success: false, error: error?.message || "Internal server error" },
       { status: 500 }
     );
   }
