@@ -24,7 +24,7 @@ export default function ProductGallery({ product }: { product: SareeProduct | Un
   const activeSrc = getImgSrc(activeImage);
 
   return (
-    <div className="lg:col-span-7 flex flex-col-reverse sm:flex-row gap-4 w-full">
+    <div className="lg:col-span-7 flex flex-col-reverse sm:flex-row gap-4 w-full lg:sticky lg:top-24 self-start">
       {/* Vertical Stack of Thumbnails */}
       <div className="flex flex-row sm:flex-col gap-3 sm:w-24 w-full flex-shrink-0">
         <button

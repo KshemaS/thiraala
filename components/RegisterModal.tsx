@@ -249,7 +249,7 @@ export default function RegisterModal({
               {mode === "register" && (
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                    <label className="block text-[11px] font-bold text-[#1E3A2C]/80 uppercase tracking-wider leading-relaxed select-none">
                       First Name *
                     </label>
                     <input
@@ -263,7 +263,7 @@ export default function RegisterModal({
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                    <label className="block text-[11px] font-bold text-[#1E3A2C]/80 uppercase tracking-wider leading-relaxed select-none">
                       Last Name *
                     </label>
                     <input
@@ -279,7 +279,7 @@ export default function RegisterModal({
               )}
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                <label className="block text-[11px] font-bold text-[#1E3A2C]/80 uppercase tracking-wider leading-relaxed select-none">
                   Email Address *
                 </label>
                 <input
@@ -294,7 +294,7 @@ export default function RegisterModal({
 
               {mode === "register" && (
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                  <label className="block text-[11px] font-bold text-[#1E3A2C]/80 uppercase tracking-wider leading-relaxed select-none">
                     Phone Number (Optional)
                   </label>
                   <input
@@ -311,7 +311,7 @@ export default function RegisterModal({
               {mode !== "forgot" && (
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                    <label className="block text-[11px] font-bold text-[#1E3A2C]/80 uppercase tracking-wider leading-relaxed select-none">
                       Password *
                     </label>
                     <span className="text-[10px] text-[#1E3A2C]/40 font-medium">Min 6 characters</span>

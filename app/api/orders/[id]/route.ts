@@ -1,5 +1,15 @@
 import { NextResponse } from "next/server";
-import { getOrdersFromFile, saveOrdersToFile, Order, OrderStatus } from "../route";
+import prisma from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
+import { requireAdmin } from "@/lib/auth/guard";
+import { toOrderJSON, type OrderStatus, type TrackingEvent } from "../route";
+
+async function findOrderByHumanId(id: string) {
+  return prisma.order.findFirst({
+    where: { humanId: { equals: id.trim(), mode: "insensitive" } },
+    include: { items: true },
+  });
+}
 
 // GET single order by id
 export async function GET(
@@ -8,10 +18,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const orders = getOrdersFromFile();
-    const order = orders.find(
-      (o) => o.id.toLowerCase() === id.trim().toLowerCase()
-    );
+    const order = await findOrderByHumanId(id);
 
     if (!order) {
       return NextResponse.json(
@@ -20,7 +27,7 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ success: true, order });
+    return NextResponse.json({ success: true, order: toOrderJSON(order) });
   } catch (error: any) {
     console.error("Error fetching order:", error);
     return NextResponse.json(
@@ -35,24 +42,22 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const unauthorized = await requireAdmin();
+  if (unauthorized) return unauthorized;
+
   try {
     const { id } = await params;
     const body = await request.json();
-    const orders = getOrdersFromFile();
-    const orderIndex = orders.findIndex(
-      (o) => o.id.toLowerCase() === id.trim().toLowerCase()
-    );
+    const order = await findOrderByHumanId(id);
 
-    if (orderIndex === -1) {
+    if (!order) {
       return NextResponse.json(
         { success: false, error: "Order not found" },
         { status: 404 }
       );
     }
 
-    const order = orders[orderIndex];
     const now = new Date().toISOString();
-
     const {
       status,
       trackingNumber,
@@ -62,17 +67,21 @@ export async function PATCH(
       timelineUpdate,
     } = body;
 
-    // Update field values if provided
-    if (trackingNumber !== undefined) order.trackingNumber = trackingNumber;
-    if (courierName !== undefined) order.courierName = courierName;
-    if (paymentStatus !== undefined) order.paymentStatus = paymentStatus;
-    if (notes !== undefined) order.notes = notes;
+    let timeline = (order.trackingTimeline as unknown as TrackingEvent[]) || [];
+    let newPaymentStatus = order.paymentStatus;
+    let newTrackingNumber = order.trackingNumber;
+    let newCourierName = order.courierName;
+    let newNotes = order.notes;
+    let newStatus = order.status;
 
-    // Update status and synchronize timeline if provided
+    if (trackingNumber !== undefined) newTrackingNumber = trackingNumber;
+    if (courierName !== undefined) newCourierName = courierName;
+    if (paymentStatus !== undefined) newPaymentStatus = paymentStatus;
+    if (notes !== undefined) newNotes = notes;
+
     if (status !== undefined) {
-      order.status = status as OrderStatus;
+      newStatus = status as OrderStatus;
 
-      // Ensure 5 standard tracking steps exist
       const STANDARD_STEPS = [
         {
           title: "Order Placed",
@@ -96,46 +105,40 @@ export async function PATCH(
         },
       ];
 
-      // Normalize timeline if needed
-      if (!Array.isArray(order.trackingTimeline) || order.trackingTimeline.length < 5) {
-        order.trackingTimeline = STANDARD_STEPS.map((step, idx) => {
-          const existing = order.trackingTimeline?.[idx];
+      if (!Array.isArray(timeline) || timeline.length < 5) {
+        timeline = STANDARD_STEPS.map((step, idx) => {
+          const existing = timeline?.[idx];
           return {
             title: step.title,
             description: existing?.description || step.description,
-            timestamp: existing?.timestamp || (idx === 0 ? order.createdAt || now : ""),
+            timestamp: existing?.timestamp || (idx === 0 ? order.createdAt.toISOString() : ""),
             completed: existing ? existing.completed : idx === 0,
           };
         });
       } else {
-        // Ensure standard titles
         STANDARD_STEPS.forEach((step, idx) => {
-          if (order.trackingTimeline[idx]) {
-            order.trackingTimeline[idx].title = step.title;
+          if (timeline[idx]) {
+            timeline[idx].title = step.title;
           }
         });
       }
 
-      // Determine completion level based on status
-      let completeUpToIndex = 0; // 0: Placed
-      if (status === "Order Confirmed" || status === "Confirmed") {
+      let completeUpToIndex = 0;
+      if (newStatus === "Order Confirmed" || newStatus === "Confirmed") {
         completeUpToIndex = 1;
-      } else if (status === "Dispatched" || status === "Shipped") {
+      } else if (newStatus === "Dispatched" || newStatus === "Shipped") {
         completeUpToIndex = 2;
-      } else if (status === "In Transit") {
+      } else if (newStatus === "In Transit") {
         completeUpToIndex = 3;
-      } else if (status === "Delivered") {
+      } else if (newStatus === "Delivered") {
         completeUpToIndex = 4;
-        order.paymentStatus = "Paid";
+        newPaymentStatus = "Paid";
       }
 
-      if (status !== "Cancelled") {
-        // Remove any prior cancellation step if transitioning back to active
-        order.trackingTimeline = order.trackingTimeline.filter(
-          (t) => t.title !== "Order Cancelled"
-        );
+      if (newStatus !== "Cancelled") {
+        timeline = timeline.filter((t) => t.title !== "Order Cancelled");
 
-        order.trackingTimeline.forEach((t, idx) => {
+        timeline.forEach((t, idx) => {
           if (idx <= completeUpToIndex) {
             t.completed = true;
             if (!t.timestamp) {
@@ -147,17 +150,15 @@ export async function PATCH(
           }
         });
 
-        // Add custom courier details to Dispatched step
         if (completeUpToIndex >= 2 && (courierName || trackingNumber)) {
-          order.trackingTimeline[2].description = `Dispatched via ${courierName || order.courierName || "Courier"}${
-            trackingNumber || order.trackingNumber ? ` (Tracking ID: ${trackingNumber || order.trackingNumber})` : ""
+          timeline[2].description = `Dispatched via ${courierName || newCourierName || "Courier"}${
+            trackingNumber || newTrackingNumber ? ` (Tracking ID: ${trackingNumber || newTrackingNumber})` : ""
           }.`;
         }
       } else {
-        // Order Cancelled
-        const hasCancelStep = order.trackingTimeline.some((t) => t.title === "Order Cancelled");
+        const hasCancelStep = timeline.some((t) => t.title === "Order Cancelled");
         if (!hasCancelStep) {
-          order.trackingTimeline.push({
+          timeline.push({
             title: "Order Cancelled",
             description: notes || "The order was cancelled by administrator.",
             timestamp: now,
@@ -168,24 +169,26 @@ export async function PATCH(
     }
 
     if (timelineUpdate && Array.isArray(timelineUpdate)) {
-      order.trackingTimeline = timelineUpdate;
+      timeline = timelineUpdate;
     }
 
-    order.updatedAt = now;
-    orders[orderIndex] = order;
-
-    const saved = saveOrdersToFile(orders);
-    if (!saved) {
-      return NextResponse.json(
-        { success: false, error: "Failed to persist order updates" },
-        { status: 500 }
-      );
-    }
+    const updated = await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        status: newStatus,
+        trackingNumber: newTrackingNumber,
+        courierName: newCourierName,
+        paymentStatus: newPaymentStatus,
+        notes: newNotes,
+        trackingTimeline: timeline as unknown as Prisma.InputJsonValue,
+      },
+      include: { items: true },
+    });
 
     return NextResponse.json({
       success: true,
       message: "Order updated successfully",
-      order,
+      order: toOrderJSON(updated),
     });
   } catch (error: any) {
     console.error("Error updating order:", error);
@@ -201,21 +204,22 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const unauthorized = await requireAdmin();
+  if (unauthorized) return unauthorized;
+
   try {
     const { id } = await params;
-    const orders = getOrdersFromFile();
-    const filtered = orders.filter(
-      (o) => o.id.toLowerCase() !== id.trim().toLowerCase()
-    );
+    const order = await findOrderByHumanId(id);
 
-    if (filtered.length === orders.length) {
+    if (!order) {
       return NextResponse.json(
         { success: false, error: "Order not found" },
         { status: 404 }
       );
     }
 
-    saveOrdersToFile(filtered);
+    await prisma.order.delete({ where: { id: order.id } });
+
     return NextResponse.json({
       success: true,
       message: `Order ${id} deleted successfully`,

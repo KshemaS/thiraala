@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import fs from "fs";
-import path from "path";
-import { getAdminSession } from "@/lib/auth/guard";
 import prisma from "@/lib/prisma";
+import { getAdminSession } from "@/lib/auth/guard";
+import type { Order as PrismaOrder, OrderItem as PrismaOrderItem, Prisma } from "@prisma/client";
 
 export interface OrderItem {
   id: string | number;
@@ -29,7 +28,7 @@ export type OrderStatus =
   | "Confirmed"
   | "Shipped";
 export type PaymentStatus = "Pending" | "Paid" | "Failed" | "Refunded";
-export type PaymentMethod = "COD" | "UPI" | "Card" | "NetBanking";
+export type PaymentMethod = "COD" | "UPI" | "Card" | "NetBanking" | "Razorpay";
 
 export interface TrackingEvent {
   title: string;
@@ -66,35 +65,48 @@ export interface Order {
   updatedAt: string;
 }
 
-const dataFilePath = path.join(process.cwd(), "data", "orders.json");
+export type OrderWithItems = PrismaOrder & { items: PrismaOrderItem[] };
 
-export function getOrdersFromFile(): Order[] {
-  try {
-    if (fs.existsSync(dataFilePath)) {
-      const content = fs.readFileSync(dataFilePath, "utf8");
-      const parsed = JSON.parse(content);
-      if (Array.isArray(parsed)) {
-        return parsed;
-      }
-    }
-  } catch (error) {
-    console.error("Error reading orders.json:", error);
-  }
-  return [];
-}
-
-export function saveOrdersToFile(orders: Order[]): boolean {
-  try {
-    const dir = path.dirname(dataFilePath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(dataFilePath, JSON.stringify(orders, null, 2), "utf8");
-    return true;
-  } catch (error) {
-    console.error("Error saving orders.json:", error);
-    return false;
-  }
+export function toOrderJSON(order: OrderWithItems): Order {
+  return {
+    id: order.humanId,
+    customerName: order.customerName,
+    phone: order.phone,
+    email: order.email || "",
+    address: order.address,
+    houseOrFlat: order.houseOrFlat || "",
+    street: order.street || "",
+    city: order.city || "",
+    district: order.district || "",
+    state: order.state || "",
+    pincode: order.pincode || "",
+    total: order.total,
+    subtotal: order.subtotal ?? order.total,
+    deliveryFee: order.deliveryFee,
+    discount: order.discount,
+    paymentMethod: order.paymentMethod as PaymentMethod,
+    paymentStatus: order.paymentStatus as PaymentStatus,
+    status: order.status as OrderStatus,
+    trackingNumber: order.trackingNumber || "",
+    courierName: order.courierName || "",
+    notes: order.notes || "",
+    items: (order.items || []).map((item: PrismaOrderItem) => ({
+      id: item.id,
+      productId: item.productId || undefined,
+      sku: item.sku || undefined,
+      name: item.name,
+      price: item.price,
+      priceValue: item.priceValue,
+      quantity: item.quantity,
+      foldedImg: item.foldedImg || undefined,
+      wornImg: item.wornImg || undefined,
+      category: item.category || undefined,
+      selectedColor: item.selectedColor || undefined,
+    })),
+    trackingTimeline: (order.trackingTimeline as unknown as TrackingEvent[]) || [],
+    createdAt: order.createdAt.toISOString(),
+    updatedAt: order.updatedAt.toISOString(),
+  };
 }
 
 // GET all orders
@@ -114,94 +126,75 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const search = searchParams.get("search");
-    let email = searchParams.get("email")?.trim().toLowerCase();
-    let phone = searchParams.get("phone")?.trim();
+    const email = searchParams.get("email")?.trim().toLowerCase();
+    const phone = searchParams.get("phone")?.trim();
 
-    let orders = getOrdersFromFile();
+    const andConditions: Prisma.OrderWhereInput[] = [];
+    const where: Prisma.OrderWhereInput = {};
 
-    // If customer (not admin), strictly scope to customer's own identity
+    // Customer scoping: regular customer can ONLY view their own orders (TH-001)
     if (!adminSession && customerUserId) {
-      let customerEmail: string | null = null;
-      let customerPhone: string | null = null;
-
-      try {
-        if ((prisma as any)?.user) {
-          const dbUser = await (prisma as any).user.findUnique({
-            where: { id: customerUserId },
-          });
-          if (dbUser) {
-            customerEmail = dbUser.email?.toLowerCase().trim() || null;
-            customerPhone = dbUser.phone?.trim() || null;
-          }
-        }
-      } catch {
-        // Fallback
-      }
-
-      if (!customerEmail) {
-        const usersFile = path.join(process.cwd(), "data", "users.json");
-        if (fs.existsSync(usersFile)) {
-          try {
-            const raw = JSON.parse(fs.readFileSync(usersFile, "utf8"));
-            const found = Array.isArray(raw) ? raw.find((u: any) => u.id === customerUserId) : null;
-            if (found) {
-              customerEmail = (found.email || "").toLowerCase().trim() || null;
-              customerPhone = (found.phone || "").trim() || null;
-            }
-          } catch {
-            // ignore
-          }
-        }
-      }
-
-      if (!customerEmail && !customerPhone) {
+      const user = await prisma.user.findUnique({ where: { id: customerUserId } });
+      if (!user) {
         return NextResponse.json(
-          { success: false, error: "User profile not found." },
+          { success: false, error: "User not found" },
           { status: 401 }
         );
       }
 
-      // Restrict orders to only matching this customer
-      orders = orders.filter((o) => {
-        const orderEmail = (o.email || "").toLowerCase().trim();
-        const orderPhone = (o.phone || "").trim();
-        return (customerEmail && orderEmail === customerEmail) || (customerPhone && orderPhone === customerPhone);
-      });
-    } else {
-      // Admin query filters
+      const customerOrFilters: Prisma.OrderWhereInput[] = [{ userId: customerUserId }];
+      if (user.email) {
+        customerOrFilters.push({ email: { equals: user.email, mode: "insensitive" } });
+      }
+      if (user.phone) {
+        customerOrFilters.push({ phone: { equals: user.phone } });
+      }
+
+      andConditions.push({ OR: customerOrFilters });
+    }
+
+    // Admin direct filters
+    if (adminSession) {
       if (email) {
-        orders = orders.filter((o) => (o.email || "").toLowerCase().trim() === email);
+        where.email = { equals: email, mode: "insensitive" };
       }
       if (phone) {
-        orders = orders.filter((o) => (o.phone || "").includes(phone));
+        where.phone = { contains: phone };
       }
     }
 
     if (status && status !== "All") {
-      orders = orders.filter((o) => o.status.toLowerCase() === status.toLowerCase());
+      where.status = { equals: status, mode: "insensitive" };
     }
 
     if (search) {
-      const q = search.toLowerCase();
-      orders = orders.filter(
-        (o) =>
-          o.id.toLowerCase().includes(q) ||
-          o.customerName.toLowerCase().includes(q) ||
-          o.phone.includes(q) ||
-          (o.email && o.email.toLowerCase().includes(q)) ||
-          o.items.some((item) => item.name.toLowerCase().includes(q))
-      );
+      const q = search;
+      andConditions.push({
+        OR: [
+          { humanId: { contains: q, mode: "insensitive" } },
+          { customerName: { contains: q, mode: "insensitive" } },
+          { phone: { contains: q } },
+          { email: { contains: q, mode: "insensitive" } },
+          { items: { some: { name: { contains: q, mode: "insensitive" } } } },
+        ],
+      });
     }
 
-    // Sort newest orders first
-    orders.sort((a, b) => {
-      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      if (timeA && timeB) return timeB - timeA;
-      return b.id.localeCompare(a.id);
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
+    }
+
+    const orders = await prisma.order.findMany({
+      where,
+      include: { items: true },
+      orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({ success: true, count: orders.length, orders });
+    return NextResponse.json({
+      success: true,
+      count: orders.length,
+      orders: orders.map(toOrderJSON),
+    });
   } catch (error: any) {
     console.error("Error fetching orders:", error);
     return NextResponse.json(
@@ -214,8 +207,12 @@ export async function GET(request: Request) {
 // POST create new order
 export async function POST(request: Request) {
   try {
+    const cookieStore = await cookies();
+    const customerUserId = cookieStore.get("thiraala_user_id")?.value;
+
     const body = await request.json();
     const {
+      userId,
       customerName,
       phone,
       email = "",
@@ -231,8 +228,7 @@ export async function POST(request: Request) {
       subtotal,
       deliveryFee = 0,
       discount = 0,
-      paymentMethod = "UPI",
-      paymentStatus = "Pending",
+      paymentMethod = "Razorpay",
       notes = "",
     } = body;
 
@@ -246,104 +242,98 @@ export async function POST(request: Request) {
       );
     }
 
-    const currentOrders = getOrdersFromFile();
-
     // Generate unique human-readable order id e.g. THR-1087
     let nextNum = 1087;
-    const existingIds = currentOrders.map((o) => o.id);
-    while (existingIds.includes(`THR-${nextNum}`)) {
+    const existing = await prisma.order.findMany({ select: { humanId: true } });
+    const existingIds = new Set(existing.map((o: { humanId: string }) => o.humanId));
+    while (existingIds.has(`THR-${nextNum}`)) {
       nextNum++;
     }
     const newOrderId = `THR-${nextNum}`;
     const now = new Date().toISOString();
 
-    const newOrder: Order = {
-      id: newOrderId,
-      customerName: customerName.trim(),
-      phone: phone.trim(),
-      email: email.trim(),
-      address: address.trim(),
-      houseOrFlat: houseOrFlat ? String(houseOrFlat).trim() : "",
-      street: street ? String(street).trim() : "",
-      city: city ? String(city).trim() : "",
-      district: district ? String(district).trim() : "",
-      state: state ? String(state).trim() : "",
-      pincode: pincode ? String(pincode).trim() : "",
-      items: items.map((item: any, idx: number) => ({
-        id: item.id || `item-${idx + 1}`,
-        productId: item.productId || item.id,
-        sku: item.sku || `THR-SKU-${idx + 1}`,
-        name: item.name,
-        price: item.price || `₹${item.priceValue || 0}`,
-        priceValue: item.priceValue || parseInt(String(item.price).replace(/[^\d]/g, ""), 10) || 0,
-        quantity: item.quantity || 1,
-        foldedImg: item.foldedImg || "/images/folded-gopuram.jpeg",
-        wornImg: item.wornImg || "/images/gopura.jpeg",
-        category: item.category || "Handloom Saree",
-        selectedColor: item.selectedColor || "",
-      })),
-      total: Number(total) || 0,
-      subtotal: Number(subtotal !== undefined ? subtotal : total),
-      deliveryFee: Number(deliveryFee) || 0,
-      discount: Number(discount) || 0,
-      paymentMethod: (paymentMethod as PaymentMethod) || "UPI",
-      paymentStatus: (paymentStatus as PaymentStatus) || (paymentMethod === "COD" ? "Pending" : "Paid"),
-      status: "Pending",
-      trackingNumber: "",
-      courierName: "",
-      notes: notes || "",
-      trackingTimeline: [
-        {
-          title: "Order Placed",
-          description: `Order placed successfully via ${paymentMethod === "COD" ? "Cash on Delivery" : "Online Payment"}.`,
-          timestamp: now,
-          completed: true,
-        },
-        {
-          title: "Order Confirmed",
-          description: "Artisanal handloom drape inspected and confirmed by Thiraala boutique.",
-          timestamp: "",
-          completed: false,
-        },
-        {
-          title: "Dispatched",
-          description: "Consignment packed and dispatched from Thiraala fulfillment center.",
-          timestamp: "",
-          completed: false,
-        },
-        {
-          title: "In Transit",
-          description: "Package is on its way and in transit to your shipping address.",
-          timestamp: "",
-          completed: false,
-        },
-        {
-          title: "Delivered",
-          description: "Order completed and delivered to customer. Enjoy your drape!",
-          timestamp: "",
-          completed: false,
-        },
-      ],
-      createdAt: now,
-      updatedAt: now,
-    };
+    const trackingTimeline: TrackingEvent[] = [
+      {
+        title: "Order Placed",
+        description: "Order placed successfully. Awaiting payment confirmation.",
+        timestamp: now,
+        completed: true,
+      },
+      {
+        title: "Order Confirmed",
+        description: "Artisanal handloom drape inspected and confirmed by Thiraala boutique.",
+        timestamp: "",
+        completed: false,
+      },
+      {
+        title: "Dispatched",
+        description: "Consignment packed and dispatched from Thiraala fulfillment center.",
+        timestamp: "",
+        completed: false,
+      },
+      {
+        title: "In Transit",
+        description: "Package is on its way and in transit to your shipping address.",
+        timestamp: "",
+        completed: false,
+      },
+      {
+        title: "Delivered",
+        description: "Order completed and delivered to customer. Enjoy your drape!",
+        timestamp: "",
+        completed: false,
+      },
+    ];
 
-    // Prepend new order to list so newest is first
-    const updatedOrders = [newOrder, ...currentOrders];
-    const saved = saveOrdersToFile(updatedOrders);
-
-    if (!saved) {
-      return NextResponse.json(
-        { success: false, error: "Failed to persist order to storage" },
-        { status: 500 }
-      );
-    }
+    const created = await prisma.order.create({
+      data: {
+        humanId: newOrderId,
+        userId: userId || customerUserId || null,
+        customerName: String(customerName).trim(),
+        phone: String(phone).trim(),
+        email: String(email).trim(),
+        address: String(address).trim(),
+        houseOrFlat: houseOrFlat ? String(houseOrFlat).trim() : "",
+        street: street ? String(street).trim() : "",
+        city: city ? String(city).trim() : "",
+        district: district ? String(district).trim() : "",
+        state: state ? String(state).trim() : "",
+        pincode: pincode ? String(pincode).trim() : "",
+        total: Math.round(Number(total)) || 0,
+        subtotal: Math.round(Number(subtotal !== undefined ? subtotal : total)) || 0,
+        deliveryFee: Math.round(Number(deliveryFee)) || 0,
+        discount: Math.round(Number(discount)) || 0,
+        paymentMethod: String(paymentMethod) || "Razorpay",
+        // Payment is never verified at creation time — only a verified
+        // Razorpay payment (client verify or webhook) flips this to "Paid".
+        paymentStatus: "Pending",
+        status: "Pending",
+        notes: notes || "",
+        trackingTimeline: trackingTimeline as unknown as Prisma.InputJsonValue,
+        items: {
+          create: items.map((item: any, idx: number) => ({
+            productId: item.productId ? String(item.productId) : item.id ? String(item.id) : null,
+            sku: item.sku || `THR-SKU-${idx + 1}`,
+            name: item.name,
+            price: item.price || `₹${item.priceValue || 0}`,
+            priceValue:
+              item.priceValue || parseInt(String(item.price).replace(/[^\d]/g, ""), 10) || 0,
+            quantity: item.quantity || 1,
+            foldedImg: item.foldedImg || "/images/folded-gopuram.jpeg",
+            wornImg: item.wornImg || "/images/gopura.jpeg",
+            category: item.category || "Handloom Saree",
+            selectedColor: item.selectedColor || "",
+          })),
+        },
+      },
+      include: { items: true },
+    });
 
     return NextResponse.json(
       {
         success: true,
         message: "Order placed successfully",
-        order: newOrder,
+        order: toOrderJSON(created),
       },
       { status: 201 }
     );
