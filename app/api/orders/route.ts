@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import fs from "fs";
 import path from "path";
+import { getAdminSession } from "@/lib/auth/guard";
+import prisma from "@/lib/prisma";
 
 export interface OrderItem {
   id: string | number;
@@ -97,20 +100,81 @@ export function saveOrdersToFile(orders: Order[]): boolean {
 // GET all orders
 export async function GET(request: Request) {
   try {
+    const adminSession = await getAdminSession();
+    const cookieStore = await cookies();
+    const customerUserId = cookieStore.get("thiraala_user_id")?.value;
+
+    if (!adminSession && !customerUserId) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized. Please log in to view orders." },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const search = searchParams.get("search");
-    const email = searchParams.get("email")?.trim().toLowerCase();
-    const phone = searchParams.get("phone")?.trim();
+    let email = searchParams.get("email")?.trim().toLowerCase();
+    let phone = searchParams.get("phone")?.trim();
 
     let orders = getOrdersFromFile();
 
-    if (email) {
-      orders = orders.filter((o) => (o.email || "").toLowerCase().trim() === email);
-    }
+    // If customer (not admin), strictly scope to customer's own identity
+    if (!adminSession && customerUserId) {
+      let customerEmail: string | null = null;
+      let customerPhone: string | null = null;
 
-    if (phone) {
-      orders = orders.filter((o) => (o.phone || "").includes(phone));
+      try {
+        if ((prisma as any)?.user) {
+          const dbUser = await (prisma as any).user.findUnique({
+            where: { id: customerUserId },
+          });
+          if (dbUser) {
+            customerEmail = dbUser.email?.toLowerCase().trim() || null;
+            customerPhone = dbUser.phone?.trim() || null;
+          }
+        }
+      } catch {
+        // Fallback
+      }
+
+      if (!customerEmail) {
+        const usersFile = path.join(process.cwd(), "data", "users.json");
+        if (fs.existsSync(usersFile)) {
+          try {
+            const raw = JSON.parse(fs.readFileSync(usersFile, "utf8"));
+            const found = Array.isArray(raw) ? raw.find((u: any) => u.id === customerUserId) : null;
+            if (found) {
+              customerEmail = (found.email || "").toLowerCase().trim() || null;
+              customerPhone = (found.phone || "").trim() || null;
+            }
+          } catch {
+            // ignore
+          }
+        }
+      }
+
+      if (!customerEmail && !customerPhone) {
+        return NextResponse.json(
+          { success: false, error: "User profile not found." },
+          { status: 401 }
+        );
+      }
+
+      // Restrict orders to only matching this customer
+      orders = orders.filter((o) => {
+        const orderEmail = (o.email || "").toLowerCase().trim();
+        const orderPhone = (o.phone || "").trim();
+        return (customerEmail && orderEmail === customerEmail) || (customerPhone && orderPhone === customerPhone);
+      });
+    } else {
+      // Admin query filters
+      if (email) {
+        orders = orders.filter((o) => (o.email || "").toLowerCase().trim() === email);
+      }
+      if (phone) {
+        orders = orders.filter((o) => (o.phone || "").includes(phone));
+      }
     }
 
     if (status && status !== "All") {

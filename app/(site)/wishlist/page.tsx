@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Container from "@/components/Container";
@@ -16,6 +16,10 @@ export default function WishlistPage() {
   const { addToCart } = useCart();
   const [isClearing, setIsClearing] = useState(false);
 
+  useEffect(() => {
+    document.title = "My Wishlist | thiraala";
+  }, []);
+
   const handleAddAllToCart = () => {
     wishlist.forEach((item) => {
       addToCart({
@@ -24,6 +28,7 @@ export default function WishlistPage() {
         price: item.price,
         foldedImg: item.foldedImg,
         wornImg: item.wornImg,
+        stock: (item as any).stock,
       });
     });
   };
@@ -147,6 +152,7 @@ export default function WishlistPage() {
                               price: item.price,
                               foldedImg: item.foldedImg,
                               wornImg: item.wornImg,
+                              stock: (item as any).stock,
                             })
                           }
                           className="flex-1 py-2 px-3 rounded-xl border border-[#1E3A2C]/10 bg-white hover:bg-[#1E3A2C] text-[#1E3A2C] hover:text-[#FAF8F5] text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs group/btn"

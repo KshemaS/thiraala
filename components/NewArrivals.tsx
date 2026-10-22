@@ -146,36 +146,36 @@ export default function NewArrivals() {
   };
 
   const leftVariant = {
-    hidden: { x: -60, opacity: 0 },
+    hidden: { y: 40, opacity: 0 },
     show: {
-      x: 0,
+      y: 0,
       opacity: 1,
       transition: {
-        duration: 1.8,
+        duration: 0.8,
         ease: [0.16, 1, 0.3, 1] as const,
       },
     },
   };
 
   const rightVariant = {
-    hidden: { x: 60, opacity: 0 },
+    hidden: { y: 40, opacity: 0 },
     show: {
-      x: 0,
+      y: 0,
       opacity: 1,
       transition: {
-        duration: 1.8,
+        duration: 0.8,
         ease: [0.16, 1, 0.3, 1] as const,
       },
     },
   };
 
   const centerVariant = {
-    hidden: { y: 60, opacity: 0 },
+    hidden: { y: 40, opacity: 0 },
     show: {
       y: 0,
       opacity: 1,
       transition: {
-        duration: 1.8,
+        duration: 0.8,
         ease: [0.16, 1, 0.3, 1] as const,
       },
     },
@@ -203,11 +203,12 @@ export default function NewArrivals() {
           </motion.div>
 
           {/* Slick-like Slider Container */}
-          <div className="relative w-full px-4 md:px-12">
+          <div className="relative w-full px-2 sm:px-6 md:px-12">
             {/* Prev Navigation Button */}
             <button
+              type="button"
               onClick={prevSlide}
-              className={`absolute left-[-10px] md:left-0 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full btn-animate-border-circle flex items-center justify-center text-[#1E3A2C] hover:text-white cursor-pointer z-20 shadow-sm [--btn-bg:#ffffff] [--btn-hover-bg:#1E3A2C] ${
+              className={`absolute left-0 sm:left-1 md:left-0 top-1/2 -translate-y-1/2 w-11 h-11 min-w-[44px] min-h-[44px] rounded-full btn-animate-border-circle flex items-center justify-center text-[#1E3A2C] hover:text-white cursor-pointer z-20 shadow-sm [--btn-bg:#ffffff] [--btn-hover-bg:#1E3A2C] ${
                 currentIndex === 0 ? "opacity-30 cursor-not-allowed" : "opacity-100"
               }`}
               disabled={currentIndex === 0}
@@ -288,8 +289,9 @@ export default function NewArrivals() {
 
             {/* Next Navigation Button */}
             <button
+              type="button"
               onClick={nextSlide}
-              className={`absolute right-[-10px] md:right-0 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full btn-animate-border-circle flex items-center justify-center text-[#1E3A2C] hover:text-white cursor-pointer z-20 shadow-sm [--btn-bg:#ffffff] [--btn-hover-bg:#1E3A2C] ${
+              className={`absolute right-0 sm:right-1 md:right-0 top-1/2 -translate-y-1/2 w-11 h-11 min-w-[44px] min-h-[44px] rounded-full btn-animate-border-circle flex items-center justify-center text-[#1E3A2C] hover:text-white cursor-pointer z-20 shadow-sm [--btn-bg:#ffffff] [--btn-hover-bg:#1E3A2C] ${
                 currentIndex >= maxIndex ? "opacity-30 cursor-not-allowed" : "opacity-100"
               }`}
               disabled={currentIndex >= maxIndex}

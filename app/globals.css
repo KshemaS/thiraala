@@ -141,11 +141,13 @@
   animation: scan-laser 2.5s ease-in-out infinite;
 }
 
+html,
 body {
   background: linear-gradient(135deg, var(--bg-gradient-start) 0%, #ffffff 50%, var(--bg-gradient-end) 100%);
   color: var(--foreground);
   font-family: var(--font-open-sans), Arial, Helvetica, sans-serif;
-  overflow-x: hidden;
+  overflow-x: clip;
+  max-width: 100%;
 }
 
 /* Custom glassmorphism navbar links capsule */

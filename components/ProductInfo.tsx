@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { SareeProduct } from "@/data/products";
 import { UnifiedProduct } from "@/lib/products";
@@ -22,6 +23,7 @@ export interface PincodeCheckResult {
 }
 
 export default function ProductInfo({ product }: { product: SareeProduct | UnifiedProduct | any }) {
+  const router = useRouter();
   const { addToCart } = useCart();
   const { toggleWishlist, isInWishlist } = useWishlist();
 
@@ -38,11 +40,11 @@ export default function ProductInfo({ product }: { product: SareeProduct | Unifi
 
   // MRP and discount calculations
   const priceVal = product.priceValue || 1499;
-  const mrpVal = product.mrp || 4997;
+  const mrpVal = product.mrp || Math.round(priceVal * 1.5);
   const discountPercent =
     mrpVal > priceVal
       ? Math.round(((mrpVal - priceVal) / mrpVal) * 100)
-      : product.discountPercent || 70;
+      : product.discountPercent || 0;
 
   // Highlights list
   const defaultHighlights = [
@@ -62,8 +64,15 @@ export default function ProductInfo({ product }: { product: SareeProduct | Unifi
     product.description ||
     "An off-white Kerala cotton saree with deep wine lilies painted across the pallu and pleats, framed by a slim contrast border. Light enough for long festive days, rooted in the coast it comes from.";
 
+  // Only show variants if this product actually has variants configured
+  const hasVariants = Boolean(
+    (product.colorVariants && product.colorVariants.length > 0) ||
+    product.id === 1 ||
+    product.sku === "THR-1042"
+  );
+
   // Color variants gallery
-  const colorVariantsList = [
+  const colorVariantsList = product.colorVariants || [
     {
       name: "Wine Lily",
       img: typeof product.wornImg === "string" ? product.wornImg : "/images/gopura.jpeg",
@@ -81,10 +90,10 @@ export default function ProductInfo({ product }: { product: SareeProduct | Unifi
   // India Post Delivery check handler
   const handleCheckPincode = async () => {
     const pin = pincode.trim();
-    if (!pin || pin.length !== 6 || !/^\d{6}$/.test(pin)) {
+    if (!pin || pin.length !== 6 || !/^[1-9]\d{5}$/.test(pin)) {
       setPincodeStatus({
         valid: false,
-        message: "Please enter a valid 6-digit Indian PIN code.",
+        message: "Enter a valid 6 digit PIN",
       });
       return;
     }
@@ -124,13 +133,10 @@ export default function ProductInfo({ product }: { product: SareeProduct | Unifi
     }
   };
 
-  // Buy Now handler
+  // Buy Now handler: Adds to cart and redirects directly to cart page
   const handleBuyNow = () => {
     addToCart(product, 1);
-    setBuyNowNotice("Added to bag! Proceeding to checkout...");
-    setTimeout(() => {
-      setBuyNowNotice(null);
-    }, 2500);
+    router.push("/cart");
   };
 
   return (
@@ -183,40 +189,43 @@ export default function ProductInfo({ product }: { product: SareeProduct | Unifi
         </p>
       </div>
 
-      {/* 4. MORE COLOURS */}
-      <div className="space-y-2 pt-1">
-        <h3 className="text-xs font-bold text-neutral-900 uppercase tracking-wider">
-          MORE COLOURS
-        </h3>
-        <div className="flex items-center gap-2.5 pt-1">
-          {colorVariantsList.map((variant, idx) => {
-            const isSelected = selectedColor.toLowerCase() === variant.name.toLowerCase();
-            return (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => setSelectedColor(variant.name)}
-                className={`relative w-12 h-16 rounded overflow-hidden transition-all cursor-pointer bg-neutral-100 ${isSelected
-                    ? "border-2 border-neutral-900 shadow-xs"
-                    : "border border-neutral-200 hover:border-neutral-400 opacity-75 hover:opacity-100"
+      {/* 4. MORE COLOURS (Only shown if product has variants) */}
+      {hasVariants && (
+        <div className="space-y-2 pt-1">
+          <h3 className="text-xs font-bold text-neutral-900 uppercase tracking-wider">
+            MORE COLOURS
+          </h3>
+          <div className="flex items-center gap-2.5 pt-1">
+            {colorVariantsList.map((variant: any, idx: number) => {
+              const isSelected = selectedColor.toLowerCase() === variant.name.toLowerCase();
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setSelectedColor(variant.name)}
+                  className={`relative w-12 h-16 rounded overflow-hidden transition-all cursor-pointer bg-neutral-100 ${
+                    isSelected
+                      ? "border-2 border-neutral-900 shadow-xs"
+                      : "border border-neutral-200 hover:border-neutral-400 opacity-75 hover:opacity-100"
                   }`}
-                title={variant.name}
-              >
-                <Image
-                  src={variant.img}
-                  alt={variant.name}
-                  fill
-                  className="object-cover"
-                  unoptimized={typeof variant.img === "string" && variant.img.startsWith("data:")}
-                />
-              </button>
-            );
-          })}
+                  title={variant.name}
+                >
+                  <Image
+                    src={variant.img}
+                    alt={variant.name}
+                    fill
+                    className="object-cover"
+                    unoptimized={typeof variant.img === "string" && variant.img.startsWith("data:")}
+                  />
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-neutral-600 pt-0.5">
+            Selected: <span className="font-bold text-neutral-900">{selectedColor}</span>
+          </p>
         </div>
-        <p className="text-xs text-neutral-600 pt-0.5">
-          Selected: <span className="font-bold text-neutral-900">{selectedColor}</span>
-        </p>
-      </div>
+      )}
 
       {/* 5. SELECT SIZE */}
       <div className="space-y-2.5 pt-2">
@@ -230,31 +239,43 @@ export default function ProductInfo({ product }: { product: SareeProduct | Unifi
         </div>
       </div>
 
-      {/* 6. ACTION CTAS (BUY NOW & WISHLIST) */}
+      {/* 6. ACTION CTAS (ADD TO BAG, BUY NOW & WISHLIST) */}
       <div className="space-y-2 pt-2">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* ADD TO BAG Button */}
+          <button
+            type="button"
+            onClick={() => addToCart(product, 1)}
+            className="w-full bg-white hover:bg-neutral-50 text-[#1E3A2C] border-2 border-[#1E3A2C] text-xs font-bold uppercase tracking-wider py-3.5 px-3 rounded-md flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
+          >
+            <ShoppingBag className="w-4 h-4 text-[#1E3A2C]" />
+            <span>ADD TO BAG</span>
+          </button>
+
           {/* BUY NOW Button */}
           <button
             type="button"
             onClick={handleBuyNow}
-            className="w-full bg-[#1E3A2C] hover:bg-[#162e22] text-white text-xs font-bold uppercase tracking-wider py-3.5 px-4 rounded-md flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+            className="w-full bg-[#1E3A2C] hover:bg-[#162e22] text-white text-xs font-bold uppercase tracking-wider py-3.5 px-3 rounded-md flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
           >
-            <ShoppingBag className="w-4 h-4" />
-            <span>BUY NOW • {product.price || `₹${priceVal.toLocaleString("en-IN")}`}</span>
+            <span>BUY NOW</span>
           </button>
 
           {/* WISHLIST Button */}
           <button
             type="button"
             onClick={() => toggleWishlist(product)}
-            className={`w-full border text-xs font-bold uppercase tracking-wider py-3.5 px-4 rounded-md flex items-center justify-center gap-2 transition-all cursor-pointer ${isWishlisted
+            aria-label={isWishlisted ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
+            className={`w-full border text-xs font-bold uppercase tracking-wider py-3.5 px-3 rounded-md flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              isWishlisted
                 ? "bg-rose-50 border-rose-300 text-rose-600"
                 : "bg-white border-neutral-300 text-neutral-800 hover:bg-neutral-50"
-              }`}
+            }`}
           >
             <Heart
-              className={`w-4 h-4 ${isWishlisted ? "fill-rose-500 text-rose-500" : "text-neutral-700"
-                }`}
+              className={`w-4 h-4 ${
+                isWishlisted ? "fill-rose-500 text-rose-500" : "text-neutral-700"
+              }`}
             />
             <span>{isWishlisted ? "WISHLISTED" : "WISHLIST"}</span>
           </button>
@@ -336,26 +357,28 @@ export default function ProductInfo({ product }: { product: SareeProduct | Unifi
               <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
             )}
             <p className="font-semibold text-[13px]">
-              {pincodeStatus.valid ? "Delivery Available" : "Delivery Unavailable"}
+              {pincodeStatus.message}
             </p>
           </div>
         )}
 
-        {/* Feature list */}
-        <div className="space-y-1.5 pt-1 text-xs text-neutral-600">
-          <p className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#1E3A2C]/60" />
-            <span>Delivered via <strong>India Post Speed Post & Parcel</strong> service</span>
-          </p>
-          <p className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#1E3A2C]/60" />
-            <span>Expected in 2–4 days across Kerala, 4–7 days all-India</span>
-          </p>
-          <p className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#1E3A2C]/60" />
-            <span>Real-time India Post tracking ID shared after dispatch</span>
-          </p>
-        </div>
+        {/* Feature list - hidden when an invalid pincode is checked */}
+        {(!pincodeStatus || pincodeStatus.valid) && (
+          <div className="space-y-1.5 pt-1 text-xs text-neutral-600">
+            <p className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#1E3A2C]/60" />
+              <span>Delivered via <strong>India Post Speed Post & Parcel</strong> service</span>
+            </p>
+            <p className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#1E3A2C]/60" />
+              <span>Expected in 2–4 days across Kerala, 4–7 days all-India</span>
+            </p>
+            <p className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#1E3A2C]/60" />
+              <span>Real-time India Post tracking ID shared after dispatch</span>
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Divider */}
@@ -418,9 +441,11 @@ export default function ProductInfo({ product }: { product: SareeProduct | Unifi
         {/* Material & Care */}
         <div className="pt-2">
           <h4 className="text-xs font-bold text-neutral-900 mb-1">Material & Care</h4>
-          <p className="text-xs text-neutral-700">{product.fabric || "Cotton"}</p>
-          <p className="text-xs text-neutral-700">
-            {product.careInstructions || "Care: [confirm care instructions]"}
+          <p className="text-xs text-neutral-700">{product.fabric || "Kerala Cotton"}</p>
+          <p className="text-xs text-neutral-700 mt-1">
+            {product.careInstructions && !product.careInstructions.includes("[confirm care instructions]")
+              ? product.careInstructions
+              : "Dry clean recommended for first wash. Gentle hand wash in cold water with mild detergent thereafter. Dry in shade."}
           </p>
         </div>
 
@@ -433,7 +458,7 @@ export default function ProductInfo({ product }: { product: SareeProduct | Unifi
               <div className="border-b border-neutral-200 pb-2 mb-2">
                 <span className="text-[11px] text-neutral-400 block font-normal">Fabric</span>
                 <span className="text-neutral-900 font-medium block mt-0.5">
-                  {product.fabric || "Cotton"}
+                  {product.fabric || "Kerala Cotton"}
                 </span>
               </div>
               <div className="border-b border-neutral-200 pb-2 mb-2">
@@ -459,7 +484,7 @@ export default function ProductInfo({ product }: { product: SareeProduct | Unifi
                   Saree Fabric
                 </span>
                 <span className="text-neutral-900 font-medium block mt-0.5">
-                  {product.sareeFabric || "Kerala Cotton"}
+                  {product.sareeFabric || product.fabric || "Kerala Cotton"}
                 </span>
               </div>
               <div className="border-b border-neutral-200 pb-2 mb-2">

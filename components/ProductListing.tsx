@@ -64,6 +64,7 @@ export default function ProductListing() {
     return 0;
   });
   const [inStockOnly, setInStockOnly] = useState<boolean>(false);
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState<boolean>(false);
 
   // Products and facets data
   const [products, setProducts] = useState<FilteredProduct[]>([]);
@@ -178,7 +179,7 @@ export default function ProductListing() {
     <section className="w-full py-10 lg:py-14">
       <Container>
         {/* Top Header Controls: Search bar & Sorter & Result Counter */}
-        <div className="w-full mb-8 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-[22px] border border-[#1E3A2C]/10 shadow-[0_4px_20px_rgba(30,58,44,0.03)]">
+        <div className="w-full mb-8 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4 bg-white p-3.5 sm:p-5 rounded-[22px] border border-[#1E3A2C]/10 shadow-[0_4px_20px_rgba(30,58,44,0.03)]">
           {/* Search Input */}
           <div className="relative flex-1 max-w-md">
             <svg
@@ -194,7 +195,7 @@ export default function ProductListing() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by saree name, fabric, design..."
-              className="w-full pl-10 pr-9 py-2.5 bg-[#fbfaf8] border border-[#1E3A2C]/15 rounded-xl text-xs text-[#1E3A2C] placeholder:text-[#1E3A2C]/40 focus:outline-none focus:border-[#DAA87C] focus:ring-2 focus:ring-[#DAA87C]/20 transition-all"
+              className="w-full pl-10 pr-9 py-2 sm:py-2.5 bg-[#fbfaf8] border border-[#1E3A2C]/15 rounded-xl text-xs text-[#1E3A2C] placeholder:text-[#1E3A2C]/40 focus:outline-none focus:border-[#DAA87C] focus:ring-2 focus:ring-[#DAA87C]/20 transition-all"
             />
             {searchQuery && (
               <button
@@ -209,8 +210,8 @@ export default function ProductListing() {
           </div>
 
           {/* Counts & Sorter */}
-          <div className="flex items-center justify-between md:justify-end gap-4">
-            <div className="text-xs text-[#1E3A2C]/65 font-medium whitespace-nowrap">
+          <div className="flex flex-wrap items-center justify-between md:justify-end gap-2.5 sm:gap-4 w-full md:w-auto">
+            <div className="text-[11px] sm:text-xs text-[#1E3A2C]/65 font-medium shrink-0">
               {loading ? (
                 <span>Loading weaves...</span>
               ) : (
@@ -222,7 +223,7 @@ export default function ProductListing() {
             </div>
 
             {/* Sort Selector */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               <label htmlFor="sort-dropdown" className="text-xs text-[#1E3A2C]/50 hidden sm:inline">
                 Sort:
               </label>
@@ -230,7 +231,7 @@ export default function ProductListing() {
                 id="sort-dropdown"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="py-2 px-3 bg-[#fbfaf8] border border-[#1E3A2C]/15 rounded-xl text-xs font-semibold text-[#1E3A2C] focus:outline-none focus:border-[#DAA87C] cursor-pointer"
+                className="py-1.5 px-2.5 sm:py-2 sm:px-3 bg-[#fbfaf8] border border-[#1E3A2C]/15 rounded-xl text-[11px] sm:text-xs font-semibold text-[#1E3A2C] focus:outline-none focus:border-[#DAA87C] cursor-pointer max-w-[140px] sm:max-w-none"
               >
                 {SORT_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -324,10 +325,32 @@ export default function ProductListing() {
           </div>
         )}
 
+        {/* Mobile Filter Toggle Button */}
+        <div className="lg:hidden w-full mb-4">
+          <button
+            type="button"
+            onClick={() => setIsMobileFilterOpen(!isMobileFilterOpen)}
+            className="w-full py-3 px-4 rounded-2xl border border-[#1E3A2C]/15 bg-white flex items-center justify-between text-xs font-bold text-[#1E3A2C] shadow-xs cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-[#DAA87C]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+              <span>{isMobileFilterOpen ? "Hide Filter Options" : "Filter Sarees"}</span>
+              {hasActiveFilters && (
+                <span className="w-2 h-2 rounded-full bg-[#DAA87C]" />
+              )}
+            </div>
+            <span className="text-[11px] text-[#DAA87C] font-semibold">
+              {isMobileFilterOpen ? "Close ▲" : "Filter ▼"}
+            </span>
+          </button>
+        </div>
+
         {/* Main Layout: Filter Sidebar + Products Grid */}
         <div className="flex flex-col lg:flex-row gap-8 lg:gap-10 items-start w-full">
           {/* Left Sidebar: Filter Panel */}
-          <aside className="w-full lg:w-[270px] flex-shrink-0 bg-white p-6 rounded-[24px] border border-[#1E3A2C]/10 shadow-[0_10px_30px_rgba(30,58,44,0.02)] space-y-6">
+          <aside className={`${isMobileFilterOpen ? "block" : "hidden lg:block"} w-full lg:w-[270px] flex-shrink-0 bg-white p-6 rounded-[24px] border border-[#1E3A2C]/10 shadow-[0_10px_30px_rgba(30,58,44,0.02)] space-y-6`}>
             {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-[#1E3A2C]/10">
               <div className="flex items-center gap-2">

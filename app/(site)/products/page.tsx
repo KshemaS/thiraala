@@ -1,8 +1,14 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ProductBanner from "@/components/ProductBanner";
 import ProductListing from "@/components/ProductListing";
+
+export const metadata: Metadata = {
+  title: "Curated Saree Collection",
+  description: "Browse handwoven Kasavu, cotton, tissue, and festive sarees at thiraala. Filter by fabric, sort by newest arrivals and top ratings.",
+};
 
 export default function ProductsListingPage() {
   return (

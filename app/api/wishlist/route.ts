@@ -91,10 +91,16 @@ export async function GET(request: Request) {
       // Fallback to JSON
     }
 
-    // Filter by userId if provided
-    if (userId) {
-      items = items.filter((item) => item.userId === userId);
+    // If no userId, return empty list (guests use local device storage)
+    if (!userId) {
+      return NextResponse.json({
+        success: true,
+        count: 0,
+        items: [],
+      });
     }
+
+    items = items.filter((item) => item.userId === userId);
 
     // Filter by productId if provided
     if (productId) {
@@ -410,16 +416,19 @@ export async function DELETE(request: Request) {
 
     const initialLength = items.length;
     items = items.filter((it) => {
-      if (targetId && it.id === targetId) return false;
-      if (targetProductId && String(it.productId) === String(targetProductId)) return false;
+      if (targetId && (it.id === targetId || String(it.productId) === String(targetId))) return false;
+      if (targetProductId && (it.id === targetProductId || String(it.productId) === String(targetProductId))) return false;
       return true;
     });
 
     if (items.length === initialLength) {
-      return NextResponse.json(
-        { success: false, error: "Item not found in wishlist." },
-        { status: 404 }
-      );
+      // Even if item wasn't in JSON, return success if already gone
+      return NextResponse.json({
+        success: true,
+        message: "Item already removed from wishlist.",
+        removedId: targetId || targetProductId,
+        remainingCount: items.length,
+      });
     }
 
     saveWishlistItems(items);

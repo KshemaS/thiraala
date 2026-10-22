@@ -12,7 +12,10 @@ const openSans = Open_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "thiraala | Elegant Saree Collection",
+  title: {
+    default: "thiraala | Elegant Saree Collection",
+    template: "%s | thiraala",
+  },
   description: "Discover beautiful sarees for every occasion at thiraala. Explore our curated collection of simple, elegant, and comfortable sarees designed to make your moments special.",
 };
 

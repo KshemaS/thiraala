@@ -105,9 +105,9 @@ export default function OnamCollection() {
   };
 
   const leftVariant = {
-    hidden: { x: -30, opacity: 0 },
+    hidden: { y: 30, opacity: 0 },
     show: {
-      x: 0,
+      y: 0,
       opacity: 1,
       transition: {
         duration: 0.5,
@@ -117,9 +117,9 @@ export default function OnamCollection() {
   };
 
   const rightVariant = {
-    hidden: { x: 30, opacity: 0 },
+    hidden: { y: 30, opacity: 0 },
     show: {
-      x: 0,
+      y: 0,
       opacity: 1,
       transition: {
         duration: 0.5,
@@ -141,7 +141,7 @@ export default function OnamCollection() {
   };
 
   return (
-    <section className="w-full mt-[60px] md:mt-[80px] lg:mt-[140px] mb-[80px] lg:mb-[140px] select-none">
+    <section className="w-full mt-[60px] md:mt-[80px] lg:mt-[140px] mb-[80px] lg:mb-[140px] select-none overflow-hidden">
       <Container>
         <motion.div
           variants={containerVariants}
@@ -174,7 +174,6 @@ export default function OnamCollection() {
                   <ProductCard
                     saree={{
                       ...saree,
-                      priority: idx <= 2,
                     }}
                   />
                 </motion.div>

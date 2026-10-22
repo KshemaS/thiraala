@@ -49,6 +49,10 @@ function OrdersContent() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
+  useEffect(() => {
+    document.title = "My Orders | thiraala";
+  }, []);
+
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {

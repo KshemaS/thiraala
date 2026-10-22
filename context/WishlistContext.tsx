@@ -45,11 +45,46 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
     return user?.id || user?.email || null;
   }, [user]);
 
-  // Fetch wishlist from API (READ)
+  // Fetch wishlist from local storage for guests, or API for authenticated users
   const refreshWishlist = useCallback(async () => {
     try {
       const userId = getUserId();
-      const url = userId ? `/api/wishlist?userId=${encodeURIComponent(userId)}` : "/api/wishlist";
+      if (!userId) {
+        if (typeof window !== "undefined") {
+          try {
+            const stored = localStorage.getItem("thiraala_guest_wishlist");
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              if (Array.isArray(parsed)) {
+                // Filter out corrupted or broken items (e.g. price '?' or missing names)
+                const validItems = parsed.filter(
+                  (item: any) =>
+                    item &&
+                    item.name &&
+                    item.price &&
+                    item.price !== "?" &&
+                    !String(item.price).includes("NaN") &&
+                    item.name !== "Mayil Peacock Motif" &&
+                    item.name !== "Gopuram Classic Kasavu"
+                );
+                setWishlist(validItems);
+                if (validItems.length !== parsed.length) {
+                  localStorage.setItem("thiraala_guest_wishlist", JSON.stringify(validItems));
+                }
+              } else {
+                setWishlist([]);
+              }
+            } else {
+              setWishlist([]);
+            }
+          } catch {
+            setWishlist([]);
+          }
+        }
+        return;
+      }
+
+      const url = `/api/wishlist?userId=${encodeURIComponent(userId)}`;
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
@@ -73,13 +108,13 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
         }
       }
     } catch (e) {
-      console.error("Failed to fetch wishlist from API:", e);
+      console.error("Failed to fetch wishlist:", e);
     } finally {
       setIsLoading(false);
     }
   }, [getUserId]);
 
-  // Initial load: Fetch from API
+  // Initial load: Fetch from API or localStorage
   useEffect(() => {
     refreshWishlist();
   }, [refreshWishlist]);
@@ -97,9 +132,20 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
     setWishlist(updated);
     showToast(`${product.name} added to wishlist`);
 
+    const userId = getUserId();
+    if (!userId) {
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("thiraala_guest_wishlist", JSON.stringify(updated));
+        } catch {
+          // ignore
+        }
+      }
+      return;
+    }
+
     // API call (POST /api/wishlist)
     try {
-      const userId = getUserId();
       await fetch("/api/wishlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -130,12 +176,25 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
     setWishlist(updated);
     if (itemToRemove) {
       showToast(`${itemToRemove.name} removed from wishlist`);
+    } else {
+      showToast("Removed from wishlist");
+    }
+
+    const userId = getUserId();
+    if (!userId) {
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("thiraala_guest_wishlist", JSON.stringify(updated));
+        } catch {
+          // ignore
+        }
+      }
+      return;
     }
 
     // API call (DELETE /api/wishlist?productId=...)
     try {
-      const userId = getUserId();
-      const params = new URLSearchParams({ productId: String(id) });
+      const params = new URLSearchParams({ productId: String(id), id: String(id) });
       if (userId) params.append("userId", userId);
 
       await fetch(`/api/wishlist?${params.toString()}`, {
@@ -154,9 +213,20 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
     setWishlist([]);
     showToast("Wishlist cleared");
 
+    const userId = getUserId();
+    if (!userId) {
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.removeItem("thiraala_guest_wishlist");
+        } catch {
+          // ignore
+        }
+      }
+      return;
+    }
+
     // API call (DELETE /api/wishlist?clearAll=true)
     try {
-      const userId = getUserId();
       const params = new URLSearchParams({ clearAll: "true" });
       if (userId) params.append("userId", userId);
 

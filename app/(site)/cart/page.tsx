@@ -42,6 +42,11 @@ export default function CartPage() {
 
   const [paymentMethod] = useState<"UPI">("UPI");
 
+  // Set dynamic page title
+  useEffect(() => {
+    document.title = "Shopping Bag | thiraala";
+  }, []);
+
   // Sync user info into form state when user logs in
   useEffect(() => {
     if (user) {
@@ -255,7 +260,7 @@ export default function CartPage() {
                   <div className="absolute left-0 right-0 h-[2.5px] bg-[#DAA87C] opacity-60 shadow-[0_0_8px_#DAA87C] animate-scan-laser" />
                 </div>
                 
-                <span className="text-xs font-extrabold text-[#1E3A2C] mt-4">Amount: Rs. {orderTotal.toLocaleString()}</span>
+                <span className="text-xs font-extrabold text-[#1E3A2C] mt-4">Amount: ₹{orderTotal.toLocaleString("en-IN")}</span>
                 <p className="text-[10px] text-[#1E3A2C]/50 mt-1.5 font-semibold text-center leading-relaxed">
                   Scan this QR code using GPAY, PhonePe, Paytm, or any UPI app to complete payment.
                 </p>
@@ -347,9 +352,14 @@ export default function CartPage() {
                               <Link href={`/products/${item.id}`} className="text-sm font-bold text-[#1E3A2C] hover:text-[#DAA87C] transition-colors leading-tight">
                                 {item.name}
                               </Link>
-                              <p className="text-[10px] text-[#1E3A2C]/40 mt-1 font-semibold select-none">
-                                Free Express Delivery Across India
+                              <p className="text-[10px] text-[#1E3A2C]/60 mt-1 font-semibold select-none">
+                                Delivery via India Post (2–4 days Kerala, 4–7 days India)
                               </p>
+                              {item.quantity >= (item.stock ?? 10) && (
+                                <p className="text-[10px] text-amber-700 font-bold mt-0.5">
+                                  Only {item.stock ?? 10} left in stock
+                                </p>
+                              )}
                             </div>
                             
                             {/* Remove button */}
@@ -381,7 +391,9 @@ export default function CartPage() {
                               </span>
                               <button
                                 onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-[#1E3A2C] hover:bg-[#1E3A2C]/5 cursor-pointer transition-colors"
+                                disabled={item.quantity >= (item.stock ?? 10)}
+                                title={item.quantity >= (item.stock ?? 10) ? `Only ${item.stock ?? 10} left` : "Increase quantity"}
+                                className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-[#1E3A2C] hover:bg-[#1E3A2C]/5 cursor-pointer transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                               >
                                 +
                               </button>
@@ -403,7 +415,7 @@ export default function CartPage() {
                 <div className="space-y-3.5 text-xs font-semibold text-[#1E3A2C]">
                   <div className="flex justify-between">
                     <span className="text-[#1E3A2C]/65">Subtotal</span>
-                    <span>Rs. {cartTotal.toLocaleString()}</span>
+                    <span>₹{cartTotal.toLocaleString("en-IN")}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-[#1E3A2C]/65">Shipping</span>
@@ -411,7 +423,7 @@ export default function CartPage() {
                   </div>
                   <div className="border-t border-[#1E3A2C]/10 pt-3.5 flex justify-between text-sm font-extrabold text-[#0c2b1c]">
                     <span>Total Amount</span>
-                    <span>Rs. {cartTotal.toLocaleString()}</span>
+                    <span>₹{cartTotal.toLocaleString("en-IN")}</span>
                   </div>
                 </div>
 

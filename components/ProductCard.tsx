@@ -49,8 +49,10 @@ export default function ProductCard({ saree }: ProductCardProps) {
       <div className="relative aspect-[3/4] w-full overflow-hidden bg-[#fbfaf8]">
         {/* Wishlist Toggle Button */}
         <button
+          type="button"
           onClick={handleWishlistClick}
-          className="absolute top-4 right-4 z-20 p-2.5 rounded-full bg-white/85 hover:bg-white text-[#1E3A2C]/80 hover:text-red-500 transition-all duration-300 shadow-md backdrop-blur-xs flex items-center justify-center cursor-pointer group/wishlist active:scale-90"
+          aria-label={isWishlisted ? `Remove ${saree.name} from wishlist` : `Add ${saree.name} to wishlist`}
+          className="absolute top-3 right-3 z-20 w-11 h-11 min-w-[44px] min-h-[44px] rounded-full bg-white/90 hover:bg-white text-[#1E3A2C]/80 hover:text-red-500 transition-all duration-300 shadow-md backdrop-blur-xs flex items-center justify-center cursor-pointer group/wishlist active:scale-90"
         >
           <svg
             className={`w-4 h-4 transition-transform duration-300 group-hover/wishlist:scale-110 ${
@@ -88,23 +90,23 @@ export default function ProductCard({ saree }: ProductCardProps) {
       </div>
 
       {/* Information Block */}
-      <div className="p-5 flex flex-col justify-between flex-1 border-t border-[#1E3A2C]/5">
+      <div className="p-3.5 sm:p-5 flex flex-col justify-between flex-1 border-t border-[#1E3A2C]/5">
         <div>
-          <h3 className="text-[#1E3A2C] font-bold text-base tracking-tight group-hover:text-[#0c2b1c] transition-colors duration-200">
+          <h3 className="text-[#1E3A2C] font-bold text-sm sm:text-base tracking-tight group-hover:text-[#0c2b1c] transition-colors duration-200 line-clamp-1">
             {saree.name}
           </h3>
-          <p className="text-[#1E3A2C]/50 text-xs mt-1">
-            Free Express Delivery Across India
+          <p className="text-[#1E3A2C]/50 text-[11px] sm:text-xs mt-0.5 sm:mt-1">
+            Delivery via India Post
           </p>
         </div>
 
-        <div className="mt-4 flex items-center justify-between">
-          <span className="text-lg font-bold text-[#0c2b1c]">{saree.price}</span>
+        <div className="mt-3 sm:mt-4 flex flex-wrap items-center justify-between gap-1.5">
+          <span className="text-base sm:text-lg font-bold text-[#0c2b1c] shrink-0">{saree.price}</span>
 
-          <span className="text-[11px] font-bold text-[#1E3A2C] group-hover:text-[#0c2b1c] flex items-center gap-1 transition-colors">
+          <span className="text-[10px] sm:text-[11px] font-bold text-[#1E3A2C] group-hover:text-[#0c2b1c] flex items-center gap-1 transition-colors shrink-0">
             Quick View
             <svg
-              className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform"
+              className="w-3 sm:w-3.5 h-3 sm:h-3.5 group-hover:translate-x-0.5 transition-transform"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
