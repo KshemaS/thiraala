@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import AboutHero from "@/components/AboutHero";
@@ -9,6 +10,9 @@ import Craftsmanship from "@/components/Craftsmanship";
 import AboutPromise from "@/components/AboutPromise";
 
 export default function AboutPage() {
+  useEffect(() => {
+    document.title = "Boutique Heritage & About Us | thiraala";
+  }, []);
   return (
     <div className="min-h-screen flex flex-col justify-between selection:bg-[#DAA87C]/20 selection:text-[#DAA87C]">
       <Header />

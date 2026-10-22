@@ -127,8 +127,8 @@ export async function getAllUnifiedProducts(): Promise<UnifiedProduct[]> {
             priceValue: item.priceValue || parseInt(String(item.price).replace(/[^\d]/g, ""), 10) || 0,
             mrp: item.mrp,
             discountPercent: item.mrp && item.priceValue ? Math.round(((item.mrp - item.priceValue) / item.mrp) * 100) : undefined,
-            rating: item.rating || 4.8,
-            ratingCount: item.ratingCount || 85,
+            rating: item.rating !== undefined ? item.rating : 4.8,
+            ratingCount: item.ratingCount !== undefined ? item.ratingCount : 85,
             selectedColor: item.selectedColor,
             category: item.category || "Cotton Saree",
             collection: item.collection,
@@ -152,7 +152,7 @@ export async function getAllUnifiedProducts(): Promise<UnifiedProduct[]> {
             description: item.description || "",
             status: item.status || "active",
             featured: item.featured,
-            isNewArrival: item.isNewArrival,
+            isNewArrival: Boolean(item.isNewArrival),
           });
         }
       }

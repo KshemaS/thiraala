@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import prisma from "@/lib/prisma";
+import { getAdminSession } from "@/lib/auth/guard";
 
 const dataFilePath = path.join(process.cwd(), "data", "users.json");
 
@@ -20,6 +21,13 @@ function getUsersFromFile(): any[] {
 
 export async function GET() {
   try {
+    const adminSession = await getAdminSession();
+    if (!adminSession) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized. Admin privileges required." },
+        { status: 401 }
+      );
+    }
     let users: any[] = [];
 
     // Try finding in Prisma database first

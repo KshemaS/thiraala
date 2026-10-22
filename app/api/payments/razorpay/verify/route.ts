@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { verifyPaymentSignature } from "@/lib/razorpay";
 import { toOrderJSON, type TrackingEvent } from "@/app/api/orders/route";
 
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
         status: order.status === "Pending" ? "Order Confirmed" : order.status,
         razorpayPaymentId: razorpay_payment_id,
         razorpaySignature: razorpay_signature,
-        trackingTimeline: timeline,
+        trackingTimeline: timeline as unknown as Prisma.InputJsonValue,
       },
       include: { items: true },
     });

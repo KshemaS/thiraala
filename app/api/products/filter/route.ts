@@ -129,16 +129,15 @@ export async function GET(request: Request) {
       filtered = filtered.filter((p) => (p.stock ?? 0) > 0);
     }
 
-    // Keyword search filter
-    if (searchQuery) {
+    // Keyword search filter with whitespace normalization
+    const cleanSearch = searchQuery.replace(/\s+/g, " ").trim();
+    if (cleanSearch) {
+      const tokens = cleanSearch.split(" ").filter(Boolean);
       filtered = filtered.filter((p) => {
-        const titleMatch = (p.name || "").toLowerCase().includes(searchQuery);
-        const skuMatch = (p.sku || "").toLowerCase().includes(searchQuery);
-        const categoryMatch = (p.category || "").toLowerCase().includes(searchQuery);
-        const fabricMatch = (p.fabric || "").toLowerCase().includes(searchQuery);
-        const colorMatch = (p.color || "").toLowerCase().includes(searchQuery);
-        const descMatch = (p.description || "").toLowerCase().includes(searchQuery);
-        return titleMatch || skuMatch || categoryMatch || fabricMatch || colorMatch || descMatch;
+        const text = `${p.name} ${p.sku} ${p.category} ${p.fabric} ${p.sareeFabric || ""} ${p.color || ""} ${p.description || ""}`
+          .toLowerCase()
+          .replace(/\s+/g, " ");
+        return tokens.every((token) => text.includes(token));
       });
     }
 

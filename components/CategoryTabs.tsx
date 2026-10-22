@@ -111,9 +111,9 @@ export default function CategoryTabs() {
   };
 
   const leftVariant = {
-    hidden: { x: -30, opacity: 0 },
+    hidden: { y: 30, opacity: 0 },
     show: {
-      x: 0,
+      y: 0,
       opacity: 1,
       transition: {
         duration: 0.5,
@@ -123,9 +123,9 @@ export default function CategoryTabs() {
   };
 
   const rightVariant = {
-    hidden: { x: 30, opacity: 0 },
+    hidden: { y: 30, opacity: 0 },
     show: {
-      x: 0,
+      y: 0,
       opacity: 1,
       transition: {
         duration: 0.5,
@@ -147,7 +147,7 @@ export default function CategoryTabs() {
   };
 
   return (
-    <section className="w-full mb-[140px] select-none">
+    <section className="w-full mb-[140px] select-none overflow-hidden">
       <Container>
         <motion.div
           variants={containerVariants}

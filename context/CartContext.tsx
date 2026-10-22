@@ -1,6 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { sareesData } from "@/data/products";
 
 export interface CartItem {
   id: number | string;
@@ -9,6 +11,7 @@ export interface CartItem {
   foldedImg?: any;
   wornImg?: any;
   quantity: number;
+  stock?: number;
 }
 
 interface CartContextType {
@@ -24,29 +27,110 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [toast, setToast] = useState<{ message: string; show: boolean }>({ message: "", show: false });
 
-  // Load cart from localStorage on mount
+  const saveCart = (items: CartItem[]) => {
+    setCart(items);
+    if (typeof window !== "undefined") {
+      const key = user?.id ? `thiraala_cart_user_${user.id}` : "thiraala_cart_guest";
+      localStorage.setItem(key, JSON.stringify(items));
+    }
+  };
+
+  // Synchronize cart on mount or when user authentication state changes (TH-041)
   useEffect(() => {
-    const stored = localStorage.getItem("thiraala_cart");
-    if (stored) {
-      try {
-        setCart(JSON.parse(stored));
-      } catch (e) {
-        console.error("Failed to load cart", e);
+    if (typeof window === "undefined") return;
+
+    if (user?.id) {
+      // User logged in: migrate any guest items into user account cart
+      const guestRaw = localStorage.getItem("thiraala_cart_guest") || localStorage.getItem("thiraala_cart");
+      let guestItems: CartItem[] = [];
+      if (guestRaw) {
+        try {
+          guestItems = JSON.parse(guestRaw);
+        } catch (e) {
+          console.error("Failed to parse guest cart", e);
+        }
+      }
+
+      const userKey = `thiraala_cart_user_${user.id}`;
+      const userRaw = localStorage.getItem(userKey);
+      let userItems: CartItem[] = [];
+      if (userRaw) {
+        try {
+          userItems = JSON.parse(userRaw);
+        } catch (e) {
+          console.error("Failed to parse user cart", e);
+        }
+      }
+
+      if (guestItems.length > 0) {
+        const merged = [...userItems];
+        guestItems.forEach((gItem) => {
+          const idx = merged.findIndex((m) => String(m.id) === String(gItem.id));
+          if (idx > -1) {
+            merged[idx].quantity = Math.min(
+              merged[idx].quantity + gItem.quantity,
+              merged[idx].stock ?? 10
+            );
+          } else {
+            merged.push(gItem);
+          }
+        });
+        localStorage.setItem(userKey, JSON.stringify(merged));
+        localStorage.removeItem("thiraala_cart_guest");
+        localStorage.removeItem("thiraala_cart");
+        setCart(merged);
+      } else {
+        setCart(userItems);
+      }
+    } else {
+      // Guest mode: load guest cart or initialize empty
+      const guestRaw = localStorage.getItem("thiraala_cart_guest");
+      if (guestRaw) {
+        try {
+          setCart(JSON.parse(guestRaw));
+        } catch {
+          setCart([]);
+        }
+      } else {
+        setCart([]);
       }
     }
-  }, []);
+  }, [user]);
 
   const addToCart = (product: any, quantity: number = 1) => {
     let updated: CartItem[];
-    const existingIndex = cart.findIndex((item) => item.id === product.id);
+    const existingIndex = cart.findIndex((item) => String(item.id) === String(product.id));
+    
+    // Resolve accurate stock limit from product object or catalog
+    const catalogItem = sareesData.find(
+      (p) => String(p.id) === String(product.id) || p.slug === product.slug || p.name === product.name
+    );
+    const stockLimit = product.stock !== undefined ? product.stock : (catalogItem?.stock ?? 10);
 
     if (existingIndex > -1) {
+      const currentQty = cart[existingIndex].quantity;
+      const newQty = currentQty + quantity;
+      if (newQty > stockLimit) {
+        showToast(`Only ${stockLimit} left in stock`);
+        return;
+      }
       updated = [...cart];
-      updated[existingIndex].quantity += quantity;
+      updated[existingIndex] = {
+        ...updated[existingIndex],
+        quantity: newQty,
+        stock: stockLimit,
+      };
+      saveCart(updated);
+      showToast(`${product.name} quantity increased in bag (${newQty})`);
     } else {
+      if (quantity > stockLimit) {
+        showToast(`Only ${stockLimit} left in stock`);
+        return;
+      }
       updated = [
         ...cart,
         {
@@ -56,22 +140,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           foldedImg: product.foldedImg,
           wornImg: product.wornImg,
           quantity,
+          stock: stockLimit,
         },
       ];
+      saveCart(updated);
+      showToast(`${product.name} added to bag`);
     }
-
-    setCart(updated);
-    localStorage.setItem("thiraala_cart", JSON.stringify(updated));
-    showToast(`${quantity} x ${product.name} added to cart`);
   };
 
   const removeFromCart = (id: number | string) => {
     const itemToRemove = cart.find((item) => String(item.id) === String(id));
     const updated = cart.filter((item) => String(item.id) !== String(id));
-    setCart(updated);
-    localStorage.setItem("thiraala_cart", JSON.stringify(updated));
+    saveCart(updated);
     if (itemToRemove) {
-      showToast(`${itemToRemove.name} removed from cart`);
+      showToast(`${itemToRemove.name} removed from bag`);
     }
   };
 
@@ -80,14 +162,27 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       removeFromCart(id);
       return;
     }
-    const updated = cart.map((item) => (String(item.id) === String(id) ? { ...item, quantity } : item));
-    setCart(updated);
-    localStorage.setItem("thiraala_cart", JSON.stringify(updated));
+    const targetItem = cart.find((item) => String(item.id) === String(id));
+    const catalogItem = sareesData.find((p) => String(p.id) === String(id));
+    const stockLimit = targetItem?.stock !== undefined ? targetItem.stock : (catalogItem?.stock ?? 10);
+    
+    if (quantity > stockLimit) {
+      showToast(`Only ${stockLimit} left in stock`);
+      return;
+    }
+    const updated = cart.map((item) =>
+      String(item.id) === String(id) ? { ...item, quantity, stock: stockLimit } : item
+    );
+    saveCart(updated);
   };
 
   const clearCart = () => {
     setCart([]);
-    localStorage.removeItem("thiraala_cart");
+    if (typeof window !== "undefined") {
+      const key = user?.id ? `thiraala_cart_user_${user.id}` : "thiraala_cart_guest";
+      localStorage.removeItem(key);
+      localStorage.removeItem("thiraala_cart");
+    }
   };
 
   const showToast = (message: string) => {

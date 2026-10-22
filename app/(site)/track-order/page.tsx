@@ -34,9 +34,17 @@ function TrackOrderContent() {
   const [error, setError] = useState<string | null>(null);
   const [copiedTracking, setCopiedTracking] = useState(false);
 
+  useEffect(() => {
+    document.title = "Track Order Shipment | thiraala";
+  }, []);
+
   const fetchOrder = async (idToSearch: string) => {
     const cleanId = idToSearch.trim();
-    if (!cleanId) return;
+    if (!cleanId) {
+      setError("Please enter your Order ID");
+      setOrder(null);
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
@@ -139,32 +147,6 @@ function TrackOrderContent() {
                 </button>
               </div>
             </form>
-
-            {/* Quick Helper pill */}
-            <div className="mt-3 flex items-center justify-center gap-2 text-[11px] text-[#1E3A2C]/50 font-medium">
-              <span>Try sample orders:</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setOrderId("THR-1081");
-                  fetchOrder("THR-1081");
-                }}
-                className="underline hover:text-[#1E3A2C] font-semibold cursor-pointer"
-              >
-                THR-1081
-              </button>
-              <span>·</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setOrderId("THR-1082");
-                  fetchOrder("THR-1082");
-                }}
-                className="underline hover:text-[#1E3A2C] font-semibold cursor-pointer"
-              >
-                THR-1082
-              </button>
-            </div>
           </div>
 
           {/* Error Message */}

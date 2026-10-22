@@ -90,43 +90,43 @@ export default function BestSellers() {
   };
 
   const leftVariant = {
-    hidden: { x: -60, opacity: 0 },
+    hidden: { y: 40, opacity: 0 },
     show: {
-      x: 0,
+      y: 0,
       opacity: 1,
       transition: {
-        duration: 1.8,
+        duration: 0.8,
         ease: [0.16, 1, 0.3, 1] as const,
       },
     },
   };
 
   const rightVariant = {
-    hidden: { x: 60, opacity: 0 },
+    hidden: { y: 40, opacity: 0 },
     show: {
-      x: 0,
+      y: 0,
       opacity: 1,
       transition: {
-        duration: 1.8,
+        duration: 0.8,
         ease: [0.16, 1, 0.3, 1] as const,
       },
     },
   };
 
   const centerVariant = {
-    hidden: { y: 60, opacity: 0 },
+    hidden: { y: 40, opacity: 0 },
     show: {
       y: 0,
       opacity: 1,
       transition: {
-        duration: 1.8,
+        duration: 0.8,
         ease: [0.16, 1, 0.3, 1] as const,
       },
     },
   };
 
   return (
-    <section className="w-full mb-[140px] select-none">
+    <section className="w-full mb-[140px] select-none overflow-hidden">
       <Container>
         <motion.div
           variants={containerVariants}

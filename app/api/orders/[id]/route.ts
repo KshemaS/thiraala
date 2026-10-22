@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth/guard";
 import { toOrderJSON, type OrderStatus, type TrackingEvent } from "../route";
 
@@ -179,7 +180,7 @@ export async function PATCH(
         courierName: newCourierName,
         paymentStatus: newPaymentStatus,
         notes: newNotes,
-        trackingTimeline: timeline,
+        trackingTimeline: timeline as unknown as Prisma.InputJsonValue,
       },
       include: { items: true },
     });

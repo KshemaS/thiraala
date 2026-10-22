@@ -34,16 +34,16 @@ export default function Footer() {
             <h4 className="text-[#1E3A2C] font-bold text-sm tracking-wide">Shop & Explore</h4>
             <ul className="flex flex-col gap-2.5 text-[#1E3A2C]/70 text-xs md:text-sm">
               <li>
-                <a href="#" className="hover:text-[#0c2b1c] transition-colors">Onam Collections</a>
+                <Link href="/products?collection=Onam%20Collection" className="hover:text-[#0c2b1c] transition-colors">Onam Collections</Link>
               </li>
               <li>
-                <a href="#" className="hover:text-[#0c2b1c] transition-colors">Fabric Categories</a>
+                <Link href="/products" className="hover:text-[#0c2b1c] transition-colors">Fabric Categories</Link>
               </li>
               <li>
-                <a href="#" className="hover:text-[#0c2b1c] transition-colors">New Arrivals</a>
+                <Link href="/products?sort=newest" className="hover:text-[#0c2b1c] transition-colors">New Arrivals</Link>
               </li>
               <li>
-                <a href="#" className="hover:text-[#0c2b1c] transition-colors">Best Sellers</a>
+                <Link href="/products?sort=rating" className="hover:text-[#0c2b1c] transition-colors">Best Sellers</Link>
               </li>
             </ul>
           </div>
@@ -59,13 +59,13 @@ export default function Footer() {
                 <Link href="/track-order" className="hover:text-[#0c2b1c] transition-colors">Track Your Order</Link>
               </li>
               <li>
-                <a href="#" className="hover:text-[#0c2b1c] transition-colors">Boutique Heritage</a>
+                <Link href="/about" className="hover:text-[#0c2b1c] transition-colors">Boutique Heritage</Link>
               </li>
               <li>
-                <a href="#" className="hover:text-[#0c2b1c] transition-colors">Saree Care Guide</a>
+                <Link href="/care-guide" className="hover:text-[#0c2b1c] transition-colors">Saree Care Guide</Link>
               </li>
               <li>
-                <a href="#" className="hover:text-[#0c2b1c] transition-colors">Shipping & Returns</a>
+                <Link href="/shipping-returns" className="hover:text-[#0c2b1c] transition-colors">Shipping & Returns</Link>
               </li>
               <li>
                 <Link href="/contact" className="hover:text-[#0c2b1c] transition-colors">Contact Support</Link>
@@ -77,8 +77,8 @@ export default function Footer() {
           <div className="flex flex-col gap-4">
             <h4 className="text-[#1E3A2C] font-bold text-sm tracking-wide">Connect With Us</h4>
             <div className="flex flex-col gap-2 text-[#1E3A2C]/70 text-xs md:text-sm">
-              <p>Email: <a href="mailto:hello@thiraala.com" className="hover:text-[#0c2b1c] font-semibold transition-colors">hello@thiraala.com</a></p>
-              <p>Support: <a href="tel:+919876543210" className="hover:text-[#0c2b1c] font-semibold transition-colors">+91 98765 43210</a></p>
+              <p>Email: <a href="mailto:thiraala@gmail.com" className="hover:text-[#0c2b1c] font-semibold transition-colors">thiraala@gmail.com</a></p>
+              <p>Support: <a href="tel:+918921768742" className="hover:text-[#0c2b1c] font-semibold transition-colors">+91 8921768742</a></p>
             </div>
 
             {/* Social media icons (Instagram, WhatsApp) */}
@@ -106,7 +106,7 @@ export default function Footer() {
 
               {/* WhatsApp link */}
               <a
-                href="https://wa.me/919876543210"
+                href="https://wa.me/918921768742"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="WhatsApp Support Chat"
@@ -128,8 +128,8 @@ export default function Footer() {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-8 border-t border-[#1E3A2C]/10 text-[#1E3A2C]/50 text-[11px] md:text-xs">
           <span>© {currentYear} thiraala. All rights reserved.</span>
           <div className="flex gap-6">
-            <a href="#" className="hover:text-[#0c2b1c] transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-[#0c2b1c] transition-colors">Terms of Service</a>
+            <Link href="/privacy" className="hover:text-[#0c2b1c] transition-colors">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-[#0c2b1c] transition-colors">Terms of Service</Link>
           </div>
         </div>
       </Container>

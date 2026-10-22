@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Container from "@/components/Container";
@@ -7,6 +8,26 @@ import ProductInfo from "@/components/ProductInfo";
 import RelatedProducts from "@/components/RelatedProducts";
 import { getProductById, getAllUnifiedProducts } from "@/lib/products";
 import { notFound } from "next/navigation";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const product = await getProductById(id);
+  if (!product) {
+    return {
+      title: "Saree Not Found",
+    };
+  }
+  return {
+    title: product.name,
+    description:
+      product.description ||
+      `Explore ${product.name} priced at ${product.price}. Handcrafted handloom saree from thiraala.`,
+  };
+}
 
 export default async function ProductDetailPage({
   params,

@@ -105,8 +105,8 @@ export async function POST(request: Request) {
 
     if (!matchedUser) {
       return NextResponse.json(
-        { success: false, error: "No account found with this email. Please check your email or register." },
-        { status: 404 }
+        { success: false, error: "Invalid email or password." },
+        { status: 401 }
       );
     }
 
@@ -115,10 +115,15 @@ export async function POST(request: Request) {
       const isMatch = verifyPassword(password, matchedUser.passwordHash);
       if (!isMatch) {
         return NextResponse.json(
-          { success: false, error: "Incorrect password. Please try again." },
+          { success: false, error: "Invalid email or password." },
           { status: 401 }
         );
       }
+    } else {
+      return NextResponse.json(
+        { success: false, error: "Invalid email or password." },
+        { status: 401 }
+      );
     }
 
     // 4. Prepare sanitized user response

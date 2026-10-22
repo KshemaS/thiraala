@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
-import type { Order as PrismaOrder, OrderItem as PrismaOrderItem } from "@prisma/client";
+import { getAdminSession } from "@/lib/auth/guard";
+import type { Order as PrismaOrder, OrderItem as PrismaOrderItem, Prisma } from "@prisma/client";
 
 export interface OrderItem {
   id: string | number;
@@ -63,7 +65,7 @@ export interface Order {
   updatedAt: string;
 }
 
-type OrderWithItems = PrismaOrder & { items: PrismaOrderItem[] };
+export type OrderWithItems = PrismaOrder & { items: PrismaOrderItem[] };
 
 export function toOrderJSON(order: OrderWithItems): Order {
   return {
@@ -88,7 +90,7 @@ export function toOrderJSON(order: OrderWithItems): Order {
     trackingNumber: order.trackingNumber || "",
     courierName: order.courierName || "",
     notes: order.notes || "",
-    items: order.items.map((item) => ({
+    items: (order.items || []).map((item: PrismaOrderItem) => ({
       id: item.id,
       productId: item.productId || undefined,
       sku: item.sku || undefined,
@@ -110,20 +112,55 @@ export function toOrderJSON(order: OrderWithItems): Order {
 // GET all orders
 export async function GET(request: Request) {
   try {
+    const adminSession = await getAdminSession();
+    const cookieStore = await cookies();
+    const customerUserId = cookieStore.get("thiraala_user_id")?.value;
+
+    if (!adminSession && !customerUserId) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized. Please log in to view orders." },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const search = searchParams.get("search");
     const email = searchParams.get("email")?.trim().toLowerCase();
     const phone = searchParams.get("phone")?.trim();
 
-    const where: Record<string, unknown> = {};
+    const andConditions: Prisma.OrderWhereInput[] = [];
+    const where: Prisma.OrderWhereInput = {};
 
-    if (email) {
-      where.email = { equals: email, mode: "insensitive" };
+    // Customer scoping: regular customer can ONLY view their own orders (TH-001)
+    if (!adminSession && customerUserId) {
+      const user = await prisma.user.findUnique({ where: { id: customerUserId } });
+      if (!user) {
+        return NextResponse.json(
+          { success: false, error: "User not found" },
+          { status: 401 }
+        );
+      }
+
+      const customerOrFilters: Prisma.OrderWhereInput[] = [{ userId: customerUserId }];
+      if (user.email) {
+        customerOrFilters.push({ email: { equals: user.email, mode: "insensitive" } });
+      }
+      if (user.phone) {
+        customerOrFilters.push({ phone: { equals: user.phone } });
+      }
+
+      andConditions.push({ OR: customerOrFilters });
     }
 
-    if (phone) {
-      where.phone = { contains: phone };
+    // Admin direct filters
+    if (adminSession) {
+      if (email) {
+        where.email = { equals: email, mode: "insensitive" };
+      }
+      if (phone) {
+        where.phone = { contains: phone };
+      }
     }
 
     if (status && status !== "All") {
@@ -132,13 +169,19 @@ export async function GET(request: Request) {
 
     if (search) {
       const q = search;
-      where.OR = [
-        { humanId: { contains: q, mode: "insensitive" } },
-        { customerName: { contains: q, mode: "insensitive" } },
-        { phone: { contains: q } },
-        { email: { contains: q, mode: "insensitive" } },
-        { items: { some: { name: { contains: q, mode: "insensitive" } } } },
-      ];
+      andConditions.push({
+        OR: [
+          { humanId: { contains: q, mode: "insensitive" } },
+          { customerName: { contains: q, mode: "insensitive" } },
+          { phone: { contains: q } },
+          { email: { contains: q, mode: "insensitive" } },
+          { items: { some: { name: { contains: q, mode: "insensitive" } } } },
+        ],
+      });
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
     }
 
     const orders = await prisma.order.findMany({
@@ -164,8 +207,12 @@ export async function GET(request: Request) {
 // POST create new order
 export async function POST(request: Request) {
   try {
+    const cookieStore = await cookies();
+    const customerUserId = cookieStore.get("thiraala_user_id")?.value;
+
     const body = await request.json();
     const {
+      userId,
       customerName,
       phone,
       email = "",
@@ -198,7 +245,7 @@ export async function POST(request: Request) {
     // Generate unique human-readable order id e.g. THR-1087
     let nextNum = 1087;
     const existing = await prisma.order.findMany({ select: { humanId: true } });
-    const existingIds = new Set(existing.map((o) => o.humanId));
+    const existingIds = new Set(existing.map((o: { humanId: string }) => o.humanId));
     while (existingIds.has(`THR-${nextNum}`)) {
       nextNum++;
     }
@@ -241,6 +288,7 @@ export async function POST(request: Request) {
     const created = await prisma.order.create({
       data: {
         humanId: newOrderId,
+        userId: userId || customerUserId || null,
         customerName: String(customerName).trim(),
         phone: String(phone).trim(),
         email: String(email).trim(),
@@ -251,17 +299,17 @@ export async function POST(request: Request) {
         district: district ? String(district).trim() : "",
         state: state ? String(state).trim() : "",
         pincode: pincode ? String(pincode).trim() : "",
-        total: Number(total) || 0,
-        subtotal: Number(subtotal !== undefined ? subtotal : total) || 0,
-        deliveryFee: Number(deliveryFee) || 0,
-        discount: Number(discount) || 0,
+        total: Math.round(Number(total)) || 0,
+        subtotal: Math.round(Number(subtotal !== undefined ? subtotal : total)) || 0,
+        deliveryFee: Math.round(Number(deliveryFee)) || 0,
+        discount: Math.round(Number(discount)) || 0,
         paymentMethod: String(paymentMethod) || "Razorpay",
         // Payment is never verified at creation time — only a verified
         // Razorpay payment (client verify or webhook) flips this to "Paid".
         paymentStatus: "Pending",
         status: "Pending",
         notes: notes || "",
-        trackingTimeline,
+        trackingTimeline: trackingTimeline as unknown as Prisma.InputJsonValue,
         items: {
           create: items.map((item: any, idx: number) => ({
             productId: item.productId ? String(item.productId) : item.id ? String(item.id) : null,

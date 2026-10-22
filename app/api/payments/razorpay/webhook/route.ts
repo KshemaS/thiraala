@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { verifyWebhookSignature } from "@/lib/razorpay";
 import type { TrackingEvent } from "@/app/api/orders/route";
 
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
           paymentStatus: "Paid",
           status: order.status === "Pending" ? "Order Confirmed" : order.status,
           razorpayPaymentId: razorpayPaymentId || order.razorpayPaymentId,
-          trackingTimeline: timeline,
+          trackingTimeline: timeline as unknown as Prisma.InputJsonValue,
         },
       });
     } else if (eventType === "payment.failed") {

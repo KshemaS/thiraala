@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import Script from "next/script";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Container from "@/components/Container";
@@ -11,6 +10,46 @@ import RegisterModal from "@/components/RegisterModal";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
+
+const loadRazorpayScript = (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined") {
+      resolve(false);
+      return;
+    }
+    if ((window as any).Razorpay) {
+      resolve(true);
+      return;
+    }
+
+    const src = "https://checkout.razorpay.com/v1/checkout.js";
+
+    // Timeout guard: never hang the checkout process
+    const timer = setTimeout(() => {
+      const isAvailable = typeof (window as any).Razorpay !== "undefined";
+      resolve(isAvailable);
+    }, 3500);
+
+    // Remove any stale, failed, or blocked script element
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing) {
+      existing.remove();
+    }
+
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.onload = () => {
+      clearTimeout(timer);
+      resolve(typeof (window as any).Razorpay !== "undefined");
+    };
+    script.onerror = () => {
+      clearTimeout(timer);
+      resolve(false);
+    };
+    document.body.appendChild(script);
+  });
+};
 
 export default function CartPage() {
   const { cart, removeFromCart, updateQuantity, cartTotal, clearCart } = useCart();
@@ -42,6 +81,22 @@ export default function CartPage() {
   } | null>(null);
 
   const [isRazorpayReady, setIsRazorpayReady] = useState(false);
+
+  // Load & verify Razorpay checkout.js script
+  useEffect(() => {
+    if (typeof window !== "undefined" && (window as any).Razorpay) {
+      setIsRazorpayReady(true);
+    } else {
+      loadRazorpayScript().then((ready) => {
+        setIsRazorpayReady(ready);
+      });
+    }
+  }, []);
+
+  // Set dynamic page title
+  useEffect(() => {
+    document.title = "Shopping Bag | thiraala";
+  }, []);
 
   // Sync user info into form state when user logs in
   useEffect(() => {
@@ -154,12 +209,6 @@ export default function CartPage() {
       .filter(Boolean)
       .join(", ");
 
-    if (!isRazorpayReady || typeof (window as any).Razorpay === "undefined") {
-      alert("Payment is still loading. Please wait a moment and try again.");
-      setIsSubmitting(false);
-      return;
-    }
-
     const finishUp = () => {
       setIsCheckoutOpen(false);
       clearCart();
@@ -231,7 +280,25 @@ export default function CartPage() {
         return;
       }
 
-      // Step 3: open Razorpay Checkout.
+      // Step 3: ensure Razorpay checkout script is available
+      let ready = typeof (window as any).Razorpay !== "undefined";
+      if (!ready) {
+        ready = await loadRazorpayScript();
+      }
+
+      if (!ready || typeof (window as any).Razorpay === "undefined") {
+        alert(
+          "Payment gateway could not be loaded.\n\n" +
+            "Your order (" +
+            pendingOrder.id +
+            ") is saved in Pending state.\n" +
+            "If you have an AdBlocker or Brave Shields active, please disable it for localhost and retry."
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Step 4: open Razorpay Checkout modal.
       const razorpay = new (window as any).Razorpay({
         key: razorpayOrderData.keyId,
         amount: razorpayOrderData.amount,
@@ -266,6 +333,9 @@ export default function CartPage() {
                   "."
               );
             }
+          } catch (verifyErr) {
+            console.error("Verification error:", verifyErr);
+            alert("Payment completed, but verification timed out. Our team will verify your payment.");
           } finally {
             setIsSubmitting(false);
           }
@@ -278,20 +348,15 @@ export default function CartPage() {
       });
 
       razorpay.open();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Order placement error:", error);
-      alert("Something went wrong while placing your order. Please check your connection.");
+      alert("Something went wrong while placing your order: " + (error?.message || "Please check your connection."));
       setIsSubmitting(false);
     }
   };
 
   return (
     <div className="min-h-screen flex flex-col justify-between selection:bg-[#DAA87C]/20 selection:text-[#DAA87C] bg-[#fcfbfa]">
-      <Script
-        src="https://checkout.razorpay.com/v1/checkout.js"
-        strategy="afterInteractive"
-        onLoad={() => setIsRazorpayReady(true)}
-      />
       <Header />
 
       <main className="flex-1 py-12 sm:py-16 lg:py-20">
@@ -412,9 +477,14 @@ export default function CartPage() {
                               <Link href={`/products/${item.id}`} className="text-sm font-bold text-[#1E3A2C] hover:text-[#DAA87C] transition-colors leading-tight">
                                 {item.name}
                               </Link>
-                              <p className="text-[10px] text-[#1E3A2C]/40 mt-1 font-semibold select-none">
-                                Free Express Delivery Across India
+                              <p className="text-[10px] text-[#1E3A2C]/60 mt-1 font-semibold select-none">
+                                Delivery via India Post (2–4 days Kerala, 4–7 days India)
                               </p>
+                              {item.quantity >= (item.stock ?? 10) && (
+                                <p className="text-[10px] text-amber-700 font-bold mt-0.5">
+                                  Only {item.stock ?? 10} left in stock
+                                </p>
+                              )}
                             </div>
                             
                             {/* Remove button */}
@@ -446,7 +516,9 @@ export default function CartPage() {
                               </span>
                               <button
                                 onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-[#1E3A2C] hover:bg-[#1E3A2C]/5 cursor-pointer transition-colors"
+                                disabled={item.quantity >= (item.stock ?? 10)}
+                                title={item.quantity >= (item.stock ?? 10) ? `Only ${item.stock ?? 10} left` : "Increase quantity"}
+                                className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-[#1E3A2C] hover:bg-[#1E3A2C]/5 cursor-pointer transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                               >
                                 +
                               </button>
@@ -468,7 +540,7 @@ export default function CartPage() {
                 <div className="space-y-3.5 text-xs font-semibold text-[#1E3A2C]">
                   <div className="flex justify-between">
                     <span className="text-[#1E3A2C]/65">Subtotal</span>
-                    <span>Rs. {cartTotal.toLocaleString()}</span>
+                    <span>₹{cartTotal.toLocaleString("en-IN")}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-[#1E3A2C]/65">Shipping</span>
@@ -476,7 +548,7 @@ export default function CartPage() {
                   </div>
                   <div className="border-t border-[#1E3A2C]/10 pt-3.5 flex justify-between text-sm font-extrabold text-[#0c2b1c]">
                     <span>Total Amount</span>
-                    <span>Rs. {cartTotal.toLocaleString()}</span>
+                    <span>₹{cartTotal.toLocaleString("en-IN")}</span>
                   </div>
                 </div>
 
@@ -557,7 +629,7 @@ export default function CartPage() {
                 {/* Contact Information Section */}
                 <div className="flex flex-col gap-3">
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                    <label className="block text-[11px] font-bold text-[#1E3A2C]/80 uppercase tracking-wider leading-relaxed select-none">
                       Full Name *
                     </label>
                     <input
@@ -572,7 +644,7 @@ export default function CartPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                      <label className="block text-[11px] font-bold text-[#1E3A2C]/80 uppercase tracking-wider leading-relaxed select-none">
                         Phone Number *
                       </label>
                       <input
@@ -586,7 +658,7 @@ export default function CartPage() {
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                      <label className="block text-[11px] font-bold text-[#1E3A2C]/80 uppercase tracking-wider leading-relaxed select-none">
                         Email Address
                       </label>
                       <input
@@ -602,18 +674,18 @@ export default function CartPage() {
 
                 {/* Delivery Address Section (Split Fields with Pincode Search) */}
                 <div className="flex flex-col gap-3 pt-3 border-t border-[#1E3A2C]/10">
-                  <div className="flex items-center justify-between select-none">
-                    <span className="text-[10px] font-bold text-[#1E3A2C] uppercase tracking-wider">
+                  <div className="flex items-center justify-between gap-2 select-none">
+                    <span className="text-[11px] font-bold text-[#1E3A2C] uppercase tracking-wider leading-relaxed">
                       Delivery Address
                     </span>
-                    <span className="text-[10px] text-[#DAA87C] font-semibold">
+                    <span className="text-[11px] text-[#DAA87C] font-semibold leading-relaxed shrink-0">
                       Enter Pincode for auto-fill
                     </span>
                   </div>
 
                   {/* 1. Pincode Search Row */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                    <label className="block text-[11px] font-bold text-[#1E3A2C]/80 uppercase tracking-wider leading-relaxed select-none">
                       Pincode *
                     </label>
                     <div className="flex gap-2">
@@ -678,7 +750,7 @@ export default function CartPage() {
 
                   {/* 2. House Name or Flat Name & Number */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                    <label className="block text-[11px] font-bold text-[#1E3A2C]/80 uppercase tracking-wider leading-relaxed select-none">
                       House / Flat Name & Number *
                     </label>
                     <input
@@ -693,7 +765,7 @@ export default function CartPage() {
 
                   {/* 3. Street / Area / Landmark */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                    <label className="block text-[11px] font-bold text-[#1E3A2C]/80 uppercase tracking-wider leading-relaxed select-none">
                       Street / Area / Landmark
                     </label>
                     <input
@@ -708,7 +780,7 @@ export default function CartPage() {
                   {/* 4. City & District (2 Columns) */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                      <label className="block text-[11px] font-bold text-[#1E3A2C]/80 uppercase tracking-wider leading-relaxed select-none">
                         City / Town *
                       </label>
                       <input
@@ -722,7 +794,7 @@ export default function CartPage() {
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                      <label className="block text-[11px] font-bold text-[#1E3A2C]/80 uppercase tracking-wider leading-relaxed select-none">
                         District *
                       </label>
                       <input
@@ -738,7 +810,7 @@ export default function CartPage() {
 
                   {/* 5. State */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                    <label className="block text-[11px] font-bold text-[#1E3A2C]/80 uppercase tracking-wider leading-relaxed select-none">
                       State *
                     </label>
                     <input
@@ -754,16 +826,16 @@ export default function CartPage() {
 
                 {/* Payment Option Selector (Razorpay) */}
                 <div className="flex flex-col gap-1.5 pt-2 border-t border-[#1E3A2C]/10">
-                  <label className="text-[10px] font-bold text-[#1E3A2C]/70 uppercase tracking-widest select-none">
+                  <label className="block text-[11px] font-bold text-[#1E3A2C]/80 uppercase tracking-wider leading-relaxed select-none">
                     Payment Method
                   </label>
                   <div className="p-3.5 rounded-xl border border-[#1E3A2C] bg-[#1E3A2C] text-white flex items-center justify-between shadow-sm select-none">
                     <div className="flex flex-col gap-0.5">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold">Pay via Razorpay</span>
-                        <span className="px-1.5 py-0.5 text-[9px] font-bold bg-[#DAA87C] text-[#1E3A2C] rounded-full uppercase tracking-wider">Secure</span>
+                        <span className="text-xs font-bold leading-normal">Pay via Razorpay</span>
+                        <span className="px-1.5 py-0.5 text-[9px] font-bold bg-[#DAA87C] text-[#1E3A2C] rounded-full uppercase tracking-wider leading-none">Secure</span>
                       </div>
-                      <span className="text-[10px] text-[#DAA87C] font-medium">
+                      <span className="text-[10px] text-[#DAA87C] font-medium leading-normal">
                         Cards, UPI, Net Banking, Wallets
                       </span>
                     </div>
