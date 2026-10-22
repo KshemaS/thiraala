@@ -149,4 +149,58 @@ model WishlistItem {
   @@map("wishlist_items")
 }
 
+model Order {
+  id                String      @id @default(cuid())
+  humanId           String      @unique
+  userId            String?
+  customerName      String
+  phone             String
+  email             String?
+  address           String
+  houseOrFlat       String?
+  street            String?
+  city              String?
+  district          String?
+  state             String?
+  pincode           String?
+  total             Int
+  subtotal          Int?
+  deliveryFee       Int         @default(0)
+  discount          Int         @default(0)
+  paymentMethod     String      @default("Razorpay")
+  paymentStatus     String      @default("Pending")
+  status            String      @default("Pending")
+  trackingNumber    String?
+  courierName       String?
+  notes             String?
+  trackingTimeline  Json
+  razorpayOrderId   String?     @unique
+  razorpayPaymentId String?
+  razorpaySignature String?
+  items             OrderItem[]
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id            String   @id @default(cuid())
+  orderId       String
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId     String?
+  sku           String?
+  name          String
+  price         String
+  priceValue    Int      @default(0)
+  quantity      Int      @default(1)
+  foldedImg     String?  @db.Text
+  wornImg       String?  @db.Text
+  category      String?
+  selectedColor String?
+  createdAt     DateTime @default(now())
+
+  @@map("order_items")
+}
+
 
