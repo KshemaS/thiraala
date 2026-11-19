@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { sareesData, SareeProduct } from "@/data/products";
+import type { SareeProduct } from "@/data/products";
 
 // Interfaces
 interface Order {
@@ -32,76 +32,9 @@ interface CustomerMessage {
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<"overview" | "orders" | "products" | "messages">("overview");
 
-  // State initialized with mock data
-  const [products, setProducts] = useState<SareeProduct[]>(sareesData);
-  const [orders, setOrders] = useState<Order[]>([
-    {
-      id: "THR-1081",
-      customerName: "Ananya Nair",
-      email: "ananya.nair@gmail.com",
-      date: "2026-08-28",
-      sku: "SAR_TIS_01",
-      productName: "Thumba Saree",
-      quantity: 1,
-      total: 1350,
-      status: "Delivered",
-    },
-    {
-      id: "THR-1082",
-      customerName: "Rahul Krishnan",
-      email: "rahul.k@yahoo.com",
-      date: "2026-08-29",
-      sku: "SAR_COT_002",
-      productName: "Puliyilakkara",
-      quantity: 1,
-      total: 499,
-      status: "Shipped",
-    },
-    {
-      id: "THR-1083",
-      customerName: "Divya Menon",
-      email: "divya.menon@outlook.com",
-      date: "2026-08-30",
-      sku: "SAR_MUL_003",
-      productName: "Mul Cotton White",
-      quantity: 2,
-      total: 2180,
-      status: "Pending",
-    },
-    {
-      id: "THR-1084",
-      customerName: "Meera Pillai",
-      email: "meera.pillai@gmail.com",
-      date: "2026-08-30",
-      sku: "SAR_TIS_04",
-      productName: "Vaka Saree",
-      quantity: 1,
-      total: 1250,
-      status: "Pending",
-    },
-    {
-      id: "THR-1085",
-      customerName: "Vishnu Dev",
-      email: "vishnu.dev@hotmail.com",
-      date: "2026-08-27",
-      sku: "SAR_COT_006",
-      productName: "Chemparuthi Saree",
-      quantity: 1,
-      total: 899,
-      status: "Cancelled",
-    },
-    {
-      id: "THR-1086",
-      customerName: "Saritha Varma",
-      email: "saritha.v@gmail.com",
-      date: "2026-08-26",
-      sku: "SAR_CHA_005",
-      productName: "Chanderi Fire",
-      quantity: 1,
-      total: 1950,
-      status: "Delivered",
-    },
-  ]);
+  // Populated from the APIs; empty until data loads
+  const [products, setProducts] = useState<SareeProduct[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
 
   const [customerCount, setCustomerCount] = useState<number>(0);
 
@@ -117,7 +50,7 @@ export default function DashboardPage() {
 
         if (ordersRes.ok) {
           const data = await ordersRes.json();
-          if (data.success && Array.isArray(data.orders) && data.orders.length > 0) {
+          if (data.success && Array.isArray(data.orders)) {
             const mapped: Order[] = data.orders.map((o: any) => ({
               id: o.id,
               customerName: o.customerName,
@@ -135,7 +68,7 @@ export default function DashboardPage() {
 
         if (prodRes.ok) {
           const prodData = await prodRes.json();
-          if (Array.isArray(prodData) && prodData.length > 0) {
+          if (Array.isArray(prodData)) {
             setProducts(prodData);
           }
         }
@@ -160,35 +93,7 @@ export default function DashboardPage() {
     };
   }, []);
 
-  const [messages, setMessages] = useState<CustomerMessage[]>([
-    {
-      id: "MSG-001",
-      sender: "Priya Nair",
-      email: "priya.nair@gmail.com",
-      date: "2026-08-29",
-      subject: "Custom Saree Blouse Stitching Inquiry",
-      content: "Do you offer custom blouse stitching with the Golden Tissue Set saree? If so, what are the measurement details and pricing guidelines?",
-      status: "Pending",
-    },
-    {
-      id: "MSG-002",
-      sender: "Gautham R.",
-      email: "gautham.r@yahoo.com",
-      date: "2026-08-30",
-      subject: "Bulk Purchase for Wedding Function",
-      content: "We are looking to purchase about 15 units of Chemparuthi saree for bridesmaids at an upcoming wedding. Is there any special discount or custom packing available?",
-      status: "Pending",
-    },
-    {
-      id: "MSG-003",
-      sender: "Sruthi P.",
-      email: "sruthi.p@outlook.com",
-      date: "2026-08-28",
-      subject: "Checking Order Dispatch Timeline",
-      content: "Hi, I ordered the Puliyilakkara saree three days ago (Order THR-1082). Just wanted to know if it has been dispatched, as I need it by next Friday.",
-      status: "Replied",
-    },
-  ]);
+  const [messages, setMessages] = useState<CustomerMessage[]>([]);
 
   // Search & Filter States
   const [productSearch, setProductSearch] = useState("");
@@ -221,9 +126,52 @@ export default function DashboardPage() {
       orderCount: orders.length,
       outOfStockCount,
       lowStockCount,
-      customerCount: customerCount > 0 ? customerCount : 3,
+      customerCount,
     };
   }, [orders, products, customerCount]);
+
+  // Revenue for the last 7 days, from real (non-cancelled) orders
+  const weeklyRevenue = useMemo(() => {
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - (6 - i));
+      return {
+        key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
+        label: d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric" }),
+        revenue: 0,
+      };
+    });
+    orders
+      .filter((o) => o.status !== "Cancelled")
+      .forEach((o) => {
+        const day = days.find((d) => d.key === o.date);
+        if (day) day.revenue += o.total;
+      });
+    return days;
+  }, [orders]);
+
+  // Units sold per product category, from real (non-cancelled) orders
+  const categoryShares = useMemo(() => {
+    const bySku = new Map(products.map((p) => [p.sku, p.category]));
+    const totals = new Map<string, number>();
+    orders
+      .filter((o) => o.status !== "Cancelled")
+      .forEach((o) => {
+        const cat = bySku.get(o.sku) ?? "Other";
+        totals.set(cat, (totals.get(cat) ?? 0) + o.quantity);
+      });
+    const sum = Array.from(totals.values()).reduce((a, b) => a + b, 0);
+    const colors = ["bg-[#1E3A2C]", "bg-[#DAA87C]", "bg-[#4B6958]", "bg-[#CBA386]"];
+    return Array.from(totals.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, units], i) => ({
+        name,
+        units,
+        percentage: Math.round((units / sum) * 100),
+        color: colors[i % colors.length],
+      }));
+  }, [orders, products]);
 
   // Product Categories
   const categories = useMemo(() => {
@@ -383,7 +331,7 @@ export default function DashboardPage() {
                   {
                     title: "Total Revenue (Active Orders)",
                     value: `₹${stats.totalRevenue.toLocaleString()}`,
-                    desc: "+14.2% from last month",
+                    desc: `${stats.orderCount} total orders`,
                     bg: "bg-white",
                     iconColor: "text-emerald-700 bg-emerald-50",
                     icon: (
@@ -395,7 +343,7 @@ export default function DashboardPage() {
                   {
                     title: "Avg Order Value",
                     value: `₹${stats.avgOrderValue.toLocaleString()}`,
-                    desc: "+4.1% from last month",
+                    desc: "Per active order",
                     bg: "bg-white",
                     iconColor: "text-blue-700 bg-blue-50",
                     icon: (
@@ -407,7 +355,7 @@ export default function DashboardPage() {
                   {
                     title: "Sarees Sold",
                     value: `${stats.totalSareesSold} Units`,
-                    desc: "7 active orders total",
+                    desc: `${stats.orderCount} orders total`,
                     bg: "bg-white",
                     iconColor: "text-amber-700 bg-amber-50",
                     icon: (
@@ -449,77 +397,56 @@ export default function DashboardPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-sm font-bold text-[#1E3A2C]">Weekly Sales Revenue Trend</h4>
-                      <p className="text-[11px] text-[#1E3A2C]/50">Simulated revenue tracking for August 2026</p>
+                      <p className="text-[11px] text-[#1E3A2C]/50">Revenue from active orders over the last 7 days</p>
                     </div>
                     <span className="text-[10px] font-bold px-2.5 py-1 bg-[#1E3A2C]/5 text-[#1E3A2C] rounded-full">
-                      August 24 - August 30
+                      {weeklyRevenue[0].label} - {weeklyRevenue[6].label}
                     </span>
                   </div>
 
-                  {/* SVG Custom Interactive Line Chart */}
-                  <div className="relative h-64 w-full">
-                    <svg className="w-full h-full" viewBox="0 0 600 240" preserveAspectRatio="none">
-                      <defs>
-                        <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#1E3A2C" stopOpacity="0.25" />
-                          <stop offset="100%" stopColor="#1E3A2C" stopOpacity="0" />
-                        </linearGradient>
-                      </defs>
-
-                      {/* Grid Lines */}
-                      <line x1="40" y1="30" x2="570" y2="30" stroke="#1E3A2C" strokeOpacity="0.05" strokeWidth="1" />
-                      <line x1="40" y1="90" x2="570" y2="90" stroke="#1E3A2C" strokeOpacity="0.05" strokeWidth="1" />
-                      <line x1="40" y1="150" x2="570" y2="150" stroke="#1E3A2C" strokeOpacity="0.05" strokeWidth="1" />
-                      <line x1="40" y1="210" x2="570" y2="210" stroke="#1E3A2C" strokeOpacity="0.1" strokeWidth="1" />
-
-                      {/* Revenue Area (Gradient Fill) */}
-                      <path
-                        d="M 40 210 Q 120 180, 140 180 T 240 120 T 340 190 T 440 80 T 540 60 L 540 210 Z"
-                        fill="url(#areaGradient)"
-                      />
-
-                      {/* Revenue Trend Line */}
-                      <path
-                        d="M 40 210 Q 120 180, 140 180 T 240 120 T 340 190 T 440 80 T 540 60"
-                        fill="none"
-                        stroke="#1E3A2C"
-                        strokeWidth="3.5"
-                        strokeLinecap="round"
-                      />
-
-                      {/* Data Points */}
-                      <circle cx="140" cy="180" r="5" fill="#DAA87C" stroke="#1E3A2C" strokeWidth="2" />
-                      <circle cx="240" cy="120" r="5" fill="#DAA87C" stroke="#1E3A2C" strokeWidth="2" />
-                      <circle cx="340" cy="190" r="5" fill="#DAA87C" stroke="#1E3A2C" strokeWidth="2" />
-                      <circle cx="440" cy="80" r="5" fill="#DAA87C" stroke="#1E3A2C" strokeWidth="2" />
-                      <circle cx="540" cy="60" r="5" fill="#DAA87C" stroke="#1E3A2C" strokeWidth="2" />
-
-                      {/* X Axis Labels */}
-                      <text x="40" y="230" fill="#1E3A2C" fillOpacity="0.5" fontSize="10" textAnchor="middle" fontWeight="600">Mon 24</text>
-                      <text x="140" y="230" fill="#1E3A2C" fillOpacity="0.5" fontSize="10" textAnchor="middle" fontWeight="600">Tue 25</text>
-                      <text x="240" y="230" fill="#1E3A2C" fillOpacity="0.5" fontSize="10" textAnchor="middle" fontWeight="600">Wed 26</text>
-                      <text x="340" y="230" fill="#1E3A2C" fillOpacity="0.5" fontSize="10" textAnchor="middle" fontWeight="600">Thu 27</text>
-                      <text x="440" y="230" fill="#1E3A2C" fillOpacity="0.5" fontSize="10" textAnchor="middle" fontWeight="600">Fri 28</text>
-                      <text x="540" y="230" fill="#1E3A2C" fillOpacity="0.5" fontSize="10" textAnchor="middle" fontWeight="600">Sat 29</text>
-
-                      {/* Y Axis Labels */}
-                      <text x="30" y="214" fill="#1E3A2C" fillOpacity="0.5" fontSize="10" textAnchor="end" fontWeight="600">₹0</text>
-                      <text x="30" y="154" fill="#1E3A2C" fillOpacity="0.5" fontSize="10" textAnchor="end" fontWeight="600">₹1,000</text>
-                      <text x="30" y="94" fill="#1E3A2C" fillOpacity="0.5" fontSize="10" textAnchor="end" fontWeight="600">₹2,000</text>
-                      <text x="30" y="34" fill="#1E3A2C" fillOpacity="0.5" fontSize="10" textAnchor="end" fontWeight="600">₹3,000</text>
-                    </svg>
-
-                    {/* Chart overlay badges */}
-                    <div className="absolute top-24 left-[230px] bg-[#1E3A2C] text-[#FAF8F5] px-2 py-1 rounded text-[9px] font-bold shadow-md opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
-                      Wed: ₹1,950
+                  {weeklyRevenue.every((d) => d.revenue === 0) ? (
+                    <div className="h-64 flex flex-col items-center justify-center text-center text-[#1E3A2C]/40">
+                      <p className="text-sm font-bold">No sales in the last 7 days</p>
+                      <p className="text-[11px] mt-1">Revenue will appear here once orders come in.</p>
                     </div>
-                    <div className="absolute top-14 left-[430px] bg-[#1E3A2C] text-[#FAF8F5] px-2 py-1 rounded text-[9px] font-bold shadow-md opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
-                      Fri: ₹1,350
-                    </div>
-                    <div className="absolute top-8 left-[530px] bg-[#1E3A2C] text-[#FAF8F5] px-2 py-1 rounded text-[9px] font-bold shadow-md opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
-                      Sat: ₹2,679
-                    </div>
-                  </div>
+                  ) : (
+                    (() => {
+                      const max = Math.max(...weeklyRevenue.map((d) => d.revenue));
+                      const x = (i: number) => 40 + (i * 530) / 6;
+                      const y = (v: number) => 210 - (v / max) * 180;
+                      const line = weeklyRevenue.map((d, i) => `${i === 0 ? "M" : "L"} ${x(i)} ${y(d.revenue)}`).join(" ");
+                      return (
+                        <div className="relative h-64 w-full">
+                          <svg className="w-full h-full" viewBox="0 0 600 240" preserveAspectRatio="none">
+                            <defs>
+                              <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#1E3A2C" stopOpacity="0.25" />
+                                <stop offset="100%" stopColor="#1E3A2C" stopOpacity="0" />
+                              </linearGradient>
+                            </defs>
+                            {[30, 90, 150].map((gy) => (
+                              <line key={gy} x1="40" y1={gy} x2="570" y2={gy} stroke="#1E3A2C" strokeOpacity="0.05" strokeWidth="1" />
+                            ))}
+                            <line x1="40" y1="210" x2="570" y2="210" stroke="#1E3A2C" strokeOpacity="0.1" strokeWidth="1" />
+                            <path d={`${line} L ${x(6)} 210 L ${x(0)} 210 Z`} fill="url(#areaGradient)" />
+                            <path d={line} fill="none" stroke="#1E3A2C" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+                            {weeklyRevenue.map((d, i) => (
+                              <g key={d.key}>
+                                <circle cx={x(i)} cy={y(d.revenue)} r="5" fill="#DAA87C" stroke="#1E3A2C" strokeWidth="2">
+                                  <title>{`${d.label}: ₹${d.revenue.toLocaleString()}`}</title>
+                                </circle>
+                                <text x={x(i)} y="230" fill="#1E3A2C" fillOpacity="0.5" fontSize="10" textAnchor="middle" fontWeight="600">
+                                  {d.label}
+                                </text>
+                              </g>
+                            ))}
+                            <text x="30" y="214" fill="#1E3A2C" fillOpacity="0.5" fontSize="10" textAnchor="end" fontWeight="600">₹0</text>
+                            <text x="30" y="34" fill="#1E3A2C" fillOpacity="0.5" fontSize="10" textAnchor="end" fontWeight="600">₹{max.toLocaleString()}</text>
+                          </svg>
+                        </div>
+                      );
+                    })()
+                  )}
                 </div>
 
                 {/* Category breakdown */}
@@ -529,29 +456,31 @@ export default function DashboardPage() {
                     <p className="text-[11px] text-[#1E3A2C]/50">Order volume distribution by saree fabric category</p>
                   </div>
 
-                  <div className="space-y-4 pt-2">
-                    {[
-                      { name: "Tissue Set Saree", percentage: 40, sales: "3 sold", color: "bg-[#1E3A2C]" },
-                      { name: "Cotton Set Saree", percentage: 28, sales: "2 sold", color: "bg-[#DAA87C]" },
-                      { name: "Mul Mul Cotton", percentage: 18, sales: "1 sold", color: "bg-[#4B6958]" },
-                      { name: "Mul Chanderi", percentage: 14, sales: "1 sold", color: "bg-[#CBA386]" },
-                    ].map((cat, idx) => (
-                      <div key={idx} className="space-y-1.5">
-                        <div className="flex justify-between text-xs font-bold text-[#1E3A2C]">
-                          <span>{cat.name}</span>
-                          <span className="text-[#DAA87C]">{cat.percentage}% <span className="font-semibold text-xs text-[#1E3A2C]/40">({cat.sales})</span></span>
+                  {categoryShares.length === 0 ? (
+                    <div className="py-10 text-center text-[#1E3A2C]/40">
+                      <p className="text-sm font-bold">No category data yet</p>
+                      <p className="text-[11px] mt-1">Shares will appear once orders come in.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 pt-2">
+                      {categoryShares.map((cat, idx) => (
+                        <div key={cat.name} className="space-y-1.5">
+                          <div className="flex justify-between text-xs font-bold text-[#1E3A2C]">
+                            <span>{cat.name}</span>
+                            <span className="text-[#DAA87C]">{cat.percentage}% <span className="font-semibold text-xs text-[#1E3A2C]/40">({cat.units} sold)</span></span>
+                          </div>
+                          <div className="w-full h-2 bg-[#1E3A2C]/5 rounded-full overflow-hidden">
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{ width: `${cat.percentage}%` }}
+                              transition={{ delay: idx * 0.1, duration: 0.8 }}
+                              className={`h-full rounded-full ${cat.color}`}
+                            />
+                          </div>
                         </div>
-                        <div className="w-full h-2 bg-[#1E3A2C]/5 rounded-full overflow-hidden">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${cat.percentage}%` }}
-                            transition={{ delay: idx * 0.1, duration: 0.8 }}
-                            className={`h-full rounded-full ${cat.color}`}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -708,7 +637,7 @@ export default function DashboardPage() {
                     ) : (
                       <tr>
                         <td colSpan={7} className="p-8 text-center text-xs font-semibold text-[#1E3A2C]/40">
-                          No orders matched your search criteria.
+                          {orders.length === 0 ? "No orders yet." : "No orders matched your search criteria."}
                         </td>
                       </tr>
                     )}
@@ -858,7 +787,7 @@ export default function DashboardPage() {
                     ) : (
                       <tr>
                         <td colSpan={7} className="p-8 text-center text-xs font-semibold text-[#1E3A2C]/40">
-                          No products matched your filters.
+                          {products.length === 0 ? "No products yet." : "No products matched your filters."}
                         </td>
                       </tr>
                     )}

@@ -444,7 +444,7 @@ function TrackOrderContent() {
                   <div className="mt-6 pt-4 border-t border-[#1E3A2C]/10 flex items-center justify-between text-xs">
                     <span className="text-[#1E3A2C]/60 font-medium">Payment Mode</span>
                     <span className="font-bold text-[#1E3A2C] bg-[#FAF8F5] px-3 py-1 rounded-full border border-[#1E3A2C]/10">
-                      {order.paymentMethod === "COD" ? "Cash on Delivery" : "UPI Digital"} ({order.paymentStatus})
+                      Online ({order.paymentStatus})
                     </span>
                   </div>
                 </div>

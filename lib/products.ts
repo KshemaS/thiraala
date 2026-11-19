@@ -2,6 +2,8 @@ import fs from "fs";
 import path from "path";
 import prisma from "@/lib/prisma";
 import { sareesData, SareeProduct } from "@/data/products";
+import { formatVariant, variantsInclude, type ProductVariantItem } from "@/lib/productVariants";
+import { imageUrl } from "@/lib/productImages";
 
 export interface UnifiedProduct {
   id: number | string;
@@ -39,6 +41,8 @@ export interface UnifiedProduct {
   status?: string;
   featured?: boolean;
   isNewArrival?: boolean;
+  /** Colour variants (DB products only). */
+  variants?: ProductVariantItem[];
 }
 
 const dataFilePath = path.join(process.cwd(), "data", "products.json");
@@ -57,10 +61,15 @@ export async function getAllUnifiedProducts(): Promise<UnifiedProduct[]> {
       const dbProducts = await (prisma as any).product.findMany({
         where: { status: "active" },
         orderBy: { createdAt: "desc" },
+        include: variantsInclude,
       });
 
       if (dbProducts && dbProducts.length > 0) {
-        return dbProducts.map((p: any) => ({
+        return dbProducts.map((p: any) => {
+          // Serve uploaded (base64) photos by URL instead of inlining them.
+          const folded = imageUrl("product", p.id, "folded", p.foldedImg, p.updatedAt);
+          const worn = imageUrl("product", p.id, "worn", p.wornImg, p.updatedAt);
+          return {
           id: p.id,
           sku: p.sku,
           name: p.name,
@@ -70,14 +79,14 @@ export async function getAllUnifiedProducts(): Promise<UnifiedProduct[]> {
           priceValue: p.priceValue || parseInt(String(p.price).replace(/[^\d]/g, ""), 10) || 0,
           mrp: p.mrp || undefined,
           discountPercent: p.mrp && p.priceValue ? Math.round(((p.mrp - p.priceValue) / p.mrp) * 100) : undefined,
-          rating: p.rating || 4.8,
-          ratingCount: p.ratingCount || 85,
+          rating: p.rating ?? undefined,
+          ratingCount: p.ratingCount ?? undefined,
           selectedColor: p.selectedColor || undefined,
           category: p.categoryName || "Handloom Saree",
           collection: p.collectionName || undefined,
-          foldedImg: resolveImgPath(p.foldedImg, "/images/folded-gopuram.jpeg"),
-          wornImg: resolveImgPath(p.wornImg, "/images/gopura.jpeg"),
-          img: resolveImgPath(p.wornImg || p.foldedImg, "/images/gopura.jpeg"),
+          foldedImg: resolveImgPath(folded, "/images/folded-gopuram.jpeg"),
+          wornImg: resolveImgPath(worn, "/images/gopura.jpeg"),
+          img: resolveImgPath(worn || folded, "/images/gopura.jpeg"),
           altFolded: p.altFolded || p.name,
           altWorn: p.altWorn || p.name,
           fabric: p.fabric || "Cotton",
@@ -100,7 +109,9 @@ export async function getAllUnifiedProducts(): Promise<UnifiedProduct[]> {
           status: p.status || "active",
           featured: Boolean(p.featured),
           isNewArrival: Boolean(p.isNewArrival),
-        }));
+          variants: (p.variants || []).map(formatVariant),
+          };
+        });
       }
     }
   } catch {

@@ -18,6 +18,7 @@ import {
   Plus,
   Layers,
   ShoppingBag,
+  Truck,
 } from "lucide-react";
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
@@ -133,6 +134,21 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-3">
               <ShoppingBag className="w-5 h-5 text-[#DAA87C]" />
               <span>Orders & Tracking</span>
+            </div>
+          </Link>
+
+          {/* Delivery Charges */}
+          <Link
+            href="/dashboard/delivery"
+            className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+              pathname.startsWith("/dashboard/delivery")
+                ? "bg-[#FAF8F5]/15 text-white shadow-xs"
+                : "text-[#FAF8F5]/70 hover:text-white hover:bg-[#FAF8F5]/5"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <Truck className="w-5 h-5 text-[#DAA87C]" />
+              <span>Delivery Charges</span>
             </div>
           </Link>
 
@@ -351,6 +367,22 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-3">
               <ShoppingBag className="w-5 h-5 text-[#DAA87C]" />
               <span>Orders & Tracking</span>
+            </div>
+          </Link>
+
+          {/* Mobile Delivery Charges */}
+          <Link
+            href="/dashboard/delivery"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+              pathname.startsWith("/dashboard/delivery")
+                ? "bg-[#FAF8F5]/15 text-white shadow-xs"
+                : "text-[#FAF8F5]/70 hover:text-white hover:bg-[#FAF8F5]/5"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <Truck className="w-5 h-5 text-[#DAA87C]" />
+              <span>Delivery Charges</span>
             </div>
           </Link>
 

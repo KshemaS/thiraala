@@ -52,8 +52,33 @@ const loadRazorpayScript = (): Promise<boolean> => {
 };
 
 export default function CartPage() {
-  const { cart, removeFromCart, updateQuantity, cartTotal, clearCart } = useCart();
+  const { cart, removeFromCart, updateQuantity, cartTotal, cartCount, clearCart, refreshCart } = useCart();
   const { user } = useAuth();
+
+  // Delivery charge for the entered pincode (the server re-calculates it on
+  // the order; this is only so the customer sees it before paying).
+  const [delivery, setDelivery] = useState<{ fee: number; zoneName: string; pincode: string; sarees: number } | null>(null);
+  const fetchDelivery = async (pin: string, sarees: number) => {
+    if (!/^[1-9]\d{5}$/.test(pin) || sarees < 1) return null;
+    try {
+      const res = await fetch(`/api/delivery/quote?pincode=${pin}&sarees=${sarees}`);
+      const data = await res.json();
+      if (!data.success) return null;
+      const quote = { fee: data.fee as number, zoneName: data.zoneName as string, pincode: pin, sarees };
+      setDelivery(quote);
+      return quote;
+    } catch {
+      return null;
+    }
+  };
+
+  // Bring bag prices/stock up to date once the bag has loaded.
+  const [hasRefreshed, setHasRefreshed] = useState(false);
+  useEffect(() => {
+    if (hasRefreshed || cart.length === 0) return;
+    setHasRefreshed(true);
+    refreshCart();
+  }, [cart.length, hasRefreshed, refreshCart]);
 
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -81,6 +106,20 @@ export default function CartPage() {
   } | null>(null);
 
   const [isRazorpayReady, setIsRazorpayReady] = useState(false);
+
+  // Re-quote delivery whenever the pincode or number of sarees changes.
+  useEffect(() => {
+    const pin = pincode.trim();
+    if (/^[1-9]\d{5}$/.test(pin) && cartCount > 0) {
+      fetchDelivery(pin, cartCount);
+    } else {
+      setDelivery(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pincode, cartCount]);
+
+  const deliveryFee = delivery && delivery.pincode === pincode.trim() && delivery.sarees === cartCount ? delivery.fee : null;
+  const grandTotal = cartTotal + (deliveryFee ?? 0);
 
   // Load & verify Razorpay checkout.js script
   useEffect(() => {
@@ -196,7 +235,15 @@ export default function CartPage() {
     }
 
     setIsSubmitting(true);
-    const finalTotal = cartTotal;
+    // Make sure the delivery charge shown is the current one for this pincode.
+    const quote =
+      deliveryFee !== null ? { fee: deliveryFee } : await fetchDelivery(pincode.trim(), cartCount);
+    if (!quote) {
+      alert("We couldn't calculate delivery for this pincode. Please check it and try again.");
+      setIsSubmitting(false);
+      return;
+    }
+    const finalTotal = cartTotal + quote.fee;
     setOrderTotal(finalTotal);
 
     const fullAddress = [
@@ -249,13 +296,15 @@ export default function CartPage() {
           state: state.trim(),
           paymentMethod: "Razorpay",
           total: finalTotal,
-          subtotal: finalTotal,
           items: cart,
         }),
       });
 
       const orderData = await orderResponse.json();
       if (!orderData.success || !orderData.order) {
+        // Prices changed since the bag was filled: update the bag so the
+        // customer sees (and can accept) the current total.
+        if (orderData.code === "PRICE_CHANGED" || orderData.code === "OUT_OF_STOCK") await refreshCart();
         alert(orderData.error || "Failed to place order. Please try again.");
         setIsSubmitting(false);
         return;
@@ -474,9 +523,14 @@ export default function CartPage() {
                         <div className="flex-1 flex flex-col justify-between">
                           <div className="flex justify-between items-start gap-2">
                             <div>
-                              <Link href={`/products/${item.id}`} className="text-sm font-bold text-[#1E3A2C] hover:text-[#DAA87C] transition-colors leading-tight">
+                              <Link href={`/products/${item.productId ?? item.id}`} className="text-sm font-bold text-[#1E3A2C] hover:text-[#DAA87C] transition-colors leading-tight">
                                 {item.name}
                               </Link>
+                              {item.selectedColor && (
+                                <p className="text-[11px] text-[#1E3A2C]/70 mt-0.5">
+                                  Colour: <span className="font-bold">{item.selectedColor}</span>
+                                </p>
+                              )}
                               <p className="text-[10px] text-[#1E3A2C]/60 mt-1 font-semibold select-none">
                                 Delivery via India Post (2–4 days Kerala, 4–7 days India)
                               </p>
@@ -542,13 +596,22 @@ export default function CartPage() {
                     <span className="text-[#1E3A2C]/65">Subtotal</span>
                     <span>₹{cartTotal.toLocaleString("en-IN")}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#1E3A2C]/65">Shipping</span>
-                    <span className="text-emerald-600 font-bold">FREE</span>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-[#1E3A2C]/65">
+                      Delivery
+                      {deliveryFee !== null && delivery && (
+                        <span className="block text-[10px] font-medium text-[#1E3A2C]/45">{delivery.zoneName}</span>
+                      )}
+                    </span>
+                    {deliveryFee !== null ? (
+                      <span>₹{deliveryFee.toLocaleString("en-IN")}</span>
+                    ) : (
+                      <span className="text-[#1E3A2C]/50 font-medium text-right">Calculated at checkout</span>
+                    )}
                   </div>
                   <div className="border-t border-[#1E3A2C]/10 pt-3.5 flex justify-between text-sm font-extrabold text-[#0c2b1c]">
                     <span>Total Amount</span>
-                    <span>₹{cartTotal.toLocaleString("en-IN")}</span>
+                    <span>₹{grandTotal.toLocaleString("en-IN")}</span>
                   </div>
                 </div>
 
@@ -865,7 +928,12 @@ export default function CartPage() {
                     </>
                   ) : (
                     <>
-                      <span>Place Order · ₹{cartTotal.toLocaleString()}</span>
+                      <span>
+                        Place Order · ₹{grandTotal.toLocaleString("en-IN")}
+                        {deliveryFee !== null && (
+                          <span className="font-medium opacity-80"> (incl. ₹{deliveryFee.toLocaleString("en-IN")} delivery)</span>
+                        )}
+                      </span>
                       <svg className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                       </svg>

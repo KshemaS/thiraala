@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import type { Prisma } from "@prisma/client";
 import { verifyPaymentSignature } from "@/lib/razorpay";
-import { toOrderJSON, type TrackingEvent } from "@/app/api/orders/route";
+import { markOrderPaid } from "@/lib/orderPayment";
+import { toOrderJSON } from "@/app/api/orders/route";
 
 // POST verify a Razorpay Checkout success callback and mark the order Paid.
 // Hit by the customer's browser right after Checkout.js's handler fires —
@@ -48,26 +48,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, order: toOrderJSON(order) });
     }
 
-    const timeline = (order.trackingTimeline as unknown as TrackingEvent[]) || [];
-    const now = new Date().toISOString();
-    if (timeline[1]) {
-      timeline[1].completed = true;
-      timeline[1].timestamp = timeline[1].timestamp || now;
-    }
-
-    const updated = await prisma.order.update({
-      where: { id: order.id },
-      data: {
-        paymentStatus: "Paid",
-        status: order.status === "Pending" ? "Order Confirmed" : order.status,
-        razorpayPaymentId: razorpay_payment_id,
-        razorpaySignature: razorpay_signature,
-        trackingTimeline: timeline as unknown as Prisma.InputJsonValue,
-      },
-      include: { items: true },
+    const updated = await markOrderPaid(order.id, {
+      razorpayPaymentId: razorpay_payment_id,
+      razorpaySignature: razorpay_signature,
     });
 
-    return NextResponse.json({ success: true, order: toOrderJSON(updated) });
+    return NextResponse.json({ success: true, order: toOrderJSON(updated ?? order) });
   } catch (error: any) {
     console.error("Error verifying Razorpay payment:", error);
     return NextResponse.json(

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Razorpay from "razorpay";
 import prisma from "@/lib/prisma";
+import { OutOfStockError, reserveOrderStock } from "@/lib/stock";
 
 // POST create a Razorpay order for an already-created, Pending app order.
 // Hit by the customer's browser during checkout — no admin auth required.
@@ -17,6 +18,7 @@ export async function POST(request: Request) {
 
     const order = await prisma.order.findFirst({
       where: { humanId: { equals: String(orderId).trim(), mode: "insensitive" } },
+      include: { items: true },
     });
 
     if (!order) {
@@ -31,6 +33,29 @@ export async function POST(request: Request) {
         { success: false, error: "Order is already paid" },
         { status: 400 }
       );
+    }
+
+    if (order.status === "Cancelled") {
+      return NextResponse.json(
+        { success: false, error: "This order was cancelled. Please place a new order." },
+        { status: 409 }
+      );
+    }
+
+    // Retrying payment after the stock hold expired (or after a failed
+    // payment released it): take the stock again before letting them pay,
+    // and restart the hold so it isn't released mid-payment.
+    try {
+      if (order.stockReserved) {
+        await prisma.order.update({ where: { id: order.id }, data: { stockReservedAt: new Date() } });
+      } else {
+        await prisma.$transaction((tx) => reserveOrderStock(tx, order));
+      }
+    } catch (err) {
+      if (err instanceof OutOfStockError) {
+        return NextResponse.json({ success: false, error: err.message, code: "OUT_OF_STOCK" }, { status: 409 });
+      }
+      throw err;
     }
 
     const instance = new Razorpay({

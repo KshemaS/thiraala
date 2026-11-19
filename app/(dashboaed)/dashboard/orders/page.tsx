@@ -148,10 +148,9 @@ export default function OrdersDashboardPage() {
         (statusFilter === "Dispatched" && o.status === "Shipped");
       const matchesPayment =
         paymentFilter === "All" ||
-        (paymentFilter === "COD" && o.paymentMethod === "COD") ||
-        (paymentFilter === "UPI" && o.paymentMethod === "UPI") ||
         (paymentFilter === "Paid" && o.paymentStatus === "Paid") ||
-        (paymentFilter === "Unpaid" && o.paymentStatus !== "Paid");
+        (paymentFilter === "Unpaid" && o.paymentStatus === "Pending") ||
+        (paymentFilter === "Failed" && o.paymentStatus === "Failed");
 
       return matchesSearch && matchesStatus && matchesPayment;
     });
@@ -417,11 +416,10 @@ export default function OrdersDashboardPage() {
             onChange={(e) => setPaymentFilter(e.target.value)}
             className="h-9 px-3 bg-white border border-[#1E3A2C]/15 rounded-xl text-xs font-semibold text-[#1E3A2C] outline-none cursor-pointer"
           >
-            <option value="All">All Payment Modes</option>
-            <option value="COD">Cash on Delivery (COD)</option>
-            <option value="UPI">UPI Digital Payment</option>
+            <option value="All">All Payments</option>
             <option value="Paid">Paid Only</option>
-            <option value="Unpaid">Pending Payment Only</option>
+            <option value="Unpaid">Awaiting Payment</option>
+            <option value="Failed">Payment Failed</option>
           </select>
         </div>
       </div>
@@ -530,7 +528,7 @@ export default function OrdersDashboardPage() {
                       <td className="p-4">
                         <div className="flex flex-col gap-1 items-start">
                           <span className="inline-flex px-2 py-0.5 text-[9px] font-bold rounded-full bg-[#FAF8F5] border border-[#1E3A2C]/10 text-[#1E3A2C]">
-                            {order.paymentMethod === "COD" ? "Cash on Delivery" : "UPI QR"}
+                            Online (Razorpay)
                           </span>
                           <span
                             className={`text-[9px] font-bold uppercase ${
@@ -991,7 +989,7 @@ export default function OrdersDashboardPage() {
                         <div className="flex justify-between items-center">
                           <span className="text-[#1E3A2C]/60">Payment Mode:</span>
                           <span className="font-bold text-[#1E3A2C]">
-                            {selectedOrder.paymentMethod === "COD" ? "Cash on Delivery" : "UPI QR Payment"}
+                            Online (Razorpay)
                           </span>
                         </div>
 

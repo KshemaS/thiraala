@@ -423,6 +423,23 @@ export default function ProductsListPage() {
                             {product.collection}
                           </span>
                         )}
+                        {product.variants && product.variants.length > 0 && (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-medium bg-white text-[#1E3A2C] border border-[#1E3A2C]/15"
+                            title={product.variants.map((v) => `${v.name}: ${v.stock}`).join("\n")}
+                          >
+                            <span className="flex -space-x-1">
+                              {product.variants.slice(0, 4).map((v) => (
+                                <span
+                                  key={v.sku}
+                                  className="w-2.5 h-2.5 rounded-full border border-white"
+                                  style={{ backgroundColor: v.colorHex || "#1E3A2C" }}
+                                />
+                              ))}
+                            </span>
+                            {product.variants.length} {product.variants.length === 1 ? "colour" : "colours"}
+                          </span>
+                        )}
                       </div>
                     </td>
 
@@ -434,6 +451,15 @@ export default function ProductsListPage() {
                     {/* Stock Adjustment */}
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-2">
+                        {product.variants && product.variants.length > 0 ? (
+                          <Link
+                            href={`/dashboard/products/edit/${product.id}`}
+                            className="px-2.5 py-0.5 text-xs font-bold min-w-[28px] text-center border border-[#1E3A2C]/15 rounded-lg bg-white shadow-2xs hover:bg-[#FAF8F5]"
+                            title="Total across colour variants. Edit the product to change each variant's stock."
+                          >
+                            {product.stock ?? 0}
+                          </Link>
+                        ) : (
                         <div className="flex items-center border border-[#1E3A2C]/15 rounded-lg bg-white overflow-hidden shadow-2xs">
                           <button
                             type="button"
@@ -454,6 +480,7 @@ export default function ProductsListPage() {
                             +
                           </button>
                         </div>
+                        )}
                         <span
                           className={`inline-block w-2 h-2 rounded-full ${
                             (product.stock ?? 0) > 2

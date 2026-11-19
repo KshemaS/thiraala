@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import type { Prisma } from "@prisma/client";
 import { verifyWebhookSignature } from "@/lib/razorpay";
-import type { TrackingEvent } from "@/app/api/orders/route";
+import { markOrderPaid, markOrderPaymentFailed } from "@/lib/orderPayment";
 
 // POST — Razorpay server-to-server webhook. Authoritative source of truth
 // for payment capture/failure: catches payments that succeeded even if the
@@ -40,33 +39,10 @@ export async function POST(request: Request) {
     }
 
     if (eventType === "payment.captured") {
-      if (order.paymentStatus === "Paid") {
-        return NextResponse.json({ success: true });
-      }
-
-      const timeline = (order.trackingTimeline as unknown as TrackingEvent[]) || [];
-      const now = new Date().toISOString();
-      if (timeline[1]) {
-        timeline[1].completed = true;
-        timeline[1].timestamp = timeline[1].timestamp || now;
-      }
-
-      await prisma.order.update({
-        where: { id: order.id },
-        data: {
-          paymentStatus: "Paid",
-          status: order.status === "Pending" ? "Order Confirmed" : order.status,
-          razorpayPaymentId: razorpayPaymentId || order.razorpayPaymentId,
-          trackingTimeline: timeline as unknown as Prisma.InputJsonValue,
-        },
-      });
+      await markOrderPaid(order.id, { razorpayPaymentId });
     } else if (eventType === "payment.failed") {
-      if (order.paymentStatus === "Pending") {
-        await prisma.order.update({
-          where: { id: order.id },
-          data: { paymentStatus: "Failed" },
-        });
-      }
+      // Frees the order's stock straight away.
+      await markOrderPaymentFailed(order.id);
     }
 
     return NextResponse.json({ success: true });

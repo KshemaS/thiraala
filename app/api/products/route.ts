@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guard";
+import { imageUrl, incomingImage } from "@/lib/productImages";
+import {
+  formatVariant,
+  parseVariants,
+  syncVariants,
+  variantSkuConflict,
+  variantsInclude,
+  type ProductVariantItem,
+} from "@/lib/productVariants";
 
 export interface ProductItem {
   id: number | string;
@@ -42,44 +49,35 @@ export interface ProductItem {
   status?: "active" | "inactive";
   featured?: boolean;
   isNewArrival?: boolean;
+  variants?: ProductVariantItem[];
 }
 
-const dataFilePath = path.join(process.cwd(), "data", "products.json");
-
-function getProductsFromFile(): ProductItem[] {
-  try {
-    if (fs.existsSync(dataFilePath)) {
-      const content = fs.readFileSync(dataFilePath, "utf8");
-      return JSON.parse(content);
-    }
-  } catch (error) {
-    console.error("Error reading products.json:", error);
-  }
-  return [];
+/** Trimmed string, or null when blank/missing. */
+function text(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  const s = String(value).trim();
+  return s ? s : null;
 }
 
-function saveProductsToFile(products: ProductItem[]): boolean {
-  try {
-    const dir = path.dirname(dataFilePath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(dataFilePath, JSON.stringify(products, null, 2), "utf8");
-    return true;
-  } catch (error) {
-    console.error("Error writing products.json:", error);
-    return false;
-  }
+function optionalNumber(value: unknown): number | null {
+  if (value === undefined || value === null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+function optionalInt(value: unknown): number | null {
+  const n = optionalNumber(value);
+  return n === null ? null : Math.round(n);
 }
 
 export async function GET() {
   try {
     const dbProducts = await prisma.product.findMany({
       orderBy: { createdAt: "desc" },
+      include: variantsInclude,
     });
 
-    if (dbProducts && dbProducts.length > 0) {
-      const formatted: ProductItem[] = dbProducts.map((p) => ({
+    const formatted: ProductItem[] = dbProducts.map((p) => ({
         id: p.id,
         sku: p.sku,
         name: p.name,
@@ -88,16 +86,16 @@ export async function GET() {
         price: p.price,
         priceValue: p.priceValue,
         mrp: (p as any).mrp || undefined,
-        rating: (p as any).rating || 4.8,
-        ratingCount: (p as any).ratingCount || 85,
+        rating: (p as any).rating ?? undefined,
+        ratingCount: (p as any).ratingCount ?? undefined,
         selectedColor: (p as any).selectedColor || undefined,
         category: p.categoryName,
         categoryId: p.categoryId || undefined,
         collection: p.collectionName || undefined,
         collections: p.collectionName ? [p.collectionName] : [],
         collectionId: p.collectionId || undefined,
-        foldedImg: p.foldedImg || "/images/folded-gopuram.jpeg",
-        wornImg: p.wornImg || "/images/gopura.jpeg",
+        foldedImg: imageUrl("product", p.id, "folded", p.foldedImg, p.updatedAt) || "/images/folded-gopuram.jpeg",
+        wornImg: imageUrl("product", p.id, "worn", p.wornImg, p.updatedAt) || "/images/gopura.jpeg",
         altFolded: p.altFolded || p.name,
         altWorn: p.altWorn || p.name,
         fabric: p.fabric || "",
@@ -120,15 +118,16 @@ export async function GET() {
         status: (p.status as "active" | "inactive") || "active",
         featured: p.featured,
         isNewArrival: p.isNewArrival,
+        variants: p.variants.map(formatVariant),
       }));
-      return NextResponse.json(formatted);
-    }
+    return NextResponse.json(formatted);
   } catch (err) {
-    // Database offline - fallback to JSON file
+    console.error("Failed to load products:", err);
+    return NextResponse.json(
+      { success: false, error: "Unable to load products." },
+      { status: 500 }
+    );
   }
-
-  const products = getProductsFromFile();
-  return NextResponse.json(products);
 }
 
 export async function POST(request: Request) {
@@ -145,6 +144,12 @@ export async function POST(request: Request) {
       );
     }
 
+    const parsed = parseVariants(body.variants);
+    if ("error" in parsed) {
+      return NextResponse.json({ success: false, error: parsed.error }, { status: 400 });
+    }
+    const variants = parsed.variants;
+
     const newId = body.id || `prod_${Date.now()}`;
     const slug = body.slug || body.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
@@ -153,74 +158,82 @@ export async function POST(request: Request) {
       id: newId,
       slug,
       status: body.status || "active",
-      stock: Number(body.stock) >= 0 ? Number(body.stock) : 0,
+      // With variants, product stock is the total of the variants' stock.
+      stock: variants.length
+        ? variants.reduce((sum, v) => sum + v.stock, 0)
+        : Number(body.stock) >= 0
+          ? Number(body.stock)
+          : 0,
       priceValue: Number(body.priceValue) || (body.price ? Number(String(body.price).replace(/[^0-9]/g, "")) : 0),
+      variants,
     };
 
-    // Try saving to Prisma
-    try {
-      await prisma.product.upsert({
-        where: { sku: newProduct.sku },
-        update: {
-          name: newProduct.name,
-          slug: newProduct.slug,
-          price: newProduct.price,
-          priceValue: newProduct.priceValue,
-          categoryName: newProduct.category || "General",
-          categoryId: newProduct.categoryId || null,
-          collectionName: newProduct.collection || null,
-          collectionId: newProduct.collectionId || null,
-          stock: newProduct.stock,
-          fabric: newProduct.fabric || null,
-          color: newProduct.color || null,
-          pattern: newProduct.pattern || null,
-          description: newProduct.description || null,
-          foldedImg: newProduct.foldedImg || null,
-          wornImg: newProduct.wornImg || null,
-          altFolded: newProduct.altFolded || null,
-          altWorn: newProduct.altWorn || null,
-          status: newProduct.status || "active",
-          featured: Boolean(newProduct.featured),
-          isNewArrival: Boolean(newProduct.isNewArrival),
-        },
-        create: {
-          id: typeof newProduct.id === "string" ? newProduct.id : undefined,
-          sku: newProduct.sku,
-          name: newProduct.name,
-          slug: newProduct.slug || slug,
-          price: newProduct.price || "₹0",
-          priceValue: Number(newProduct.priceValue) || 0,
-          categoryName: newProduct.category || "General",
-          categoryId: newProduct.categoryId || null,
-          collectionName: newProduct.collection || null,
-          collectionId: newProduct.collectionId || null,
-          stock: Number(newProduct.stock) >= 0 ? Number(newProduct.stock) : 0,
-          fabric: newProduct.fabric || null,
-          color: newProduct.color || null,
-          pattern: newProduct.pattern || null,
-          description: newProduct.description || null,
-          foldedImg: newProduct.foldedImg || null,
-          wornImg: newProduct.wornImg || null,
-          altFolded: newProduct.altFolded || null,
-          altWorn: newProduct.altWorn || null,
-          status: newProduct.status || "active",
-          featured: Boolean(newProduct.featured),
-          isNewArrival: Boolean(newProduct.isNewArrival),
-        },
-      });
-    } catch (dbErr) {
-      console.warn("Could not write product to DB, falling back to JSON only:", dbErr);
+    // Refuse to reuse a SKU or URL slug instead of overwriting that product.
+    const clash = await prisma.product.findFirst({
+      where: { OR: [{ sku: newProduct.sku }, { slug }] },
+      select: { sku: true, slug: true, name: true },
+    });
+    if (clash) {
+      const field = clash.sku === newProduct.sku ? `SKU "${newProduct.sku}"` : `URL slug "${slug}"`;
+      return NextResponse.json(
+        { success: false, error: `${field} is already used by "${clash.name}". Please choose another.` },
+        { status: 409 }
+      );
     }
 
-    // Always update JSON fallback
-    const products = getProductsFromFile();
-    const existingIndex = products.findIndex((p) => p.sku === newProduct.sku || String(p.id) === String(newProduct.id));
-    if (existingIndex >= 0) {
-      products[existingIndex] = newProduct;
-    } else {
-      products.push(newProduct);
+    try {
+      await prisma.$transaction(async (tx) => {
+        const saved = await tx.product.create({
+          data: {
+            id: typeof newProduct.id === "string" ? newProduct.id : undefined,
+            sku: newProduct.sku,
+            name: newProduct.name,
+            subtitle: text(body.subtitle),
+            slug,
+            price: newProduct.price || "₹0",
+            priceValue: Number(newProduct.priceValue) || 0,
+            mrp: optionalInt(body.mrp),
+            rating: optionalNumber(body.rating),
+            ratingCount: optionalInt(body.ratingCount),
+            selectedColor: text(body.selectedColor),
+            categoryName: newProduct.category || "General",
+            categoryId: newProduct.categoryId || null,
+            collectionName: newProduct.collection || null,
+            collectionId: newProduct.collectionId || null,
+            stock: newProduct.stock ?? 0,
+            fabric: text(body.fabric),
+            sareeFabric: text(body.sareeFabric),
+            color: text(body.color),
+            pattern: text(body.pattern),
+            border: text(body.border),
+            blouse: text(body.blouse),
+            occasion: text(body.occasion),
+            sareeLength: text(body.sareeLength) ?? undefined,
+            blouseLength: text(body.blouseLength) ?? undefined,
+            careInstructions: text(body.careInstructions),
+            highlights: Array.isArray(body.highlights)
+              ? body.highlights.map(String).map((h: string) => h.trim()).filter(Boolean).join("\n") || null
+              : text(body.highlights),
+            description: text(body.description),
+            // A served URL only refers to another row's photo; never store it.
+            foldedImg: incomingImage(body.foldedImg) ?? null,
+            wornImg: incomingImage(body.wornImg) ?? null,
+            altFolded: text(body.altFolded),
+            altWorn: text(body.altWorn),
+            status: newProduct.status || "active",
+            featured: Boolean(body.featured),
+            isNewArrival: Boolean(body.isNewArrival),
+          },
+        });
+        await syncVariants(tx, saved.id, variants);
+      });
+    } catch (dbErr) {
+      console.error("Could not save product:", dbErr);
+      return NextResponse.json(
+        { success: false, error: variantSkuConflict(dbErr) || "Could not save the product. Please try again." },
+        { status: 500 }
+      );
     }
-    saveProductsToFile(products);
 
     return NextResponse.json({ success: true, product: newProduct });
   } catch (error: any) {

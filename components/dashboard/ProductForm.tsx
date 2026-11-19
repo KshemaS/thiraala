@@ -18,11 +18,16 @@ import {
   Loader2,
   Trash2,
   ImageIcon,
-  Star,
   Ruler,
   Percent,
 } from "lucide-react";
 import { ProductItem } from "@/app/api/products/route";
+import VariantsEditor, {
+  fromDrafts,
+  toDrafts,
+  validateDrafts,
+  type VariantDraft,
+} from "@/components/dashboard/VariantsEditor";
 
 interface CategoryOption {
   id?: string;
@@ -68,8 +73,6 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
     price: string;
     priceValue: number;
     mrp: number | "";
-    rating: number;
-    ratingCount: number;
     category: string;
     collection: string;
     stock: number;
@@ -98,8 +101,6 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
     price: initialData?.price || "",
     priceValue: initialData?.priceValue || 0,
     mrp: (initialData as any)?.mrp !== undefined && (initialData as any)?.mrp !== null ? Number((initialData as any).mrp) : "",
-    rating: (initialData as any)?.rating !== undefined ? Number((initialData as any).rating) : 4.8,
-    ratingCount: (initialData as any)?.ratingCount !== undefined ? Number((initialData as any).ratingCount) : 85,
     category: initialData?.category || DEFAULT_CATEGORIES[0],
     collection: initialData?.collection || (initialData?.collections && initialData.collections[0]) || "",
     stock: initialData?.stock !== undefined ? initialData.stock : 10,
@@ -123,6 +124,11 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
     status: initialData?.status || "active",
     isNewArrival: Boolean(initialData?.isNewArrival),
   });
+
+  const [variants, setVariants] = useState<VariantDraft[]>(() => toDrafts(initialData?.variants));
+  const hasVariants = variants.length > 0;
+  const variantStockTotal = variants.reduce((sum, v) => sum + (v.stock === "" ? 0 : v.stock), 0);
+  const effectiveStock = hasVariants ? variantStockTotal : formData.stock;
 
   const [showFoldedUrl, setShowFoldedUrl] = useState(false);
   const [showWornUrl, setShowWornUrl] = useState(false);
@@ -291,13 +297,17 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
       return;
     }
 
+    const variantError = validateDrafts(variants, formData.sku);
+    if (variantError) {
+      setErrorMessage(variantError);
+      return;
+    }
+
     setIsSubmitting(true);
 
     const payload = {
       ...formData,
       mrp: typeof formData.mrp === "number" && formData.mrp > 0 ? formData.mrp : undefined,
-      rating: Number(formData.rating) > 0 ? Number(formData.rating) : 4.8,
-      ratingCount: Number(formData.ratingCount) >= 0 ? Number(formData.ratingCount) : 85,
       highlights: formData.highlights
         ? formData.highlights
             .split("\n")
@@ -309,7 +319,8 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
       collections: formData.collection.trim() ? [formData.collection.trim()] : [],
       foldedImg: formData.foldedImg.trim(),
       wornImg: formData.wornImg.trim(),
-      stock: Number(formData.stock) >= 0 ? Number(formData.stock) : 0,
+      stock: hasVariants ? variantStockTotal : Number(formData.stock) >= 0 ? Number(formData.stock) : 0,
+      variants: fromDrafts(variants),
     };
 
     try {
@@ -568,8 +579,8 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
                 <DollarSign className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-[#1E3A2C]">Pricing, Discounts & Ratings</h3>
-                <p className="text-[11px] text-[#1E3A2C]/50">Sale price, original MRP, discount tag, and social proof</p>
+                <h3 className="text-sm font-bold text-[#1E3A2C]">Pricing, Discounts & Stock</h3>
+                <p className="text-[11px] text-[#1E3A2C]/50">Sale price, original MRP, discount tag, and stock</p>
               </div>
             </div>
 
@@ -636,54 +647,35 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
                 <input
                   type="number"
                   min="0"
-                  value={formData.stock}
+                  value={effectiveStock}
                   onChange={(e) => setFormData({ ...formData, stock: parseInt(e.target.value, 10) || 0 })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#1E3A2C]/15 text-xs font-bold text-[#1E3A2C] focus:outline-none focus:border-[#DAA87C] bg-[#FAF8F5]/30"
+                  disabled={hasVariants}
+                  title={hasVariants ? "Total of all colour variants. Edit stock per variant below." : undefined}
+                  className="w-full px-4 py-2.5 rounded-xl border border-[#1E3A2C]/15 text-xs font-bold text-[#1E3A2C] focus:outline-none focus:border-[#DAA87C] bg-[#FAF8F5]/30 disabled:opacity-60 disabled:cursor-not-allowed"
                 />
                 <div className="flex items-center gap-1.5 mt-1">
                   <span
                     className={`inline-block w-2 h-2 rounded-full ${
-                      formData.stock > 2 ? "bg-emerald-500" : formData.stock > 0 ? "bg-amber-500" : "bg-rose-500"
+                      effectiveStock > 2 ? "bg-emerald-500" : effectiveStock > 0 ? "bg-amber-500" : "bg-rose-500"
                     }`}
                   />
                   <span className="text-[10px] font-semibold text-[#1E3A2C]/60">
-                    {formData.stock > 2 ? "In Stock" : formData.stock > 0 ? "Low Stock" : "Out of Stock"}
+                    {effectiveStock > 2 ? "In Stock" : effectiveStock > 0 ? "Low Stock" : "Out of Stock"}
+                    {hasVariants && " · total of all variants"}
                   </span>
-                </div>
-              </div>
-
-              {/* Ratings */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-bold text-[#1E3A2C] mb-1.5 flex items-center gap-1">
-                    <Star className="w-3 h-3 text-[#DAA87C]" />
-                    <span>Rating (1-5)</span>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="1"
-                    max="5"
-                    value={formData.rating}
-                    onChange={(e) => setFormData({ ...formData, rating: parseFloat(e.target.value) || 4.8 })}
-                    className="w-full px-3 py-2.5 rounded-xl border border-[#1E3A2C]/15 text-xs font-bold text-[#1E3A2C] focus:outline-none focus:border-[#DAA87C] bg-[#FAF8F5]/30"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[#1E3A2C] mb-1.5">
-                    Ratings Count
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.ratingCount}
-                    onChange={(e) => setFormData({ ...formData, ratingCount: parseInt(e.target.value, 10) || 0 })}
-                    className="w-full px-3 py-2.5 rounded-xl border border-[#1E3A2C]/15 text-xs font-bold text-[#1E3A2C] focus:outline-none focus:border-[#DAA87C] bg-[#FAF8F5]/30"
-                  />
                 </div>
               </div>
             </div>
           </div>
+
+          {/* Card: Colour Variants */}
+          <VariantsEditor
+            variants={variants}
+            onChange={setVariants}
+            productSku={formData.sku}
+            productPrice={formData.priceValue}
+            onError={setErrorMessage}
+          />
 
           {/* Card: Textile Specifications */}
           <div className="bg-white rounded-2xl border border-[#1E3A2C]/10 p-6 shadow-xs space-y-5">

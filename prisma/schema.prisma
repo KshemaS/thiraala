@@ -48,8 +48,8 @@ model Product {
   price            String
   priceValue       Int
   mrp              Int?
-  rating           Float?      @default(4.8)
-  ratingCount      Int?        @default(85)
+  rating           Float?
+  ratingCount      Int?
   selectedColor    String?
   categoryName     String
   categoryId       String?
@@ -77,10 +77,44 @@ model Product {
   status           String      @default("active")
   featured         Boolean     @default(false)
   isNewArrival     Boolean     @default(false)
+  variants         ProductVariant[]
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
   @@map("products")
+}
+
+/// A colour variant of a saree. Its own SKU, stock and photos; price/MRP
+/// fall back to the parent product when null.
+model ProductVariant {
+  id         String   @id @default(cuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name       String
+  sku        String   @unique
+  colorHex   String?
+  priceValue Int?
+  mrp        Int?
+  stock      Int      @default(0)
+  foldedImg  String?  @db.Text
+  wornImg    String?  @db.Text
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([productId])
+  @@map("product_variants")
+}
+
+/// Delivery charge per zone, editable in the dashboard. Which pincodes belong
+/// to which zone is defined in lib/delivery.ts.
+model DeliveryRate {
+  zone          String   @id
+  firstItemFee  Int
+  extraItemFee  Int
+  updatedAt     DateTime @updatedAt
+
+  @@map("delivery_rates")
 }
 
 model HeroBanner {
@@ -177,6 +211,11 @@ model Order {
   razorpayOrderId   String?     @unique
   razorpayPaymentId String?
   razorpaySignature String?
+  /// True while this order holds stock (reserved at checkout, released on
+  /// cancel / failed or abandoned payment). See lib/stock.ts.
+  stockReserved     Boolean     @default(false)
+  /// When the current stock hold started (unpaid holds expire after 30 min).
+  stockReservedAt   DateTime?
   items             OrderItem[]
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
@@ -198,6 +237,7 @@ model OrderItem {
   wornImg       String?  @db.Text
   category      String?
   selectedColor String?
+  variantId     String?
   createdAt     DateTime @default(now())
 
   @@map("order_items")

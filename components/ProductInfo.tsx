@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { SareeProduct } from "@/data/products";
 import { UnifiedProduct } from "@/lib/products";
+import type { ProductVariantItem } from "@/lib/productVariants";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { ShoppingBag, Heart, Truck, CheckCircle2, AlertCircle, MapPin, Loader2 } from "lucide-react";
@@ -22,29 +23,42 @@ export interface PincodeCheckResult {
   hasDirectDelivery?: boolean;
 }
 
-export default function ProductInfo({ product }: { product: SareeProduct | UnifiedProduct | any }) {
+interface ProductInfoProps {
+  product: SareeProduct | UnifiedProduct | any;
+  /** Colour variants; the picker is shown only when there are any. */
+  variants?: ProductVariantItem[];
+  selectedVariantId?: string;
+  onSelectVariant?: (variantId: string) => void;
+}
+
+export default function ProductInfo({
+  product,
+  variants = [],
+  selectedVariantId,
+  onSelectVariant,
+}: ProductInfoProps) {
   const router = useRouter();
   const { addToCart } = useCart();
   const { toggleWishlist, isInWishlist } = useWishlist();
 
-  // State
-  const [selectedColor, setSelectedColor] = useState<string>(
-    product.selectedColor || product.color || "Wine Lily"
-  );
+  const hasVariants = variants.length > 0;
+  const selectedVariant = variants.find((v) => v.id === selectedVariantId);
+  const isVariantSoldOut = hasVariants && (selectedVariant?.stock ?? 0) <= 0;
   const [pincode, setPincode] = useState("");
   const [isCheckingPincode, setIsCheckingPincode] = useState(false);
   const [pincodeStatus, setPincodeStatus] = useState<PincodeCheckResult | null>(null);
   const [buyNowNotice, setBuyNowNotice] = useState<string | null>(null);
 
-  const isWishlisted = isInWishlist(product.id);
+  // The wishlist is per product, not per colour.
+  const wishlistProduct = product.productId ? { ...product, id: product.productId } : product;
+  const isWishlisted = isInWishlist(wishlistProduct.id);
 
   // MRP and discount calculations
   const priceVal = product.priceValue || 1499;
-  const mrpVal = product.mrp || Math.round(priceVal * 1.5);
-  const discountPercent =
-    mrpVal > priceVal
-      ? Math.round(((mrpVal - priceVal) / mrpVal) * 100)
-      : product.discountPercent || 0;
+  // Only show a strikethrough MRP when one was set and it's above the price.
+  const mrpVal = product.mrp && product.mrp > priceVal ? product.mrp : 0;
+  const hasMrp = mrpVal > 0;
+  const discountPercent = hasMrp ? Math.round(((mrpVal - priceVal) / mrpVal) * 100) : 0;
 
   // Highlights list
   const defaultHighlights = [
@@ -64,28 +78,6 @@ export default function ProductInfo({ product }: { product: SareeProduct | Unifi
     product.description ||
     "An off-white Kerala cotton saree with deep wine lilies painted across the pallu and pleats, framed by a slim contrast border. Light enough for long festive days, rooted in the coast it comes from.";
 
-  // Only show variants if this product actually has variants configured
-  const hasVariants = Boolean(
-    (product.colorVariants && product.colorVariants.length > 0) ||
-    product.id === 1 ||
-    product.sku === "THR-1042"
-  );
-
-  // Color variants gallery
-  const colorVariantsList = product.colorVariants || [
-    {
-      name: "Wine Lily",
-      img: typeof product.wornImg === "string" ? product.wornImg : "/images/gopura.jpeg",
-    },
-    {
-      name: "Pink Lily",
-      img: typeof product.foldedImg === "string" ? product.foldedImg : "/images/folded-gopuram.jpeg",
-    },
-    {
-      name: "Meadow Green",
-      img: typeof product.wornImg === "string" ? product.wornImg : "/images/gopura.jpeg",
-    },
-  ];
 
   // India Post Delivery check handler
   const handleCheckPincode = async () => {
@@ -152,17 +144,19 @@ export default function ProductInfo({ product }: { product: SareeProduct | Unifi
         </p>
       </div>
 
-      {/* 2. RATINGS BADGE */}
-      <div>
-        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-neutral-300 text-[11px] text-neutral-800 bg-white shadow-2xs font-medium">
-          <span className="font-bold">{product.rating ?? 4.8}</span>
-          <span className="text-[#1E3A2C] text-xs">★</span>
-          <span className="text-neutral-300 mx-0.5">|</span>
-          <span className="text-neutral-500 font-normal">
-            {product.ratingCount ?? 85} Ratings
-          </span>
+      {/* 2. RATINGS BADGE (only when the product has a real rating) */}
+      {product.rating > 0 && product.ratingCount > 0 && (
+        <div>
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-neutral-300 text-[11px] text-neutral-800 bg-white shadow-2xs font-medium">
+            <span className="font-bold">{product.rating}</span>
+            <span className="text-[#1E3A2C] text-xs">★</span>
+            <span className="text-neutral-300 mx-0.5">|</span>
+            <span className="text-neutral-500 font-normal">
+              {product.ratingCount} Ratings
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Divider */}
       <div className="w-full border-b border-neutral-200" />
@@ -173,7 +167,7 @@ export default function ProductInfo({ product }: { product: SareeProduct | Unifi
           <span className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">
             {product.price || `₹${priceVal.toLocaleString("en-IN")}`}
           </span>
-          {mrpVal > 0 && (
+          {hasMrp && (
             <span className="text-neutral-400 text-sm font-normal line-through">
               MRP ₹{mrpVal.toLocaleString("en-IN")}
             </span>
@@ -196,33 +190,47 @@ export default function ProductInfo({ product }: { product: SareeProduct | Unifi
             MORE COLOURS
           </h3>
           <div className="flex items-center gap-2.5 pt-1">
-            {colorVariantsList.map((variant: any, idx: number) => {
-              const isSelected = selectedColor.toLowerCase() === variant.name.toLowerCase();
+            {variants.map((variant) => {
+              const isSelected = variant.id === selectedVariantId;
+              const thumb = variant.wornImg || variant.foldedImg;
+              const soldOut = variant.stock <= 0;
               return (
                 <button
-                  key={idx}
+                  key={variant.id || variant.sku}
                   type="button"
-                  onClick={() => setSelectedColor(variant.name)}
+                  onClick={() => variant.id && onSelectVariant?.(variant.id)}
+                  aria-pressed={isSelected}
                   className={`relative w-12 h-16 rounded overflow-hidden transition-all cursor-pointer bg-neutral-100 ${
                     isSelected
                       ? "border-2 border-neutral-900 shadow-xs"
                       : "border border-neutral-200 hover:border-neutral-400 opacity-75 hover:opacity-100"
                   }`}
-                  title={variant.name}
+                  title={soldOut ? `${variant.name} (sold out)` : variant.name}
                 >
-                  <Image
-                    src={variant.img}
-                    alt={variant.name}
-                    fill
-                    className="object-cover"
-                    unoptimized={typeof variant.img === "string" && variant.img.startsWith("data:")}
-                  />
+                  {thumb ? (
+                    <Image
+                      src={thumb}
+                      alt={variant.name}
+                      fill
+                      sizes="48px"
+                      className={`object-cover ${soldOut ? "grayscale" : ""}`}
+                      unoptimized={thumb.startsWith("data:")}
+                    />
+                  ) : (
+                    <span className="absolute inset-0" style={{ backgroundColor: variant.colorHex || "#e5e5e5" }} />
+                  )}
+                  {soldOut && (
+                    <span className="absolute inset-0 flex items-center justify-center">
+                      <span className="block w-[140%] h-px bg-neutral-500 rotate-[-55deg]" />
+                    </span>
+                  )}
                 </button>
               );
             })}
           </div>
           <p className="text-xs text-neutral-600 pt-0.5">
-            Selected: <span className="font-bold text-neutral-900">{selectedColor}</span>
+            Selected: <span className="font-bold text-neutral-900">{selectedVariant?.name}</span>
+            {isVariantSoldOut && <span className="ml-2 font-bold text-rose-600">Sold out</span>}
           </p>
         </div>
       )}
@@ -246,7 +254,8 @@ export default function ProductInfo({ product }: { product: SareeProduct | Unifi
           <button
             type="button"
             onClick={() => addToCart(product, 1)}
-            className="w-full bg-white hover:bg-neutral-50 text-[#1E3A2C] border-2 border-[#1E3A2C] text-xs font-bold uppercase tracking-wider py-3.5 px-3 rounded-md flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
+            disabled={isVariantSoldOut}
+            className="w-full bg-white hover:bg-neutral-50 text-[#1E3A2C] border-2 border-[#1E3A2C] text-xs font-bold uppercase tracking-wider py-3.5 px-3 rounded-md flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <ShoppingBag className="w-4 h-4 text-[#1E3A2C]" />
             <span>ADD TO BAG</span>
@@ -256,7 +265,8 @@ export default function ProductInfo({ product }: { product: SareeProduct | Unifi
           <button
             type="button"
             onClick={handleBuyNow}
-            className="w-full bg-[#1E3A2C] hover:bg-[#162e22] text-white text-xs font-bold uppercase tracking-wider py-3.5 px-3 rounded-md flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+            disabled={isVariantSoldOut}
+            className="w-full bg-[#1E3A2C] hover:bg-[#162e22] text-white text-xs font-bold uppercase tracking-wider py-3.5 px-3 rounded-md flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <span>BUY NOW</span>
           </button>
@@ -264,7 +274,7 @@ export default function ProductInfo({ product }: { product: SareeProduct | Unifi
           {/* WISHLIST Button */}
           <button
             type="button"
-            onClick={() => toggleWishlist(product)}
+            onClick={() => toggleWishlist(wishlistProduct)}
             aria-label={isWishlisted ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
             className={`w-full border text-xs font-bold uppercase tracking-wider py-3.5 px-3 rounded-md flex items-center justify-center gap-2 transition-all cursor-pointer ${
               isWishlisted
@@ -393,12 +403,14 @@ export default function ProductInfo({ product }: { product: SareeProduct | Unifi
           Best Price: {product.price || `₹${priceVal.toLocaleString("en-IN")}`}
         </p>
         <ul className="space-y-1.5 text-xs text-neutral-600">
-          <li className="flex items-start gap-2">
-            <span className="text-neutral-400">•</span>
-            <span>
-              Flat {discountPercent}% off on MRP of ₹{mrpVal.toLocaleString("en-IN")}, already applied
-            </span>
-          </li>
+          {hasMrp && discountPercent > 0 && (
+            <li className="flex items-start gap-2">
+              <span className="text-neutral-400">•</span>
+              <span>
+                Flat {discountPercent}% off on MRP of ₹{mrpVal.toLocaleString("en-IN")}, already applied
+              </span>
+            </li>
+          )}
           <li className="flex items-start gap-2">
             <span className="text-neutral-400">•</span>
             <span>Pay securely online via Razorpay (UPI, cards, net banking)</span>

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth/guard";
+import { priceOrder } from "@/lib/orderPricing";
+import { OutOfStockError, releaseExpiredReservations, reserveStock } from "@/lib/stock";
 import type { Order as PrismaOrder, OrderItem as PrismaOrderItem, Prisma } from "@prisma/client";
 
 export interface OrderItem {
@@ -211,8 +213,10 @@ export async function POST(request: Request) {
     const customerUserId = cookieStore.get("thiraala_user_id")?.value;
 
     const body = await request.json();
+    // Prices, totals, fees and discounts from the browser are ignored: the
+    // order is priced from the database (see lib/orderPricing.ts). The browser's
+    // `total` is only compared, so nobody is charged an amount they didn't see.
     const {
-      userId,
       customerName,
       phone,
       email = "",
@@ -224,11 +228,7 @@ export async function POST(request: Request) {
       state = "",
       pincode = "",
       items = [],
-      total = 0,
-      subtotal,
-      deliveryFee = 0,
-      discount = 0,
-      paymentMethod = "Razorpay",
+      total: clientTotal,
       notes = "",
     } = body;
 
@@ -239,6 +239,25 @@ export async function POST(request: Request) {
           error: "Missing required fields (customerName, phone, address, and at least 1 item)",
         },
         { status: 400 }
+      );
+    }
+
+    // Free up stock held by checkouts that were abandoned unpaid.
+    await releaseExpiredReservations().catch((err) => console.error("Releasing expired reservations failed:", err));
+
+    const priced = await priceOrder(items, typeof pincode === "string" ? pincode.trim() : pincode);
+    if (!priced.ok) {
+      return NextResponse.json({ success: false, error: priced.error }, { status: priced.status });
+    }
+    if (clientTotal !== undefined && Math.round(Number(clientTotal)) !== priced.total) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Your order total has changed. The current total is ₹${priced.total.toLocaleString("en-IN")} (including ₹${priced.deliveryFee.toLocaleString("en-IN")} delivery). Please review your bag and try again.`,
+          code: "PRICE_CHANGED",
+          total: priced.total,
+        },
+        { status: 409 }
       );
     }
 
@@ -285,10 +304,17 @@ export async function POST(request: Request) {
       },
     ];
 
-    const created = await prisma.order.create({
+    // Create the order and take its stock together: if any item is short,
+    // nothing is saved and no stock moves.
+    const created = await prisma.$transaction(async (tx) => {
+      await reserveStock(tx, priced.lines);
+      return tx.order.create({
       data: {
         humanId: newOrderId,
-        userId: userId || customerUserId || null,
+        stockReserved: true,
+        stockReservedAt: new Date(),
+        // Only the signed-in customer's own id; never an id from the request body.
+        userId: customerUserId || null,
         customerName: String(customerName).trim(),
         phone: String(phone).trim(),
         email: String(email).trim(),
@@ -299,11 +325,13 @@ export async function POST(request: Request) {
         district: district ? String(district).trim() : "",
         state: state ? String(state).trim() : "",
         pincode: pincode ? String(pincode).trim() : "",
-        total: Math.round(Number(total)) || 0,
-        subtotal: Math.round(Number(subtotal !== undefined ? subtotal : total)) || 0,
-        deliveryFee: Math.round(Number(deliveryFee)) || 0,
-        discount: Math.round(Number(discount)) || 0,
-        paymentMethod: String(paymentMethod) || "Razorpay",
+        total: priced.total,
+        subtotal: priced.subtotal,
+        deliveryFee: priced.deliveryFee,
+        discount: priced.discount,
+        // The shop only takes online payment (no cash on delivery), so this is
+        // never taken from the request.
+        paymentMethod: "Razorpay",
         // Payment is never verified at creation time — only a verified
         // Razorpay payment (client verify or webhook) flips this to "Paid".
         paymentStatus: "Pending",
@@ -311,22 +339,23 @@ export async function POST(request: Request) {
         notes: notes || "",
         trackingTimeline: trackingTimeline as unknown as Prisma.InputJsonValue,
         items: {
-          create: items.map((item: any, idx: number) => ({
-            productId: item.productId ? String(item.productId) : item.id ? String(item.id) : null,
-            sku: item.sku || `THR-SKU-${idx + 1}`,
-            name: item.name,
-            price: item.price || `₹${item.priceValue || 0}`,
-            priceValue:
-              item.priceValue || parseInt(String(item.price).replace(/[^\d]/g, ""), 10) || 0,
-            quantity: item.quantity || 1,
-            foldedImg: item.foldedImg || "/images/folded-gopuram.jpeg",
-            wornImg: item.wornImg || "/images/gopura.jpeg",
-            category: item.category || "Handloom Saree",
-            selectedColor: item.selectedColor || "",
+          create: priced.lines.map((line) => ({
+            productId: line.productId,
+            sku: line.sku,
+            name: line.name,
+            price: line.price,
+            priceValue: line.priceValue,
+            quantity: line.quantity,
+            foldedImg: line.foldedImg || "/images/folded-gopuram.jpeg",
+            wornImg: line.wornImg || "/images/gopura.jpeg",
+            category: line.category,
+            selectedColor: line.selectedColor,
+            variantId: line.variantId,
           })),
         },
       },
       include: { items: true },
+      });
     });
 
     return NextResponse.json(
@@ -338,6 +367,12 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error: any) {
+    if (error instanceof OutOfStockError) {
+      return NextResponse.json(
+        { success: false, error: error.message, code: "OUT_OF_STOCK" },
+        { status: 409 }
+      );
+    }
     console.error("Error creating order:", error);
     return NextResponse.json(
       { success: false, error: error.message || "Failed to create order" },

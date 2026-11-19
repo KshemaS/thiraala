@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth/guard";
+import { OutOfStockError, releaseOrderStock, reserveOrderStock } from "@/lib/stock";
 import { toOrderJSON, type OrderStatus, type TrackingEvent } from "../route";
 
 async function findOrderByHumanId(id: string) {
@@ -85,7 +86,7 @@ export async function PATCH(
       const STANDARD_STEPS = [
         {
           title: "Order Placed",
-          description: `Order placed successfully via ${order.paymentMethod === "COD" ? "Cash on Delivery" : "Online Payment"}.`,
+          description: "Order placed successfully via Online Payment.",
         },
         {
           title: "Order Confirmed",
@@ -172,18 +173,44 @@ export async function PATCH(
       timeline = timelineUpdate;
     }
 
-    const updated = await prisma.order.update({
-      where: { id: order.id },
-      data: {
-        status: newStatus,
-        trackingNumber: newTrackingNumber,
-        courierName: newCourierName,
-        paymentStatus: newPaymentStatus,
-        notes: newNotes,
-        trackingTimeline: timeline as unknown as Prisma.InputJsonValue,
-      },
-      include: { items: true },
-    });
+    // Stock follows the order's status. Orders placed before stock tracking
+    // existed (stockReservedAt never set) never took stock, so leave them be.
+    const tracksStock = order.stockReservedAt !== null;
+    const cancelling = newStatus === "Cancelled" && order.status !== "Cancelled";
+    const reviving =
+      tracksStock &&
+      !order.stockReserved &&
+      newStatus !== "Cancelled" &&
+      newStatus !== order.status &&
+      (order.status === "Cancelled" || order.status === "Pending");
+
+    let updated;
+    try {
+      updated = await prisma.$transaction(async (tx) => {
+        if (cancelling) await releaseOrderStock(tx, order);
+        if (reviving) await reserveOrderStock(tx, order);
+        return tx.order.update({
+          where: { id: order.id },
+          data: {
+            status: newStatus,
+            trackingNumber: newTrackingNumber,
+            courierName: newCourierName,
+            paymentStatus: newPaymentStatus,
+            notes: newNotes,
+            trackingTimeline: timeline as unknown as Prisma.InputJsonValue,
+          },
+          include: { items: true },
+        });
+      });
+    } catch (err) {
+      if (err instanceof OutOfStockError) {
+        return NextResponse.json(
+          { success: false, error: `Can't change this order to "${newStatus}": ${err.message.replace(/ Please.*$/, "")}` },
+          { status: 409 }
+        );
+      }
+      throw err;
+    }
 
     return NextResponse.json({
       success: true,
@@ -218,7 +245,12 @@ export async function DELETE(
       );
     }
 
-    await prisma.order.delete({ where: { id: order.id } });
+    // Deleting an order that never shipped puts its stock back.
+    const shipped = ["Dispatched", "Shipped", "In Transit", "Delivered"].includes(order.status);
+    await prisma.$transaction(async (tx) => {
+      if (!shipped) await releaseOrderStock(tx, order);
+      await tx.order.delete({ where: { id: order.id } });
+    });
 
     return NextResponse.json({
       success: true,

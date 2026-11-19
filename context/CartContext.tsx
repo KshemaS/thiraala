@@ -12,6 +12,12 @@ export interface CartItem {
   wornImg?: any;
   quantity: number;
   stock?: number;
+  /** Set for colour variants, where `id` is a per-colour cart key. */
+  productId?: number | string;
+  variantId?: string;
+  selectedColor?: string;
+  sku?: string;
+  priceValue?: number;
 }
 
 interface CartContextType {
@@ -20,6 +26,7 @@ interface CartContextType {
   removeFromCart: (id: number | string) => void;
   updateQuantity: (id: number | string, quantity: number) => void;
   clearCart: () => void;
+  refreshCart: () => Promise<boolean>;
   cartCount: number;
   cartTotal: number;
 }
@@ -141,6 +148,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           wornImg: product.wornImg,
           quantity,
           stock: stockLimit,
+          productId: product.productId,
+          variantId: product.variantId,
+          selectedColor: product.selectedColor,
+          sku: product.sku,
+          priceValue: product.priceValue,
         },
       ];
       saveCart(updated);
@@ -198,6 +210,50 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [toast.show]);
 
+  /**
+   * Updates prices, stock, names and photos in the bag from the current
+   * catalogue. The server prices every order itself, so a stale bag would
+   * otherwise be refused at checkout. Returns true if anything changed.
+   */
+  const refreshCart = async (): Promise<boolean> => {
+    if (cart.length === 0) return false;
+    try {
+      const res = await fetch("/api/products", { cache: "no-store" });
+      if (!res.ok) return false;
+      const products = await res.json();
+      if (!Array.isArray(products)) return false;
+      const byId = new Map(products.map((p: any) => [String(p.id), p]));
+
+      let changed = false;
+      const updated = cart.map((item) => {
+        const product = byId.get(String(item.productId ?? item.id));
+        if (!product || product.status === "inactive") return item;
+        const variant = item.variantId
+          ? (product.variants || []).find((v: any) => v.id === item.variantId)
+          : null;
+        if (item.variantId && !variant) return item;
+
+        const priceValue: number = variant?.priceValue ?? product.priceValue;
+        const next: CartItem = {
+          ...item,
+          name: product.name,
+          price: `₹${priceValue.toLocaleString("en-IN")}`,
+          priceValue,
+          stock: variant ? variant.stock : product.stock,
+          foldedImg: variant?.foldedImg || product.foldedImg,
+          wornImg: variant?.wornImg || product.wornImg,
+        };
+        if (next.price !== item.price || next.stock !== item.stock || next.name !== item.name) changed = true;
+        return next;
+      });
+
+      if (changed) saveCart(updated);
+      return changed;
+    } catch {
+      return false;
+    }
+  };
+
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
 
   const cartTotal = cart.reduce((total, item) => {
@@ -213,6 +269,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         removeFromCart,
         updateQuantity,
         clearCart,
+        refreshCart,
         cartCount,
         cartTotal,
       }}

@@ -3,8 +3,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Container from "@/components/Container";
 import ProductBreadcrumbs from "@/components/ProductBreadcrumbs";
-import ProductGallery from "@/components/ProductGallery";
-import ProductInfo from "@/components/ProductInfo";
+import ProductDetailView from "@/components/ProductDetailView";
 import RelatedProducts from "@/components/RelatedProducts";
 import { getProductById, getAllUnifiedProducts } from "@/lib/products";
 import { notFound } from "next/navigation";
@@ -54,11 +53,8 @@ export default async function ProductDetailPage({
 
           {/* Product Detail Grid Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start mb-20">
-            {/* Left Side: Thumbnail Preview Stack & Main Image */}
-            <ProductGallery product={product} />
-
-            {/* Right Side: Product Details & Options */}
-            <ProductInfo product={product} />
+            {/* Photos + details share the selected colour variant */}
+            <ProductDetailView product={product} />
           </div>
 
           {/* Bottom Section: Related Weaves */}
