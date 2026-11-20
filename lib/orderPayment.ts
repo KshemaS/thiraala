@@ -9,17 +9,18 @@ interface TrackingEvent {
   completed: boolean;
 }
 
+// Admin-only reasons stored in Order.attentionReason (never shown to customers).
 export const STOCK_CONFLICT_NOTE =
-  "⚠ Paid after the 30-minute stock hold expired, and an item has since sold out. Refund the customer or restock before confirming.";
+  "Paid after the 30-minute stock hold expired, and an item has since sold out. Refund the customer or restock before confirming.";
 
 export const CANCELLED_PAID_NOTE =
-  "⚠ Payment received after this order was cancelled. Refund the customer, or restore the order.";
+  "Payment received after this order was cancelled. Refund the customer, or restore the order.";
 
 /**
  * Marks an order paid (from the client verify call or the Razorpay webhook,
  * whichever arrives first). If the order's stock hold had expired, stock is
- * taken again; if that's no longer possible the order stays Pending with a
- * note so the admin can refund or restock.
+ * taken again; if that's no longer possible the order stays Pending and is
+ * flagged (attentionReason) so the admin can refund or restock.
  */
 export async function markOrderPaid(
   orderId: string,
@@ -55,7 +56,7 @@ export async function markOrderPaid(
       status: stockOk && order.status === "Pending" ? "Order Confirmed" : order.status,
       razorpayPaymentId: payment.razorpayPaymentId || order.razorpayPaymentId,
       ...(payment.razorpaySignature ? { razorpaySignature: payment.razorpaySignature } : {}),
-      notes: warning ? [order.notes, warning].filter(Boolean).join("\n") : order.notes,
+      ...(warning ? { attentionReason: warning } : {}),
       trackingTimeline: timeline as unknown as Prisma.InputJsonValue,
     },
     include: { items: true },

@@ -29,6 +29,10 @@ function TrackOrderContent() {
   const initialId = searchParams.get("id") || "";
 
   const [orderId, setOrderId] = useState(initialId);
+  const [phone, setPhone] = useState("");
+  // Shown when the order isn't the signed-in customer's own: the phone number
+  // used for the order proves it's theirs.
+  const [needsPhone, setNeedsPhone] = useState(false);
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,14 +53,19 @@ function TrackOrderContent() {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/orders/${encodeURIComponent(cleanId)}`);
+      const query = phone.trim() ? `?phone=${encodeURIComponent(phone.trim())}` : "";
+      const res = await fetch(`/api/orders/${encodeURIComponent(cleanId)}${query}`);
       const data = await res.json();
 
       if (data.success && data.order) {
         setOrder(data.order);
+      } else if (data.needsPhone) {
+        setOrder(null);
+        setNeedsPhone(true);
+        setError(phone.trim() ? data.error : "Please also enter the phone number you used for this order.");
       } else {
         setOrder(null);
-        setError(`No order found with ID "${cleanId}". Please verify your order confirmation ID.`);
+        setError(data.error || `No order found with ID "${cleanId}". Please check your order ID and phone number.`);
       }
     } catch (err) {
       console.error("Error looking up order:", err);
@@ -147,6 +156,32 @@ function TrackOrderContent() {
                 </button>
               </div>
             </form>
+            {needsPhone && (
+              <div className="mt-3 max-w-md mx-auto">
+               <div className="relative">
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      fetchOrder(orderId);
+                    }
+                  }}
+                  placeholder="Phone number used for the order"
+                  aria-label="Phone number used for the order"
+                  className="w-full h-12 pl-12 pr-4 rounded-full border border-[#1E3A2C]/15 bg-white shadow-sm text-xs sm:text-sm font-semibold text-[#1E3A2C] placeholder-[#1E3A2C]/30 focus:border-[#DAA87C] focus:ring-2 focus:ring-[#DAA87C]/20 outline-none transition-all"
+                />
+                <Phone className="w-4 h-4 text-[#1E3A2C]/40 absolute left-4.5 top-1/2 -translate-y-1/2" />
+               </div>
+                <p className="text-[11px] text-[#1E3A2C]/50 mt-2">
+                  For your privacy, we need the phone number from the order. Signed in? Your own orders open without it.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Error Message */}

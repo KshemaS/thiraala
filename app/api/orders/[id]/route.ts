@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
-import { requireAdmin } from "@/lib/auth/guard";
+import { getAdminSession, requireAdmin } from "@/lib/auth/guard";
+import { getCustomerId } from "@/lib/auth/customerSession";
+import { clientAddress, lockedMinutes, recordFailure, recordSuccess } from "@/lib/auth/loginThrottle";
+import { customerOwnsOrder, phoneMatchesOrder, publicTrackingView } from "@/lib/orderAccess";
 import { OutOfStockError, releaseOrderStock, reserveOrderStock } from "@/lib/stock";
 import { toOrderJSON, type OrderStatus, type TrackingEvent } from "../route";
 
@@ -19,16 +22,49 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const order = await findOrderByHumanId(id);
 
-    if (!order) {
+    // Admin: the full order.
+    if (await getAdminSession()) {
+      const order = await findOrderByHumanId(id);
+      if (!order) return NextResponse.json({ success: false, error: "Order not found" }, { status: 404 });
+      return NextResponse.json({ success: true, order: toOrderJSON(order, { admin: true }) });
+    }
+
+    // Signed-in customer: their own order in full.
+    const customerId = await getCustomerId();
+    const order = await findOrderByHumanId(id);
+    if (order && customerId && (await customerOwnsOrder(customerId, order))) {
+      return NextResponse.json({ success: true, order: toOrderJSON(order) });
+    }
+
+    // Anyone else: order number + the phone number used for it.
+    const phone = new URL(request.url).searchParams.get("phone") || "";
+    if (!phone.trim()) {
+      // Same answer whether or not the order exists, so numbers can't be probed.
       return NextResponse.json(
-        { success: false, error: "Order not found" },
-        { status: 404 }
+        { success: false, needsPhone: true, error: "Enter the phone number you used for this order." },
+        { status: 401 }
       );
     }
 
-    return NextResponse.json({ success: true, order: toOrderJSON(order) });
+    const address = clientAddress(request);
+    const orderKey = id.trim().toUpperCase();
+    const locked = await lockedMinutes("track", orderKey, address);
+    if (locked > 0) {
+      return NextResponse.json(
+        { success: false, error: `Too many attempts. Please try again in ${locked} minute${locked === 1 ? "" : "s"}.` },
+        { status: 429, headers: { "Retry-After": String(locked * 60) } }
+      );
+    }
+    if (!order || !phoneMatchesOrder(phone, order)) {
+      await recordFailure("track", orderKey, address);
+      return NextResponse.json(
+        { success: false, error: "We couldn't find an order with that order ID and phone number." },
+        { status: 404 }
+      );
+    }
+    await recordSuccess("track", orderKey, address);
+    return NextResponse.json({ success: true, order: publicTrackingView(order) });
   } catch (error: any) {
     console.error("Error fetching order:", error);
     return NextResponse.json(
@@ -66,6 +102,7 @@ export async function PATCH(
       paymentStatus,
       notes,
       timelineUpdate,
+      resolveAttention,
     } = body;
 
     let timeline = (order.trackingTimeline as unknown as TrackingEvent[]) || [];
@@ -197,6 +234,8 @@ export async function PATCH(
             courierName: newCourierName,
             paymentStatus: newPaymentStatus,
             notes: newNotes,
+            // Admin marked the flagged issue (refund/restock) as handled.
+            ...(resolveAttention === true ? { attentionReason: null } : {}),
             trackingTimeline: timeline as unknown as Prisma.InputJsonValue,
           },
           include: { items: true },
@@ -215,7 +254,7 @@ export async function PATCH(
     return NextResponse.json({
       success: true,
       message: "Order updated successfully",
-      order: toOrderJSON(updated),
+      order: toOrderJSON(updated, { admin: true }),
     });
   } catch (error: any) {
     console.error("Error updating order:", error);

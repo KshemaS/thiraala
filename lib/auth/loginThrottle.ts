@@ -14,6 +14,9 @@ import prisma from "@/lib/prisma";
  * successful sign-in clears the account + address counter.
  */
 
+/** "track" = public order lookups (order number + phone). */
+export type ThrottleScope = "admin" | "customer" | "track";
+
 const WINDOW_MS = 15 * 60 * 1000;
 const LOCK_MS = 15 * 60 * 1000;
 const PER_ACCOUNT_LIMIT = 5;
@@ -36,7 +39,7 @@ export function clientAddress(request: Request): string {
 
 const PER_ACCOUNT_TOTAL_LIMIT = 30;
 
-function keysFor(scope: "admin" | "customer", account: string, address: string) {
+function keysFor(scope: ThrottleScope, account: string, address: string) {
   const acct = account.trim().toLowerCase();
   return {
     account: `${scope}:acct:${acct}|ip:${address}`,
@@ -46,7 +49,7 @@ function keysFor(scope: "admin" | "customer", account: string, address: string) 
 }
 
 /** Minutes left on a lock covering this attempt, or 0 if it may proceed. */
-export async function lockedMinutes(scope: "admin" | "customer", account: string, address: string): Promise<number> {
+export async function lockedMinutes(scope: ThrottleScope, account: string, address: string): Promise<number> {
   const { account: k1, address: k2, accountTotal: k3 } = keysFor(scope, account, address);
   const rows = await prisma.loginThrottle.findMany({ where: { key: { in: [k1, k2, k3] } } });
   const now = Date.now();
@@ -67,14 +70,14 @@ async function bump(key: string, limit: number) {
   });
 }
 
-export async function recordFailure(scope: "admin" | "customer", account: string, address: string) {
+export async function recordFailure(scope: ThrottleScope, account: string, address: string) {
   const { account: k1, address: k2, accountTotal: k3 } = keysFor(scope, account, address);
   await bump(k1, PER_ACCOUNT_LIMIT);
   await bump(k2, PER_ADDRESS_LIMIT);
   await bump(k3, PER_ACCOUNT_TOTAL_LIMIT);
 }
 
-export async function recordSuccess(scope: "admin" | "customer", account: string, address: string) {
+export async function recordSuccess(scope: ThrottleScope, account: string, address: string) {
   const { account: k1 } = keysFor(scope, account, address);
   await prisma.loginThrottle.deleteMany({ where: { key: k1 } });
 }

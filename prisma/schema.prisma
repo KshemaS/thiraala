@@ -236,6 +236,9 @@ model Order {
   stockReserved     Boolean     @default(false)
   /// When the current stock hold started (unpaid holds expire after 30 min).
   stockReservedAt   DateTime?
+  /// Admin-only: why this order needs action (e.g. paid after its stock hold
+  /// expired and the item sold out). Cleared when the admin resolves it.
+  attentionReason   String?
   items             OrderItem[]
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt

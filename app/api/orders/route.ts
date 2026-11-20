@@ -68,14 +68,17 @@ export interface Order {
   notes?: string;
   items: OrderItem[];
   trackingTimeline: TrackingEvent[];
+  /** Admin only: why the order needs action. Never sent to customers. */
+  attentionReason?: string;
   createdAt: string;
   updatedAt: string;
 }
 
 export type OrderWithItems = PrismaOrder & { items: PrismaOrderItem[] };
 
-export function toOrderJSON(order: OrderWithItems): Order {
+export function toOrderJSON(order: OrderWithItems, opts: { admin?: boolean } = {}): Order {
   return {
+    ...(opts.admin && order.attentionReason ? { attentionReason: order.attentionReason } : {}),
     id: order.humanId,
     customerName: order.customerName,
     phone: order.phone,
@@ -199,7 +202,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       count: orders.length,
-      orders: orders.map(toOrderJSON),
+      orders: orders.map((o) => toOrderJSON(o, { admin: !!adminSession })),
     });
   } catch (error: any) {
     console.error("Error fetching orders:", error);

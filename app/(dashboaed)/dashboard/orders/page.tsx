@@ -74,6 +74,12 @@ export default function OrdersDashboardPage() {
       const data = await res.json();
       if (data.success && Array.isArray(data.orders)) {
         setOrders(data.orders);
+        // Opened from the overview: /dashboard/orders?order=THR-1234
+        const wanted = new URLSearchParams(window.location.search).get("order");
+        if (wanted && !selectedOrder) {
+          const match = data.orders.find((o: Order) => o.id.toLowerCase() === wanted.toLowerCase());
+          if (match) setSelectedOrder(match);
+        }
         // If an order is currently open in modal, sync it
         if (selectedOrder) {
           const updated = data.orders.find((o: Order) => o.id === selectedOrder.id);
@@ -150,7 +156,8 @@ export default function OrdersDashboardPage() {
         paymentFilter === "All" ||
         (paymentFilter === "Paid" && o.paymentStatus === "Paid") ||
         (paymentFilter === "Unpaid" && o.paymentStatus === "Pending") ||
-        (paymentFilter === "Failed" && o.paymentStatus === "Failed");
+        (paymentFilter === "Failed" && o.paymentStatus === "Failed") ||
+        (paymentFilter === "Attention" && !!o.attentionReason);
 
       return matchesSearch && matchesStatus && matchesPayment;
     });
@@ -191,6 +198,31 @@ export default function OrdersDashboardPage() {
     } catch (err) {
       console.error("Error updating order:", err);
       alert("Network error while updating order");
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  // Clear the "needs attention" flag once the refund/restock is handled.
+  const handleResolveAttention = async () => {
+    if (!selectedOrder) return;
+    if (!confirm("Mark this as resolved? Do this after you've refunded the customer or restocked the item.")) return;
+    setIsUpdatingStatus(true);
+    try {
+      const res = await fetch(`/api/orders/${selectedOrder.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resolveAttention: true }),
+      });
+      const data = await res.json();
+      if (data.success && data.order) {
+        setSelectedOrder(data.order);
+        setOrders((prev) => prev.map((o) => (o.id === data.order.id ? data.order : o)));
+        showToast(`Order #${data.order.id} marked as resolved`);
+        window.dispatchEvent(new Event("thiraala-orders-updated"));
+      } else {
+        alert(data.error || "Failed to update order");
+      }
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -417,6 +449,7 @@ export default function OrdersDashboardPage() {
             className="h-9 px-3 bg-white border border-[#1E3A2C]/15 rounded-xl text-xs font-semibold text-[#1E3A2C] outline-none cursor-pointer"
           >
             <option value="All">All Payments</option>
+            <option value="Attention">⚠ Needs attention</option>
             <option value="Paid">Paid Only</option>
             <option value="Unpaid">Awaiting Payment</option>
             <option value="Failed">Payment Failed</option>
@@ -461,6 +494,14 @@ export default function OrdersDashboardPage() {
                           >
                             <span>#{order.id}</span>
                           </button>
+                          {order.attentionReason && (
+                            <span
+                              className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-700 border border-rose-200"
+                              title={order.attentionReason}
+                            >
+                              ⚠ Action
+                            </span>
+                          )}
                           <button
                             type="button"
                             onClick={() => copyToClipboard(order.id, order.id)}
@@ -686,6 +727,22 @@ export default function OrdersDashboardPage() {
 
               {/* Scrollable Body */}
               <div className="p-6 sm:p-8 overflow-y-auto space-y-6 flex-1">
+                {selectedOrder.attentionReason && (
+                  <div className="p-4 rounded-2xl border border-rose-200 bg-rose-50 flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="flex-1">
+                      <p className="text-xs font-extrabold text-rose-900">⚠ This order needs your attention</p>
+                      <p className="text-xs text-rose-900/80 mt-1">{selectedOrder.attentionReason}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleResolveAttention}
+                      disabled={isUpdatingStatus}
+                      className="px-4 py-2 rounded-xl bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold disabled:opacity-50 cursor-pointer flex-shrink-0"
+                    >
+                      Mark as resolved
+                    </button>
+                  </div>
+                )}
                 {/* Visual Tracking Stepper */}
                 <div className="bg-white p-6 rounded-2xl border border-[#1E3A2C]/10 shadow-2xs">
                   <div className="flex items-center justify-between mb-4">
