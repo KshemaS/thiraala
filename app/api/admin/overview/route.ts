@@ -40,6 +40,7 @@ export async function GET() {
       lowVariants,
       activeProducts,
       customers,
+      newMessages,
     ] = await Promise.all([
       prisma.order.count({ where: { createdAt: { gte: todayStart }, status: { not: "Cancelled" } } }),
       prisma.order.aggregate({ where: { ...EARNED, createdAt: { gte: todayStart } }, _sum: { total: true } }),
@@ -68,6 +69,7 @@ export async function GET() {
       }),
       prisma.product.count({ where: { status: "active" } }),
       prisma.user.count(),
+      prisma.customerMessage.count({ where: { status: "new" } }),
     ]);
 
     // Revenue per day for the last 7 IST days (oldest first).
@@ -113,7 +115,7 @@ export async function GET() {
       awaitingPayment,
       lowStock,
       lowStockThreshold: LOW_STOCK,
-      counts: { activeProducts, customers },
+      counts: { activeProducts, customers, newMessages },
     });
   } catch (err) {
     console.error("Overview failed:", err);

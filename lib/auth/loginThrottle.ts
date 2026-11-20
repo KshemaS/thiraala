@@ -14,8 +14,8 @@ import prisma from "@/lib/prisma";
  * successful sign-in clears the account + address counter.
  */
 
-/** "track" = public order lookups (order number + phone). */
-export type ThrottleScope = "admin" | "customer" | "track";
+/** "track" = public order lookups (order number + phone); "contact" = Contact-form messages (every message counts, to stop floods). */
+export type ThrottleScope = "admin" | "customer" | "track" | "contact";
 
 const WINDOW_MS = 15 * 60 * 1000;
 const LOCK_MS = 15 * 60 * 1000;

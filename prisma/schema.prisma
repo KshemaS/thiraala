@@ -117,6 +117,26 @@ model LoginThrottle {
   @@map("login_throttles")
 }
 
+/// A message sent from the website's Contact page.
+model CustomerMessage {
+  id        String    @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  message   String    @db.Text
+  /// "new" | "replied" | "closed"
+  status    String    @default("new")
+  /// Admin-only note (e.g. what was replied, or a follow-up reminder).
+  adminNote String?   @db.Text
+  repliedAt DateTime?
+  userId    String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@map("customer_messages")
+}
+
 /// Named counters that must never hand out the same number twice
 /// (e.g. "order" for THR-#### order numbers). See lib/counters.ts.
 model Counter {

@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   ArrowRight,
   CalendarDays,
+  Inbox,
   Clock,
   IndianRupee,
   Loader2,
@@ -27,7 +28,7 @@ interface Overview {
   awaitingPayment: number;
   lowStock: { productId: string; name: string; colour: string | null; sku: string; stock: number }[];
   lowStockThreshold: number;
-  counts: { activeProducts: number; customers: number };
+  counts: { activeProducts: number; customers: number; newMessages: number };
 }
 
 const rupees = (n: number) => `₹${n.toLocaleString("en-IN")}`;
@@ -224,7 +225,16 @@ export default function DashboardOverviewPage() {
                   </p>
                   <p className="text-xl font-bold text-[#1E3A2C] mt-1">{data.counts.customers}</p>
                 </div>
-                <Link href="/dashboard/products/create" className="col-span-2 p-3 rounded-xl border border-dashed border-[#1E3A2C]/20 text-xs font-bold text-[#1E3A2C] text-center hover:bg-[#FAF8F5]">
+                <Link
+                  href="/dashboard/messages"
+                  className={`p-3 rounded-xl ${data.counts.newMessages > 0 ? "bg-amber-50 border border-amber-200 hover:bg-amber-100" : "bg-[#FAF8F5] hover:bg-[#F3EFE8]"}`}
+                >
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#1E3A2C]/50 flex items-center gap-1">
+                    <Inbox className="w-3 h-3" /> New messages
+                  </p>
+                  <p className="text-xl font-bold text-[#1E3A2C] mt-1">{data.counts.newMessages}</p>
+                </Link>
+                <Link href="/dashboard/products/create" className="p-3 rounded-xl border border-dashed border-[#1E3A2C]/20 text-xs font-bold text-[#1E3A2C] flex items-center justify-center hover:bg-[#FAF8F5]">
                   + Add a product
                 </Link>
               </div>

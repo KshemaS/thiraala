@@ -19,6 +19,7 @@ import {
   Layers,
   ShoppingBag,
   Truck,
+  Inbox,
 } from "lucide-react";
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
@@ -28,6 +29,24 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isHomeOpen, setIsHomeOpen] = useState(true);
   const [isProductsOpen, setIsProductsOpen] = useState(true);
+  const [newMessages, setNewMessages] = useState(0);
+
+  // Count of unread Contact-page messages for the sidebar badge.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const loadCount = () =>
+      fetch("/api/admin/messages?countOnly=1")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => d?.success && setNewMessages(d.new))
+        .catch(() => {});
+    loadCount();
+    const timer = setInterval(loadCount, 60_000);
+    window.addEventListener("thiraala-messages-updated", loadCount);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("thiraala-messages-updated", loadCount);
+    };
+  }, [isAuthenticated]);
 
   const isCategoriesRoute =
     pathname === "/dashboard/categories" ||
@@ -135,6 +154,26 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
               <ShoppingBag className="w-5 h-5 text-[#DAA87C]" />
               <span>Orders & Tracking</span>
             </div>
+          </Link>
+
+          {/* Customer Messages */}
+          <Link
+            href="/dashboard/messages"
+            className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+              pathname.startsWith("/dashboard/messages")
+                ? "bg-[#FAF8F5]/15 text-white shadow-xs"
+                : "text-[#FAF8F5]/70 hover:text-white hover:bg-[#FAF8F5]/5"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <Inbox className="w-5 h-5 text-[#DAA87C]" />
+              <span>Messages</span>
+            </div>
+            {newMessages > 0 && (
+              <span className="min-w-5 h-5 px-1.5 rounded-full bg-[#DAA87C] text-[#1E3A2C] text-[10px] font-extrabold flex items-center justify-center">
+                {newMessages}
+              </span>
+            )}
           </Link>
 
           {/* Delivery Charges */}
@@ -368,6 +407,27 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
               <ShoppingBag className="w-5 h-5 text-[#DAA87C]" />
               <span>Orders & Tracking</span>
             </div>
+          </Link>
+
+          {/* Mobile Customer Messages */}
+          <Link
+            href="/dashboard/messages"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+              pathname.startsWith("/dashboard/messages")
+                ? "bg-[#FAF8F5]/15 text-white shadow-xs"
+                : "text-[#FAF8F5]/70 hover:text-white hover:bg-[#FAF8F5]/5"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <Inbox className="w-5 h-5 text-[#DAA87C]" />
+              <span>Messages</span>
+            </div>
+            {newMessages > 0 && (
+              <span className="min-w-5 h-5 px-1.5 rounded-full bg-[#DAA87C] text-[#1E3A2C] text-[10px] font-extrabold flex items-center justify-center">
+                {newMessages}
+              </span>
+            )}
           </Link>
 
           {/* Mobile Delivery Charges */}

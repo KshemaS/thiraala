@@ -6,10 +6,6 @@ import Footer from "@/components/Footer";
 import Container from "@/components/Container";
 import { Headset, Locate, Mail, Phone, ShieldCheck, TruckElectric } from "lucide-react";
 
-// Web3Forms Public Access Key
-// Get your free key at https://web3forms.com/
-const WEB3FORMS_ACCESS_KEY = "YOUR_ACCESS_KEY_HERE";
-
 export default function ContactPage() {
   const [formData, setFormData] = useState({
     name: "",
@@ -21,6 +17,9 @@ export default function ContactPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<"success" | "error" | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [errorText, setErrorText] = useState<string | null>(null);
+  // Hidden field only bots fill in.
+  const [honeypot, setHoneypot] = useState("");
 
   useEffect(() => {
     document.title = "Contact Us | thiraala";
@@ -56,41 +55,25 @@ export default function ContactPage() {
     setIsSubmitting(true);
     setSubmitStatus(null);
 
-    // If key is not configured, show error warning
-    if (WEB3FORMS_ACCESS_KEY === "YOUR_ACCESS_KEY_HERE") {
-      setSubmitStatus("error");
-      setIsSubmitting(false);
-      alert("Please configure your Web3Forms Access Key at the top of app/contact/page.tsx");
-      return;
-    }
-
     try {
-      const response = await fetch("https://api.web3forms.com/submit", {
+      // Saved to the shop's database; read and answered in Dashboard → Messages.
+      const response = await fetch("/api/messages", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          access_key: WEB3FORMS_ACCESS_KEY,
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone || "Not Provided",
-          message: formData.query,
-          subject: `thiraala Contact Form: Message from ${formData.name}`,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...formData, website: honeypot }),
       });
-
-      const result = await response.json();
-      if (result.success) {
+      const result = await response.json().catch(() => ({}));
+      if (response.ok && result.success) {
         setSubmitStatus("success");
         setFormData({ name: "", email: "", phone: "", query: "" });
       } else {
         setSubmitStatus("error");
+        setErrorText(result.error || null);
       }
     } catch (error) {
       console.error("Failed to submit contact form:", error);
       setSubmitStatus("error");
+      setErrorText(null);
     } finally {
       setIsSubmitting(false);
     }
@@ -190,7 +173,7 @@ export default function ContactPage() {
             {/* Right Side: Message Form (7 Columns) */}
             <form
               onSubmit={handleSubmit}
-              className="lg:col-span-7 bg-white p-8 rounded-3xl border border-stone-200/60 shadow-md flex flex-col justify-between space-y-6"
+              className="relative lg:col-span-7 bg-white p-8 rounded-3xl border border-stone-200/60 shadow-md flex flex-col justify-between space-y-6"
             >
               <h2 className="text-xl sm:text-2xl font-bold text-[#1E3A2C] tracking-tight select-none">
                 Send us a message
@@ -212,9 +195,17 @@ export default function ContactPage() {
               )}
               {submitStatus === "error" && (
                 <div className="p-4 bg-red-50 border border-red-200 text-red-800 rounded-2xl text-xs font-semibold select-none">
-                  Failed to send message. Please verify your access key configuration or try again.
+                  {errorText || "Sorry, your message couldn't be sent. Please try again, or email us at thiraala@gmail.com."}
                 </div>
               )}
+
+              {/* Bot trap: hidden from people and screen readers */}
+              <div aria-hidden="true" className="absolute -left-[9999px] w-px h-px overflow-hidden">
+                <label>
+                  Leave this empty
+                  <input type="text" tabIndex={-1} autoComplete="off" value={honeypot} onChange={(e) => setHoneypot(e.target.value)} />
+                </label>
+              </div>
 
               <div className="space-y-4">
                 {/* Name Input */}
