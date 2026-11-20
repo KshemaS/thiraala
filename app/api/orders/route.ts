@@ -3,6 +3,11 @@ import { getCustomerId } from "@/lib/auth/customerSession";
 import prisma from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth/guard";
 import { priceOrder } from "@/lib/orderPricing";
+import { nextOrderNumber } from "@/lib/counters";
+
+// Orders for the same saree queue on its stock row; with a remote database a
+// burst of simultaneous checkouts can take longer than Prisma's 5 s default.
+const ORDER_TRANSACTION_OPTIONS = { maxWait: 15_000, timeout: 30_000 };
 import { OutOfStockError, releaseExpiredReservations, reserveStock } from "@/lib/stock";
 import type { Order as PrismaOrder, OrderItem as PrismaOrderItem, Prisma } from "@prisma/client";
 
@@ -259,14 +264,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // Generate unique human-readable order id e.g. THR-1087
-    let nextNum = 1087;
-    const existing = await prisma.order.findMany({ select: { humanId: true } });
-    const existingIds = new Set(existing.map((o: { humanId: string }) => o.humanId));
-    while (existingIds.has(`THR-${nextNum}`)) {
-      nextNum++;
-    }
-    const newOrderId = `THR-${nextNum}`;
+    // Unique human-readable order id e.g. THR-1087, from an atomic counter so
+    // simultaneous orders never get the same number.
+    const newOrderId = await nextOrderNumber();
     const now = new Date().toISOString();
 
     const trackingTimeline: TrackingEvent[] = [
@@ -354,7 +354,7 @@ export async function POST(request: Request) {
       },
       include: { items: true },
       });
-    });
+    }, ORDER_TRANSACTION_OPTIONS);
 
     return NextResponse.json(
       {

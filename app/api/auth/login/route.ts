@@ -4,6 +4,7 @@ import path from "path";
 import crypto from "crypto";
 import prisma from "@/lib/prisma";
 import { setCustomerSession } from "@/lib/auth/customerSession";
+import { clientAddress, lockedMinutes, recordFailure, recordSuccess, tooManyAttemptsMessage } from "@/lib/auth/loginThrottle";
 
 const dataFilePath = path.join(process.cwd(), "data", "users.json");
 
@@ -73,6 +74,15 @@ export async function POST(request: Request) {
 
     const cleanEmail = email.trim().toLowerCase();
 
+    const address = clientAddress(request);
+    const locked = await lockedMinutes("customer", cleanEmail, address);
+    if (locked > 0) {
+      return NextResponse.json(
+        { success: false, error: tooManyAttemptsMessage(locked) },
+        { status: 429, headers: { "Retry-After": String(locked * 60) } }
+      );
+    }
+
     // 1. Try finding in Prisma database first
     let matchedUser: StoredUser | null = null;
     try {
@@ -104,28 +114,18 @@ export async function POST(request: Request) {
       matchedUser = fileUsers.find((u) => u.email.toLowerCase() === cleanEmail) || null;
     }
 
-    if (!matchedUser) {
+    // 3. Verify password (unknown email, no password and wrong password all
+    // count as a failed attempt and get the same answer)
+    const passwordOk =
+      !!matchedUser?.passwordHash && verifyPassword(password, matchedUser.passwordHash);
+    if (!matchedUser || !passwordOk) {
+      await recordFailure("customer", cleanEmail, address);
       return NextResponse.json(
         { success: false, error: "Invalid email or password." },
         { status: 401 }
       );
     }
-
-    // 3. Verify password
-    if (matchedUser.passwordHash) {
-      const isMatch = verifyPassword(password, matchedUser.passwordHash);
-      if (!isMatch) {
-        return NextResponse.json(
-          { success: false, error: "Invalid email or password." },
-          { status: 401 }
-        );
-      }
-    } else {
-      return NextResponse.json(
-        { success: false, error: "Invalid email or password." },
-        { status: 401 }
-      );
-    }
+    await recordSuccess("customer", cleanEmail, address);
 
     // 4. Prepare sanitized user response
     const sanitizedUser = {

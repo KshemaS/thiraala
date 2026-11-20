@@ -106,6 +106,26 @@ model ProductVariant {
   @@map("product_variants")
 }
 
+/// Failed sign-in attempts per key (network address, or account + address),
+/// used to lock out password guessing. See lib/auth/loginThrottle.ts.
+model LoginThrottle {
+  key         String    @id
+  failures    Int       @default(0)
+  windowStart DateTime  @default(now())
+  lockedUntil DateTime?
+
+  @@map("login_throttles")
+}
+
+/// Named counters that must never hand out the same number twice
+/// (e.g. "order" for THR-#### order numbers). See lib/counters.ts.
+model Counter {
+  name  String @id
+  value Int
+
+  @@map("counters")
+}
+
 /// Delivery charge per zone, editable in the dashboard. Which pincodes belong
 /// to which zone is defined in lib/delivery.ts.
 model DeliveryRate {
