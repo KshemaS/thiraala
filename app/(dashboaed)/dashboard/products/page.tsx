@@ -20,7 +20,11 @@ import {
   Loader2,
   RefreshCw,
   Sparkles,
+  Copy,
+  Eye,
+  EyeOff,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { ProductItem } from "@/app/api/products/route";
 
 export default function ProductsListPage() {
@@ -34,6 +38,13 @@ export default function ProductsListPage() {
   const [deletingProduct, setDeletingProduct] = useState<ProductItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const router = useRouter();
+
+  // Bulk selection + price dialog
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkBusy, setIsBulkBusy] = useState(false);
+  const [priceDialog, setPriceDialog] = useState<{ mode: "set" | "percent"; value: string } | null>(null);
 
   // Fetch products
   const fetchProducts = async () => {
@@ -126,15 +137,80 @@ export default function ProductsListPage() {
       if (res.ok) {
         setProducts((prev) => prev.filter((p) => p.id !== deletingProduct.id));
         showToast(`Deleted "${deletingProduct.name}"`);
+        setDeletingProduct(null);
       } else {
-        showToast("Failed to delete product.");
+        const data = await res.json().catch(() => ({}));
+        // Products in past orders can't be deleted; offer to hide instead.
+        setDeleteError(data.error || "Failed to delete product.");
       }
     } catch (err) {
       console.error("Error deleting product:", err);
-      showToast("Error deleting product.");
+      setDeleteError("Error deleting product.");
     } finally {
       setIsDeleting(false);
-      setDeletingProduct(null);
+    }
+  };
+
+  const closeDeleteDialog = () => {
+    setDeletingProduct(null);
+    setDeleteError(null);
+  };
+
+  // Show in / hide from the shop
+  const handleToggleVisibility = async (product: ProductItem) => {
+    const status = product.status === "inactive" ? "active" : "inactive";
+    const res = await fetch(`/api/products/${product.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    if (res.ok) {
+      setProducts((prev) => prev.map((p) => (p.id === product.id ? { ...p, status } : p)));
+      showToast(status === "active" ? `"${product.name}" is now visible in the shop` : `"${product.name}" is hidden from the shop`);
+      window.dispatchEvent(new Event("thiraala-products-updated"));
+      return true;
+    }
+    showToast("Failed to update product.");
+    return false;
+  };
+
+  const handleDuplicate = async (product: ProductItem) => {
+    const res = await fetch(`/api/admin/products/${product.id}/duplicate`, { method: "POST" });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.success) {
+      router.push(`/dashboard/products/edit/${data.id}`);
+    } else {
+      showToast(data.error || "Failed to duplicate product.");
+    }
+  };
+
+  const toggleSelected = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const runBulk = async (payload: Record<string, unknown>, done: string) => {
+    setIsBulkBusy(true);
+    try {
+      const res = await fetch("/api/admin/products/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...selectedIds], ...payload }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || "Bulk update failed.");
+      showToast(done.replace("{n}", String(data.updated)));
+      setSelectedIds(new Set());
+      setPriceDialog(null);
+      await fetchProducts();
+      window.dispatchEvent(new Event("thiraala-products-updated"));
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setIsBulkBusy(false);
     }
   };
 
@@ -334,6 +410,30 @@ export default function ProductsListPage() {
         </div>
       </div>
 
+      {/* Bulk actions for checked products */}
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 p-3 rounded-2xl bg-[#1E3A2C] text-white">
+          <span className="text-xs font-bold px-2">{selectedIds.size} selected</span>
+          <button type="button" disabled={isBulkBusy} onClick={() => runBulk({ action: "show" }, "{n} products are now visible in the shop")}
+            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold disabled:opacity-50 cursor-pointer inline-flex items-center gap-1.5">
+            <Eye className="w-3.5 h-3.5" /> Show in shop
+          </button>
+          <button type="button" disabled={isBulkBusy} onClick={() => runBulk({ action: "hide" }, "{n} products hidden from the shop")}
+            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold disabled:opacity-50 cursor-pointer inline-flex items-center gap-1.5">
+            <EyeOff className="w-3.5 h-3.5" /> Hide from shop
+          </button>
+          <button type="button" disabled={isBulkBusy} onClick={() => setPriceDialog({ mode: "percent", value: "" })}
+            className="px-3 py-1.5 rounded-lg bg-white text-[#1E3A2C] hover:bg-[#FAF8F5] text-xs font-bold disabled:opacity-50 cursor-pointer inline-flex items-center gap-1.5">
+            <Tag className="w-3.5 h-3.5" /> Change price…
+          </button>
+          {isBulkBusy && <span className="text-xs opacity-80">Updating…</span>}
+          <button type="button" onClick={() => setSelectedIds(new Set())}
+            className="ml-auto px-3 py-1.5 rounded-lg text-xs font-bold text-white/80 hover:text-white cursor-pointer">
+            Clear
+          </button>
+        </div>
+      )}
+
       {/* Products Table Container */}
       <div className="bg-white rounded-2xl border border-[#1E3A2C]/10 shadow-2xs overflow-hidden">
         {isLoading ? (
@@ -365,6 +465,15 @@ export default function ProductsListPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-[#1E3A2C]/5 bg-[#FAF8F5]/80 text-[11px] font-bold text-[#1E3A2C]/60 uppercase tracking-wider">
+                  <th className="py-3.5 pl-4 w-8">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all shown products"
+                      checked={filteredProducts.length > 0 && filteredProducts.every((p) => selectedIds.has(String(p.id)))}
+                      onChange={(e) => setSelectedIds(e.target.checked ? new Set(filteredProducts.map((p) => String(p.id))) : new Set())}
+                      className="w-4 h-4 accent-[#1E3A2C] cursor-pointer"
+                    />
+                  </th>
                   <th className="py-3.5 px-4">Product</th>
                   <th className="py-3.5 px-4">Category & Collection</th>
                   <th className="py-3.5 px-4">Price</th>
@@ -380,6 +489,15 @@ export default function ProductsListPage() {
                     key={product.id}
                     className="hover:bg-[#FAF8F5]/40 transition-colors group"
                   >
+                    <td className="py-3.5 pl-4">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${product.name}`}
+                        checked={selectedIds.has(String(product.id))}
+                        onChange={() => toggleSelected(String(product.id))}
+                        className="w-4 h-4 accent-[#1E3A2C] cursor-pointer"
+                      />
+                    </td>
                     {/* Thumbnail & Name */}
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-3">
@@ -514,7 +632,7 @@ export default function ProductsListPage() {
                             product.status === "inactive" ? "bg-amber-500" : "bg-emerald-500"
                           }`}
                         />
-                        {product.status === "inactive" ? "Draft" : "Active"}
+                        {product.status === "inactive" ? "Hidden" : "In shop"}
                       </span>
                     </td>
 
@@ -543,6 +661,26 @@ export default function ProductsListPage() {
                           <ExternalLink className="w-3.5 h-3.5" />
                         </Link>
 
+                        <button
+                          type="button"
+                          onClick={() => handleToggleVisibility(product)}
+                          title={product.status === "inactive" ? "Show in the shop" : "Hide from the shop"}
+                          aria-label={product.status === "inactive" ? `Show ${product.name} in the shop` : `Hide ${product.name} from the shop`}
+                          className="p-1.5 rounded-lg text-[#1E3A2C]/50 hover:text-[#1E3A2C] hover:bg-[#FAF8F5] transition-all cursor-pointer"
+                        >
+                          {product.status === "inactive" ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDuplicate(product)}
+                          title="Duplicate (creates a hidden copy to edit)"
+                          aria-label={`Duplicate ${product.name}`}
+                          className="p-1.5 rounded-lg text-[#1E3A2C]/50 hover:text-[#1E3A2C] hover:bg-[#FAF8F5] transition-all cursor-pointer"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+
                         <Link
                           href={`/dashboard/products/edit/${product.id}`}
                           title="Edit product"
@@ -569,6 +707,71 @@ export default function ProductsListPage() {
         )}
       </div>
 
+      {/* Bulk price dialog */}
+      {priceDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1E3A2C]/40">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              runBulk(
+                { action: "price", mode: priceDialog.mode, value: Number(priceDialog.value) },
+                priceDialog.mode === "percent" ? "Prices updated on {n} products" : "Price set on {n} products"
+              );
+            }}
+            className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl border border-[#1E3A2C]/10 space-y-4"
+          >
+            <div>
+              <h3 className="text-sm font-bold text-[#1E3A2C]">Change price of {selectedIds.size} product{selectedIds.size === 1 ? "" : "s"}</h3>
+              <p className="text-xs text-[#1E3A2C]/60 mt-1">MRPs stay as they are.</p>
+            </div>
+            <div className="flex gap-2">
+              {([["percent", "By percentage"], ["set", "Set a price"]] as const).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setPriceDialog({ mode, value: "" })}
+                  className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold border cursor-pointer ${
+                    priceDialog.mode === mode ? "bg-[#1E3A2C] text-white border-[#1E3A2C]" : "border-[#1E3A2C]/15 text-[#1E3A2C]"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <label className="block">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#1E3A2C]/60">
+                {priceDialog.mode === "percent" ? "Change by % (use - to lower, e.g. -10)" : "New selling price (₹)"}
+              </span>
+              <input
+                type="number"
+                step={priceDialog.mode === "percent" ? "0.5" : "1"}
+                required
+                autoFocus
+                value={priceDialog.value}
+                onChange={(e) => setPriceDialog({ ...priceDialog, value: e.target.value })}
+                placeholder={priceDialog.mode === "percent" ? "10" : "1599"}
+                className="mt-1 w-full h-10 px-3 bg-[#FAF8F5] border border-[#1E3A2C]/15 rounded-xl text-sm font-bold text-[#1E3A2C] outline-none focus:border-[#DAA87C]"
+              />
+            </label>
+            <p className="text-[11px] text-[#1E3A2C]/50">
+              {priceDialog.mode === "percent"
+                ? "Colour-specific prices change by the same percentage. Prices are rounded to whole rupees."
+                : "Colours that have their own price keep it; edit those in the product."}
+            </p>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setPriceDialog(null)}
+                className="px-4 py-2 rounded-xl border border-[#1E3A2C]/15 text-xs font-semibold text-[#1E3A2C]/70 hover:bg-[#FAF8F5] cursor-pointer">
+                Cancel
+              </button>
+              <button type="submit" disabled={isBulkBusy || !priceDialog.value}
+                className="px-4 py-2 rounded-xl bg-[#1E3A2C] text-white text-xs font-bold disabled:opacity-50 cursor-pointer">
+                Apply
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
         {deletingProduct && (
@@ -589,17 +792,32 @@ export default function ProductsListPage() {
                   <strong className="text-[#1E3A2C] font-semibold">{deletingProduct.name}</strong>?
                   This action cannot be undone.
                 </p>
+                {deleteError && (
+                  <p className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs font-semibold text-amber-900">{deleteError}</p>
+                )}
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button
                   type="button"
                   disabled={isDeleting}
-                  onClick={() => setDeletingProduct(null)}
+                  onClick={closeDeleteDialog}
                   className="px-4 py-2 rounded-xl border border-[#1E3A2C]/15 text-xs font-semibold text-[#1E3A2C]/70 hover:bg-[#FAF8F5] cursor-pointer"
                 >
                   Cancel
                 </button>
+                {deleteError && deletingProduct.status !== "inactive" ? (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (await handleToggleVisibility(deletingProduct)) closeDeleteDialog();
+                    }}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1E3A2C] text-white text-xs font-bold hover:bg-[#284f3c] cursor-pointer shadow-sm"
+                  >
+                    <EyeOff className="w-3.5 h-3.5" />
+                    <span>Hide from shop</span>
+                  </button>
+                ) : deleteError ? null : (
                 <button
                   type="button"
                   disabled={isDeleting}
@@ -613,6 +831,7 @@ export default function ProductsListPage() {
                   )}
                   <span>Delete</span>
                 </button>
+                )}
               </div>
             </motion.div>
           </div>

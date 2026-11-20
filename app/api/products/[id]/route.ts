@@ -186,14 +186,28 @@ export async function DELETE(
 
   try {
     const { id } = await params;
-    // Variants are removed with the product (onDelete: Cascade).
-    const result = await prisma.product.deleteMany({
-      where: { OR: [{ id }, { sku: id }] },
-    });
-
-    if (result.count === 0) {
+    const product = await prisma.product.findFirst({ where: { OR: [{ id }, { sku: id }] }, select: { id: true, name: true } });
+    if (!product) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
+
+    // Keep products that customers have ordered, so past orders still point
+    // at them; hide them from the shop instead.
+    const orderCount = await prisma.orderItem.count({ where: { productId: product.id } });
+    if (orderCount > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          code: "HAS_ORDERS",
+          orderCount,
+          error: `"${product.name}" is in ${orderCount} order${orderCount === 1 ? "" : "s"}, so it can't be deleted. Hide it from the shop instead.`,
+        },
+        { status: 409 }
+      );
+    }
+
+    // Variants are removed with the product (onDelete: Cascade).
+    await prisma.product.delete({ where: { id: product.id } });
     return NextResponse.json({ success: true, message: "Product deleted successfully" });
   } catch (error: any) {
     console.error("Error deleting product:", error);
