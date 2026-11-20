@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma";
 import { imageUrl } from "@/lib/productImages";
 import { isValidPincode, quoteDelivery } from "@/lib/delivery";
+import { attachImageRefs, OMIT_PHOTOS } from "@/lib/imageRefs";
 
 /**
  * Prices an order on the server from the database. Never trust prices,
@@ -63,10 +64,13 @@ export async function priceOrder(rawItems: unknown, pincode: unknown): Promise<P
     }
   }
 
-  const products = await prisma.product.findMany({
-    where: { id: { in: [...new Set(wanted.map((w) => w.productId))] } },
-    include: { variants: true },
-  });
+  const products = await attachImageRefs(
+    await prisma.product.findMany({
+      where: { id: { in: [...new Set(wanted.map((w) => w.productId))] } },
+      omit: OMIT_PHOTOS,
+      include: { variants: { omit: OMIT_PHOTOS } },
+    })
+  );
   const byId = new Map(products.map((p) => [p.id, p]));
 
   const lines: PricedLine[] = [];

@@ -10,7 +10,7 @@
  * strings when they're listed in images.localPatterns.
  */
 
-export type ImageOwner = "product" | "variant" | "category";
+export type ImageOwner = "product" | "variant" | "category" | "banner" | "editorial";
 export type ImageKind = "folded" | "worn" | "image";
 
 const SERVED_PREFIX = "/api/images/";

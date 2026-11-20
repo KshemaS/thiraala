@@ -7,9 +7,10 @@ import {
   parseVariants,
   syncVariants,
   variantSkuConflict,
-  variantsInclude,
+  variantsIncludeSlim,
 } from "@/lib/productVariants";
 import { imageUrl, incomingImage } from "@/lib/productImages";
+import { attachImageRefs, OMIT_PHOTOS } from "@/lib/imageRefs";
 import { ProductItem } from "../route";
 
 function formatProduct(p: Product & { variants: ProductVariant[] }): ProductItem {
@@ -54,11 +55,14 @@ function formatProduct(p: Product & { variants: ProductVariant[] }): ProductItem
   };
 }
 
-function findProduct(id: string, alsoSlug = false) {
-  return prisma.product.findFirst({
+/** A product with its colours, photos as refs only (lib/imageRefs.ts). */
+async function findProduct(id: string, alsoSlug = false) {
+  const product = await prisma.product.findFirst({
     where: { OR: alsoSlug ? [{ id }, { sku: id }, { slug: id }] : [{ id }, { sku: id }] },
-    include: variantsInclude,
+    omit: OMIT_PHOTOS,
+    include: variantsIncludeSlim,
   });
+  return product ? (await attachImageRefs([product]))[0] : null;
 }
 
 export async function GET(
@@ -163,11 +167,13 @@ export async function PUT(
       return tx.product.update({
         where: { id: existing.id },
         data,
-        include: variantsInclude,
+        omit: OMIT_PHOTOS,
+        include: variantsIncludeSlim,
       });
     });
 
-    return NextResponse.json({ success: true, data: formatProduct(updated) });
+    const [withRefs] = await attachImageRefs([updated]);
+    return NextResponse.json({ success: true, data: formatProduct(withRefs) });
   } catch (error: any) {
     console.error("Error updating product:", error);
     return NextResponse.json(

@@ -1,6 +1,8 @@
+import { cache } from "react";
 import prisma from "@/lib/prisma";
-import { formatVariant, variantsInclude, type ProductVariantItem } from "@/lib/productVariants";
+import { formatVariant, variantsIncludeSlim, type ProductVariantItem } from "@/lib/productVariants";
 import { imageUrl } from "@/lib/productImages";
+import { attachImageRefs, OMIT_PHOTOS } from "@/lib/imageRefs";
 
 export interface UnifiedProduct {
   id: number | string;
@@ -49,13 +51,21 @@ function resolveImgPath(img: any, fallback: string): string {
   return fallback;
 }
 
-/** Active products for the shop, from the database (the only source). */
-export async function getAllUnifiedProducts(): Promise<UnifiedProduct[]> {
-  const dbProducts = await prisma.product.findMany({
-    where: { status: "active" },
-    orderBy: { createdAt: "desc" },
-    include: variantsInclude,
-  });
+/**
+ * Active products for the shop, from the database (the only source).
+ * Photos are never loaded here, only whether each exists (lib/imageRefs.ts),
+ * and the result is shared within one page render (React cache), so a
+ * product page's title, details and related products cost one query.
+ */
+export const getAllUnifiedProducts = cache(async (): Promise<UnifiedProduct[]> => {
+  const dbProducts = await attachImageRefs(
+    await prisma.product.findMany({
+      where: { status: "active" },
+      orderBy: { createdAt: "desc" },
+      omit: OMIT_PHOTOS,
+      include: variantsIncludeSlim,
+    })
+  );
 
   return dbProducts.map((p: any) => {
     // Serve uploaded (base64) photos by URL instead of inlining them.
@@ -104,7 +114,7 @@ export async function getAllUnifiedProducts(): Promise<UnifiedProduct[]> {
       variants: (p.variants || []).map(formatVariant),
     };
   });
-}
+});
 
 export async function getProductById(id: string | number): Promise<UnifiedProduct | null> {
   const all = await getAllUnifiedProducts();

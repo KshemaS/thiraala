@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guard";
 import { imageUrl, incomingImage } from "@/lib/productImages";
+import { attachImageRefs, OMIT_PHOTOS } from "@/lib/imageRefs";
 import {
   formatVariant,
   parseVariants,
   syncVariants,
   variantSkuConflict,
-  variantsInclude,
+  variantsIncludeSlim,
   type ProductVariantItem,
 } from "@/lib/productVariants";
 
@@ -72,10 +73,14 @@ function optionalInt(value: unknown): number | null {
 
 export async function GET() {
   try {
-    const dbProducts = await prisma.product.findMany({
-      orderBy: { createdAt: "desc" },
-      include: variantsInclude,
-    });
+    // Photos aren't loaded, only whether each exists (lib/imageRefs.ts).
+    const dbProducts = await attachImageRefs(
+      await prisma.product.findMany({
+        orderBy: { createdAt: "desc" },
+        omit: OMIT_PHOTOS,
+        include: variantsIncludeSlim,
+      })
+    );
 
     const formatted: ProductItem[] = dbProducts.map((p) => ({
         id: p.id,

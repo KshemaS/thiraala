@@ -1,20 +1,25 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guard";
+import { imageUrl, isServedImageUrl } from "@/lib/productImages";
 
 const BANNER_KEYS = ["image1", "image2", "image3"] as const;
-type Banners = Record<(typeof BANNER_KEYS)[number], string>;
+type BannerKey = (typeof BANNER_KEYS)[number];
+type Banners = Record<BannerKey, string>;
 
+/**
+ * The three home page banners as links. Uploaded banners are base64 in the
+ * database (megabytes); only "is it an upload, or which static path" is read
+ * here, and uploads are served by /api/images/banner/….
+ */
 async function getBanners(): Promise<Banners> {
-  const rows = await prisma.heroBanner.findMany({
-    where: { imageKey: { in: [...BANNER_KEYS] } },
-  });
-  const byKey = new Map(rows.map((row) => [row.imageKey, row.imageUrl]));
-  return {
-    image1: byKey.get("image1") || "",
-    image2: byKey.get("image2") || "",
-    image3: byKey.get("image3") || "",
-  };
+  const rows = await prisma.$queryRaw<{ id: string; imageKey: string; updatedAt: Date; ref: string | null }[]>`
+    SELECT id, "imageKey", "updatedAt",
+      CASE WHEN "imageUrl" LIKE 'data:%' THEN 'data:' ELSE "imageUrl" END AS ref
+    FROM "hero_banners"
+    WHERE "imageKey" IN ('image1', 'image2', 'image3')`;
+  const byKey = new Map(rows.map((r) => [r.imageKey, imageUrl("banner", r.id, "image", r.ref, r.updatedAt) || ""]));
+  return { image1: byKey.get("image1") || "", image2: byKey.get("image2") || "", image3: byKey.get("image3") || "" };
 }
 
 // GET — the three home page banner images (database only).
@@ -27,30 +32,33 @@ export async function GET() {
   }
 }
 
-// POST { image1?, image2?, image3? } — replace any of the banner images.
+// POST { image1?, image2?, image3? } — replace any of the banner images. A
+// banner sent back as its served link is unchanged.
 export async function POST(request: Request) {
   const unauthorized = await requireAdmin();
   if (unauthorized) return unauthorized;
 
   try {
     const body = await request.json().catch(() => ({}));
-    const current = await getBanners();
-    const updated: Banners = {
-      image1: typeof body.image1 === "string" ? body.image1 : current.image1,
-      image2: typeof body.image2 === "string" ? body.image2 : current.image2,
-      image3: typeof body.image3 === "string" ? body.image3 : current.image3,
-    };
+    const changes = BANNER_KEYS.flatMap((key, index) => {
+      const value = body?.[key];
+      if (typeof value !== "string" || isServedImageUrl(value)) return [];
+      return [{ key, value, order: index + 1 }];
+    });
 
-    await prisma.$transaction(
-      BANNER_KEYS.map((key, index) =>
-        prisma.heroBanner.upsert({
-          where: { imageKey: key },
-          update: { imageUrl: updated[key], order: index + 1 },
-          create: { imageKey: key, imageUrl: updated[key], order: index + 1 },
-        })
-      )
-    );
-    return NextResponse.json({ success: true, data: updated });
+    if (changes.length > 0) {
+      await prisma.$transaction(
+        changes.map(({ key, value, order }) =>
+          prisma.heroBanner.upsert({
+            where: { imageKey: key },
+            update: { imageUrl: value, order },
+            create: { imageKey: key, imageUrl: value, order },
+            select: { id: true },
+          })
+        )
+      );
+    }
+    return NextResponse.json({ success: true, data: await getBanners() });
   } catch (error) {
     console.error("Error saving hero banners:", error);
     return NextResponse.json({ success: false, error: "Failed to save banners" }, { status: 500 });

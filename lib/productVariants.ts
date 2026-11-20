@@ -35,6 +35,11 @@ export const variantsInclude = {
   variants: { orderBy: { sortOrder: "asc" } },
 } satisfies Prisma.ProductInclude;
 
+/** Same, without the heavy photo columns (pair with attachImageRefs). */
+export const variantsIncludeSlim = {
+  variants: { orderBy: { sortOrder: "asc" }, omit: { foldedImg: true, wornImg: true } },
+} satisfies Prisma.ProductInclude;
+
 function toOptionalInt(value: unknown): number | null {
   if (value === undefined || value === null || value === "") return null;
   const n = Math.round(Number(value));
