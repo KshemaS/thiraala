@@ -35,7 +35,7 @@ export default async function ProductDetailPage({
 }) {
   const { id } = await params;
 
-  // Find target product dynamically from DB / products.json / sareesData
+  // Find the product in the database by id, SKU or slug
   const product = await getProductById(id);
 
   if (!product) {

@@ -1,81 +1,26 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
-import crypto from "crypto";
 import prisma from "@/lib/prisma";
 import { setCustomerSession } from "@/lib/auth/customerSession";
+import { hashCustomerPassword, verifyCustomerPassword } from "@/lib/auth/customerPassword";
+import { DUMMY_PASSWORD_HASH } from "@/lib/auth/password";
 import { clientAddress, lockedMinutes, recordFailure, recordSuccess, tooManyAttemptsMessage } from "@/lib/auth/loginThrottle";
 
-const dataFilePath = path.join(process.cwd(), "data", "users.json");
-
-interface StoredUser {
-  id: string;
-  firstName: string;
-  lastName?: string;
-  email: string;
-  passwordHash?: string | null;
-  phone?: string | null;
-  role: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-function getUsersFromFile(): StoredUser[] {
-  try {
-    if (fs.existsSync(dataFilePath)) {
-      const content = fs.readFileSync(dataFilePath, "utf8");
-      const parsed = JSON.parse(content);
-      return Array.isArray(parsed) ? parsed : [];
-    }
-  } catch (error) {
-    console.error("Error reading users.json:", error);
-  }
-  return [];
-}
-
-function verifyPassword(password: string, storedHash: string): boolean {
-  try {
-    const parts = storedHash.split(":");
-    if (parts.length !== 2) return false;
-    const [salt, originalHash] = parts;
-    const computedHash = crypto.pbkdf2Sync(password, salt, 1000, 64, "sha512").toString("hex");
-    return computedHash === originalHash;
-  } catch {
-    return false;
-  }
-}
-
+// POST { email, password } — customer sign-in.
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => null);
+    const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+    const password = typeof body?.password === "string" ? body.password : "";
 
-    if (!body || typeof body !== "object") {
-      return NextResponse.json(
-        { success: false, error: "Invalid JSON payload provided." },
-        { status: 400 }
-      );
+    if (!email) {
+      return NextResponse.json({ success: false, error: "Email address is required." }, { status: 400 });
     }
-
-    const { email, password } = body;
-
-    if (!email || typeof email !== "string" || !email.trim()) {
-      return NextResponse.json(
-        { success: false, error: "Email address is required." },
-        { status: 400 }
-      );
+    if (!password) {
+      return NextResponse.json({ success: false, error: "Password is required." }, { status: 400 });
     }
-
-    if (!password || typeof password !== "string") {
-      return NextResponse.json(
-        { success: false, error: "Password is required." },
-        { status: 400 }
-      );
-    }
-
-    const cleanEmail = email.trim().toLowerCase();
 
     const address = clientAddress(request);
-    const locked = await lockedMinutes("customer", cleanEmail, address);
+    const locked = await lockedMinutes("customer", email, address);
     if (locked > 0) {
       return NextResponse.json(
         { success: false, error: tooManyAttemptsMessage(locked) },
@@ -83,76 +28,41 @@ export async function POST(request: Request) {
       );
     }
 
-    // 1. Try finding in Prisma database first
-    let matchedUser: StoredUser | null = null;
-    try {
-      if ((prisma as any)?.user) {
-        const dbUser = await (prisma as any).user.findUnique({
-          where: { email: cleanEmail },
-        });
-        if (dbUser) {
-          matchedUser = {
-            id: dbUser.id,
-            firstName: dbUser.firstName,
-            lastName: dbUser.lastName || "",
-            email: dbUser.email,
-            passwordHash: dbUser.passwordHash,
-            phone: dbUser.phone,
-            role: dbUser.role || "customer",
-            createdAt: dbUser.createdAt?.toISOString() || new Date().toISOString(),
-            updatedAt: dbUser.updatedAt?.toISOString() || new Date().toISOString(),
-          };
-        }
-      }
-    } catch {
-      // Prisma offline or unmigrated - fall through to file
-    }
+    const user = await prisma.user.findUnique({ where: { email } });
+    // Always check a hash so the response time doesn't reveal whether the email exists.
+    const { ok, needsRehash } = await verifyCustomerPassword(password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
 
-    // 2. If not found in DB, check JSON file
-    if (!matchedUser) {
-      const fileUsers = getUsersFromFile();
-      matchedUser = fileUsers.find((u) => u.email.toLowerCase() === cleanEmail) || null;
+    // Unknown email, account without a password and wrong password all count
+    // as a failed attempt and get the same answer.
+    if (!user || !ok) {
+      await recordFailure("customer", email, address);
+      return NextResponse.json({ success: false, error: "Invalid email or password." }, { status: 401 });
     }
+    await recordSuccess("customer", email, address);
 
-    // 3. Verify password (unknown email, no password and wrong password all
-    // count as a failed attempt and get the same answer)
-    const passwordOk =
-      !!matchedUser?.passwordHash && verifyPassword(password, matchedUser.passwordHash);
-    if (!matchedUser || !passwordOk) {
-      await recordFailure("customer", cleanEmail, address);
-      return NextResponse.json(
-        { success: false, error: "Invalid email or password." },
-        { status: 401 }
-      );
+    // Upgrade an old-style password hash now that we know the password.
+    if (needsRehash) {
+      await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashCustomerPassword(password) } });
     }
-    await recordSuccess("customer", cleanEmail, address);
-
-    // 4. Prepare sanitized user response
-    const sanitizedUser = {
-      id: matchedUser.id,
-      firstName: matchedUser.firstName,
-      lastName: matchedUser.lastName || "",
-      email: matchedUser.email,
-      phone: matchedUser.phone || null,
-      role: matchedUser.role || "customer",
-      createdAt: matchedUser.createdAt,
-    };
 
     const response = NextResponse.json({
       success: true,
       message: "Signed in successfully!",
-      user: sanitizedUser,
+      user: {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName || "",
+        email: user.email,
+        phone: user.phone || null,
+        role: user.role || "customer",
+        createdAt: user.createdAt.toISOString(),
+      },
     });
-
     // Signed, httpOnly session cookie (see lib/auth/customerSession.ts)
-    setCustomerSession(response, matchedUser.id);
-
+    setCustomerSession(response, user.id);
     return response;
-  } catch (error: any) {
+  } catch (error) {
     console.error("Login API error:", error);
-    return NextResponse.json(
-      { success: false, error: "An unexpected error occurred during login." },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: "An unexpected error occurred during login." }, { status: 500 });
   }
 }

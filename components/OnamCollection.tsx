@@ -5,7 +5,6 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
 import Container from "@/components/Container";
-import { sareesData } from "@/data/products";
 
 interface CollectionData {
   id: string;
@@ -24,7 +23,7 @@ export default function OnamCollection() {
     slug: "onam-collection",
     description: "Welcome the season of abundance with our signature sarees. From fine golden Kasavu borders to custom floral weaves, celebrate in simple elegance.",
   });
-  const [collectionProducts, setCollectionProducts] = useState<any[]>(sareesData.slice(0, 6));
+  const [collectionProducts, setCollectionProducts] = useState<any[]>([]);
 
   const loadCollectionAndProducts = useCallback(async () => {
     try {

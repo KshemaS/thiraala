@@ -1,167 +1,85 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guard";
-import { CollectionItem } from "../route";
+import { duplicateCollectionError, toCollectionItem } from "../route";
 
-const dataFilePath = path.join(process.cwd(), "data", "collections.json");
+type Params = { params: Promise<{ id: string }> };
 
-function getCollections(): CollectionItem[] {
-  try {
-    if (fs.existsSync(dataFilePath)) {
-      const content = fs.readFileSync(dataFilePath, "utf8");
-      return JSON.parse(content);
-    }
-  } catch (error) {
-    console.error("Error reading collections.json:", error);
-  }
-  return [];
-}
-
-function saveCollections(collections: CollectionItem[]): boolean {
-  try {
-    const dir = path.dirname(dataFilePath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(dataFilePath, JSON.stringify(collections, null, 2), "utf8");
-    return true;
-  } catch (error) {
-    console.error("Error writing collections.json:", error);
-    return false;
-  }
-}
-
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+// GET — one collection.
+export async function GET(request: Request, { params }: Params) {
   const { id } = await params;
-
   try {
-    const dbCol = await prisma.collection.findUnique({
-      where: { id },
-    });
-    if (dbCol) {
-      return NextResponse.json({
-        id: dbCol.id,
-        name: dbCol.name,
-        slug: dbCol.slug,
-        description: dbCol.description || "",
-        image: dbCol.image || "",
-        status: (dbCol.status as "active" | "inactive") || "active",
-        featured: dbCol.featured,
-      });
-    }
+    const collection = await prisma.collection.findUnique({ where: { id } });
+    if (!collection) return NextResponse.json({ error: "Collection not found" }, { status: 404 });
+    return NextResponse.json(toCollectionItem(collection));
   } catch (err) {
-    // Database offline - fallback to file
+    console.error("Failed to load collection:", err);
+    return NextResponse.json({ error: "Unable to load collection." }, { status: 500 });
   }
-
-  const collections = getCollections();
-  const collection = collections.find((c) => String(c.id) === String(id));
-
-  if (!collection) {
-    return NextResponse.json({ error: "Collection not found" }, { status: 404 });
-  }
-
-  return NextResponse.json(collection);
 }
 
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+// PUT — update a collection. Renaming it also renames it on its products.
+export async function PUT(request: Request, { params }: Params) {
   const unauthorized = await requireAdmin();
   if (unauthorized) return unauthorized;
 
   try {
     const { id } = await params;
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
+    const before = await prisma.collection.findUnique({ where: { id } });
+    if (!before) return NextResponse.json({ error: "Collection not found" }, { status: 404 });
 
-    // Try updating in Prisma PostgreSQL
-    try {
-      await prisma.collection.update({
+    const name = typeof body.name === "string" && body.name.trim() ? body.name.trim() : undefined;
+    const updated = await prisma.$transaction(async (tx) => {
+      const c = await tx.collection.update({
         where: { id },
         data: {
-          name: body.name !== undefined ? body.name.trim() : undefined,
-          slug: body.slug !== undefined ? body.slug.trim() : undefined,
-          description: body.description !== undefined ? body.description.trim() : undefined,
-          image: body.image !== undefined ? body.image.trim() : undefined,
-          status: body.status !== undefined ? body.status : undefined,
+          name,
+          slug: typeof body.slug === "string" && body.slug.trim() ? body.slug.trim() : undefined,
+          description: typeof body.description === "string" ? body.description.trim() : undefined,
+          image: typeof body.image === "string" ? body.image.trim() : undefined,
+          status: body.status === "active" || body.status === "inactive" ? body.status : undefined,
           featured: body.featured !== undefined ? Boolean(body.featured) : undefined,
         },
       });
-    } catch (dbErr) {
-      // Database offline - fallback file sync proceeds
-    }
+      if (name && name !== before.name) {
+        await tx.product.updateMany({
+          where: { OR: [{ collectionId: id }, { collectionName: before.name }] },
+          data: { collectionName: name, collectionId: id },
+        });
+      }
+      return c;
+    });
 
-    const collections = getCollections();
-    const index = collections.findIndex((c) => String(c.id) === String(id));
-
-    if (index === -1) {
-      return NextResponse.json({ error: "Collection not found" }, { status: 404 });
-    }
-
-    const current = collections[index];
-    const updatedCollection: CollectionItem = {
-      ...current,
-      ...body,
-      id: current.id,
-      name: body.name !== undefined ? body.name.trim() : current.name,
-      slug: body.slug !== undefined ? body.slug.trim() : current.slug,
-      description: body.description !== undefined ? body.description.trim() : current.description,
-      image: body.image !== undefined ? body.image.trim() : current.image,
-      status: body.status !== undefined ? body.status : current.status,
-      featured: body.featured !== undefined ? Boolean(body.featured) : current.featured,
-    };
-
-    collections[index] = updatedCollection;
-    saveCollections(collections);
-
-    return NextResponse.json({ success: true, data: updatedCollection });
-  } catch (error: any) {
+    return NextResponse.json({ success: true, data: toCollectionItem(updated) });
+  } catch (error) {
+    const dup = duplicateCollectionError(error);
+    if (dup) return dup;
     console.error("Error updating collection:", error);
-    return NextResponse.json(
-      { success: false, error: error.message || "Failed to update collection" },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: "Failed to update collection" }, { status: 500 });
   }
 }
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+// DELETE — remove a collection. Its products stay, just without this collection.
+export async function DELETE(request: Request, { params }: Params) {
   const unauthorized = await requireAdmin();
   if (unauthorized) return unauthorized;
 
   try {
     const { id } = await params;
+    const before = await prisma.collection.findUnique({ where: { id } });
+    if (!before) return NextResponse.json({ error: "Collection not found" }, { status: 404 });
 
-    // Try deleting from Prisma PostgreSQL
-    try {
-      await prisma.collection.delete({
-        where: { id },
-      });
-    } catch (dbErr) {
-      // Database offline - fallback file sync proceeds
-    }
-
-    const collections = getCollections();
-    const filtered = collections.filter((c) => String(c.id) !== String(id));
-
-    if (filtered.length === collections.length) {
-      return NextResponse.json({ error: "Collection not found" }, { status: 404 });
-    }
-
-    saveCollections(filtered);
+    await prisma.$transaction([
+      prisma.product.updateMany({
+        where: { OR: [{ collectionId: id }, { collectionName: before.name }] },
+        data: { collectionName: null, collectionId: null },
+      }),
+      prisma.collection.delete({ where: { id } }),
+    ]);
     return NextResponse.json({ success: true, message: "Collection deleted successfully" });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error deleting collection:", error);
-    return NextResponse.json(
-      { success: false, error: error.message || "Failed to delete collection" },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: "Failed to delete collection" }, { status: 500 });
   }
 }

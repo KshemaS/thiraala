@@ -6,6 +6,7 @@ const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/a
 /**
  * Serves a product or variant photo stored in the database as a data URL.
  * URL: /api/images/{product|variant}/{id}/{folded|worn}/{version}
+ *      /api/images/category/{id}/image/{version}
  * The version is the row's updatedAt, so responses are cached immutably.
  */
 export async function GET(
@@ -13,23 +14,28 @@ export async function GET(
   { params }: { params: Promise<{ type: string; id: string; kind: string; version: string }> }
 ) {
   const { type, id, kind } = await params;
-  if ((type !== "product" && type !== "variant") || (kind !== "folded" && kind !== "worn")) {
-    return new Response("Not found", { status: 404 });
-  }
+  const valid =
+    ((type === "product" || type === "variant") && (kind === "folded" || kind === "worn")) ||
+    (type === "category" && kind === "image");
+  if (!valid) return new Response("Not found", { status: 404 });
 
-  const select = { foldedImg: kind === "folded", wornImg: kind === "worn" } as const;
-  let row: { foldedImg?: string | null; wornImg?: string | null } | null;
+  let stored: string | null | undefined;
   try {
-    row =
-      type === "product"
-        ? await prisma.product.findUnique({ where: { id }, select })
-        : await prisma.productVariant.findUnique({ where: { id }, select });
+    if (type === "category") {
+      stored = (await prisma.category.findUnique({ where: { id }, select: { image: true } }))?.image;
+    } else {
+      const select = { foldedImg: kind === "folded", wornImg: kind === "worn" } as const;
+      const row =
+        type === "product"
+          ? await prisma.product.findUnique({ where: { id }, select })
+          : await prisma.productVariant.findUnique({ where: { id }, select });
+      stored = kind === "folded" ? row?.foldedImg : row?.wornImg;
+    }
   } catch (err) {
     console.error("Failed to load image:", err);
     return new Response("Unable to load image", { status: 500 });
   }
 
-  const stored = kind === "folded" ? row?.foldedImg : row?.wornImg;
   if (!stored) return new Response("Not found", { status: 404 });
 
   // Static paths / external URLs: send the browser there.

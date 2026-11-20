@@ -5,7 +5,6 @@ import Container from "@/components/Container";
 import { motion } from "framer-motion";
 import CategoryCard, { CategoryProduct } from "@/components/CategoryCard";
 
-import { sareesData } from "@/data/products";
 
 interface CategoryItem {
   id: string;
@@ -19,7 +18,7 @@ interface CategoryItem {
 export default function CategoryTabs() {
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [activeTab, setActiveTab] = useState("");
-  const [allProducts, setAllProducts] = useState<any[]>(sareesData);
+  const [allProducts, setAllProducts] = useState<any[]>([]);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -44,7 +43,7 @@ export default function CategoryTabs() {
       const res = await fetch("/api/products/filter?limit=all");
       if (res.ok) {
         const data = await res.json();
-        if (data.success && Array.isArray(data.products) && data.products.length > 0) {
+        if (data.success && Array.isArray(data.products)) {
           setAllProducts(data.products);
         }
       }

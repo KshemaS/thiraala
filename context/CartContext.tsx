@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { sareesData } from "@/data/products";
 
 export interface CartItem {
   id: number | string;
@@ -112,11 +111,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     let updated: CartItem[];
     const existingIndex = cart.findIndex((item) => String(item.id) === String(product.id));
     
-    // Resolve accurate stock limit from product object or catalog
-    const catalogItem = sareesData.find(
-      (p) => String(p.id) === String(product.id) || p.slug === product.slug || p.name === product.name
-    );
-    const stockLimit = product.stock !== undefined ? product.stock : (catalogItem?.stock ?? 10);
+    // Stock comes with the product from the shop (and is refreshed in the bag).
+    const stockLimit = typeof product.stock === "number" ? product.stock : 10;
 
     if (existingIndex > -1) {
       const currentQty = cart[existingIndex].quantity;
@@ -175,8 +171,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     const targetItem = cart.find((item) => String(item.id) === String(id));
-    const catalogItem = sareesData.find((p) => String(p.id) === String(id));
-    const stockLimit = targetItem?.stock !== undefined ? targetItem.stock : (catalogItem?.stock ?? 10);
+    const stockLimit = typeof targetItem?.stock === "number" ? targetItem.stock : 10;
     
     if (quantity > stockLimit) {
       showToast(`Only ${stockLimit} left in stock`);
