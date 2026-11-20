@@ -6,7 +6,7 @@ import { Truck, Loader2, Check, AlertCircle, Calculator } from "lucide-react";
 interface ZoneRate {
   key: string;
   name: string;
-  description: string;
+  states: string[];
   firstItemFee: number;
   extraItemFee: number;
 }
@@ -19,6 +19,11 @@ const rupees = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
 export default function DeliveryChargesPage() {
   const [rates, setRates] = useState<Draft[]>([]);
+  // state -> zone key, as shown in the "States in each zone" editor
+  const [stateZones, setStateZones] = useState<Record<string, string>>({});
+  const [savedStateZones, setSavedStateZones] = useState<Record<string, string>>({});
+  const [isSavingStates, setIsSavingStates] = useState(false);
+  const [statesSaved, setStatesSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +41,7 @@ export default function DeliveryChargesPage() {
         const data = await res.json();
         if (!res.ok || !data.success) throw new Error(data.error || "Unable to load delivery charges.");
         setRates(data.rates.map(toDraft));
+        applyStateZones(data.rates);
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -47,6 +53,37 @@ export default function DeliveryChargesPage() {
   const update = (key: string, patch: Partial<Draft>) => {
     setSaved(false);
     setRates((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  };
+
+  const applyStateZones = (list: ZoneRate[]) => {
+    const map: Record<string, string> = {};
+    for (const z of list) for (const st of z.states) map[st] = z.key;
+    setStateZones(map);
+    setSavedStateZones(map);
+  };
+
+  const changedStates = Object.keys(stateZones).filter((st) => stateZones[st] !== savedStateZones[st]);
+
+  const handleSaveStates = async () => {
+    setIsSavingStates(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/delivery-rates", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stateZones: Object.fromEntries(changedStates.map((st) => [st, stateZones[st]])) }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Unable to save the zones.");
+      setRates(data.rates.map(toDraft));
+      applyStateZones(data.rates);
+      setStatesSaved(true);
+      setTestResult(null);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsSavingStates(false);
+    }
   };
 
   const invalid = rates.find((r) => Number.isNaN(parseFee(r.firstText)) || Number.isNaN(parseFee(r.extraText)));
@@ -69,6 +106,7 @@ export default function DeliveryChargesPage() {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || "Unable to save delivery charges.");
       setRates(data.rates.map(toDraft));
+      applyStateZones(data.rates);
       setSaved(true);
       setTestResult(null);
     } catch (err: any) {
@@ -84,7 +122,7 @@ export default function DeliveryChargesPage() {
     const data = await res.json();
     setTestResult(
       data.success
-        ? `${data.zoneName}: ${rupees(data.fee)} for ${data.sarees} ${data.sarees === 1 ? "saree" : "sarees"}`
+        ? `${data.state ?? "Unknown area"} → ${data.zoneName}: ${rupees(data.fee)} for ${data.sarees} ${data.sarees === 1 ? "saree" : "sarees"}`
         : data.error
     );
   };
@@ -135,7 +173,9 @@ export default function DeliveryChargesPage() {
                     <tr key={r.key}>
                       <td className="py-3.5 px-4">
                         <p className="font-bold text-[#1E3A2C]">{r.name}</p>
-                        <p className="text-[10px] text-[#1E3A2C]/50 mt-0.5">{r.description}</p>
+                        <p className="text-[10px] text-[#1E3A2C]/50 mt-0.5 max-w-[280px]">
+                          {r.states.length ? r.states.join(", ") : "No states — move some here below"}
+                        </p>
                       </td>
                       {(["firstText", "extraText"] as const).map((field) => (
                         <td key={field} className="py-3.5 px-4">
@@ -174,6 +214,65 @@ export default function DeliveryChargesPage() {
             >
               {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
               Save delivery charges
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Which states are in each zone */}
+      {!isLoading && rates.length > 0 && (
+        <div className="bg-white rounded-2xl border border-[#1E3A2C]/10 shadow-xs overflow-hidden">
+          <div className="p-5 border-b border-[#1E3A2C]/5">
+            <h3 className="text-sm font-bold text-[#1E3A2C]">States in each zone</h3>
+            <p className="text-[11px] text-[#1E3A2C]/50 mt-0.5">
+              Move a state to another zone to change what its customers pay. The state is worked out from the delivery pincode.
+            </p>
+          </div>
+          <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
+            {Object.keys(stateZones)
+              .sort((a, b) => a.localeCompare(b))
+              .map((st) => (
+                <label key={st} className="flex items-center justify-between gap-3 py-1">
+                  <span className={`text-xs ${stateZones[st] !== savedStateZones[st] ? "font-bold text-[#b45309]" : "font-semibold text-[#1E3A2C]"}`}>
+                    {st}
+                  </span>
+                  <select
+                    value={stateZones[st]}
+                    onChange={(e) => {
+                      setStatesSaved(false);
+                      setStateZones((prev) => ({ ...prev, [st]: e.target.value }));
+                    }}
+                    aria-label={`Zone for ${st}`}
+                    className="px-2 py-1.5 rounded-lg border border-[#1E3A2C]/15 text-[11px] font-bold text-[#1E3A2C] bg-white max-w-[170px]"
+                  >
+                    {rates.map((z) => (
+                      <option key={z.key} value={z.key}>
+                        {z.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+          </div>
+          <div className="p-4 border-t border-[#1E3A2C]/5 flex items-center justify-end gap-3">
+            {statesSaved && changedStates.length === 0 && (
+              <span className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
+                <Check className="w-4 h-4" /> Saved
+              </span>
+            )}
+            {changedStates.length > 0 && (
+              <span className="text-xs text-[#b45309] font-semibold">
+                {changedStates.length} state{changedStates.length === 1 ? "" : "s"} changed
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleSaveStates}
+              disabled={isSavingStates || changedStates.length === 0}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1E3A2C] text-white text-xs font-bold hover:bg-[#284f3c] disabled:opacity-50 cursor-pointer"
+            >
+              {isSavingStates && <Loader2 className="w-4 h-4 animate-spin" />}
+              Save zones
             </button>
           </div>
         </div>

@@ -157,6 +157,16 @@ model DeliveryRate {
   @@map("delivery_rates")
 }
 
+/// Which delivery zone a state is in, when moved from its default on the
+/// dashboard (see DEFAULT_STATE_ZONE in lib/delivery.ts).
+model DeliveryStateZone {
+  state     String   @id
+  zone      String
+  updatedAt DateTime @updatedAt
+
+  @@map("delivery_state_zones")
+}
+
 model HeroBanner {
   id        String   @id @default(cuid())
   imageKey  String   @unique

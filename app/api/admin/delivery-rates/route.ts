@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guard";
-import { getDeliveryRates, ZONES } from "@/lib/delivery";
+import { DEFAULT_STATE_ZONE, getDeliveryRates, isZoneKey, ZONES } from "@/lib/delivery";
 
 const MAX_FEE = 100000;
 
@@ -18,16 +18,28 @@ export async function GET() {
   }
 }
 
-// PUT { rates: [{ zone, firstItemFee, extraItemFee }] } — saves the amounts.
+// PUT { rates?: [{ zone, firstItemFee, extraItemFee }], stateZones?: { [state]: zone } }
+// — saves the amounts and/or which zone each state is in.
 export async function PUT(request: Request) {
   const unauthorized = await requireAdmin();
   if (unauthorized) return unauthorized;
 
   try {
     const body = await request.json().catch(() => null);
-    const incoming = Array.isArray(body?.rates) ? body.rates : null;
-    if (!incoming) {
-      return NextResponse.json({ success: false, error: "No delivery charges sent." }, { status: 400 });
+    const incoming: any[] = Array.isArray(body?.rates) ? body.rates : [];
+    const stateZones = body?.stateZones && typeof body.stateZones === "object" ? (body.stateZones as Record<string, unknown>) : null;
+    if (incoming.length === 0 && !stateZones) {
+      return NextResponse.json({ success: false, error: "Nothing to save." }, { status: 400 });
+    }
+    if (stateZones) {
+      for (const [state, zone] of Object.entries(stateZones)) {
+        if (!(state in DEFAULT_STATE_ZONE)) {
+          return NextResponse.json({ success: false, error: `Unknown state "${state}".` }, { status: 400 });
+        }
+        if (!isZoneKey(zone)) {
+          return NextResponse.json({ success: false, error: `Unknown zone for ${state}.` }, { status: 400 });
+        }
+      }
     }
 
     const updates: { zone: string; firstItemFee: number; extraItemFee: number }[] = [];
@@ -49,15 +61,21 @@ export async function PUT(request: Request) {
       updates.push({ zone: zone.key, firstItemFee: first, extraItemFee: extra });
     }
 
-    await prisma.$transaction(
-      updates.map((u) =>
+    await prisma.$transaction([
+      ...updates.map((u) =>
         prisma.deliveryRate.upsert({
           where: { zone: u.zone },
           update: { firstItemFee: u.firstItemFee, extraItemFee: u.extraItemFee },
           create: u,
         })
-      )
-    );
+      ),
+      // A state set back to its default zone doesn't need a row.
+      ...Object.entries(stateZones ?? {}).map(([state, zone]) =>
+        zone === DEFAULT_STATE_ZONE[state]
+          ? prisma.deliveryStateZone.deleteMany({ where: { state } })
+          : prisma.deliveryStateZone.upsert({ where: { state }, update: { zone: zone as string }, create: { state, zone: zone as string } })
+      ),
+    ]);
 
     return NextResponse.json({ success: true, rates: await getDeliveryRates() });
   } catch (err) {
