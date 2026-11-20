@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { clearCustomerSession } from "@/lib/auth/customerSession";
 
 export async function POST() {
   const response = NextResponse.json({
@@ -6,7 +7,7 @@ export async function POST() {
     message: "Logged out successfully",
   });
 
-  response.cookies.delete("thiraala_user_id");
+  clearCustomerSession(response);
 
   return response;
 }

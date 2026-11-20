@@ -84,8 +84,8 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const url = `/api/wishlist?userId=${encodeURIComponent(userId)}`;
-      const res = await fetch(url);
+      // The server knows who is signed in from the session cookie.
+      const res = await fetch("/api/wishlist");
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.items)) {
@@ -159,7 +159,6 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
           altFolded: product.altFolded || product.name,
           altWorn: product.altWorn || product.name,
           category: product.category,
-          userId,
         }),
       });
     } catch (err) {
@@ -194,8 +193,7 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
 
     // API call (DELETE /api/wishlist?productId=...)
     try {
-      const params = new URLSearchParams({ productId: String(id), id: String(id) });
-      if (userId) params.append("userId", userId);
+      const params = new URLSearchParams({ productId: String(id) });
 
       await fetch(`/api/wishlist?${params.toString()}`, {
         method: "DELETE",
@@ -228,7 +226,6 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
     // API call (DELETE /api/wishlist?clearAll=true)
     try {
       const params = new URLSearchParams({ clearAll: "true" });
-      if (userId) params.append("userId", userId);
 
       await fetch(`/api/wishlist?${params.toString()}`, {
         method: "DELETE",

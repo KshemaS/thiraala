@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { getCustomerId } from "@/lib/auth/customerSession";
 import fs from "fs";
 import path from "path";
 import prisma from "@/lib/prisma";
@@ -21,8 +21,7 @@ function getUsersFromFile(): any[] {
 
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const userId = cookieStore.get("thiraala_user_id")?.value;
+    const userId = await getCustomerId();
 
     if (!userId) {
       return NextResponse.json({ success: false, user: null }, { status: 200 });

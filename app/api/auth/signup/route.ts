@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import prisma from "@/lib/prisma";
+import { setCustomerSession } from "@/lib/auth/customerSession";
 
 const dataFilePath = path.join(process.cwd(), "data", "users.json");
 
@@ -204,11 +205,7 @@ export async function POST(request: Request) {
       { status: 201 }
     );
 
-    response.cookies.set("thiraala_user_id", newUser.id, {
-      path: "/",
-      maxAge: 60 * 60 * 24 * 30, // 30 days
-      sameSite: "lax",
-    });
+    setCustomerSession(response, newUser.id);
 
     return response;
   } catch (error: any) {

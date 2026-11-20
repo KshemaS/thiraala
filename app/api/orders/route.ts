@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { getCustomerId } from "@/lib/auth/customerSession";
 import prisma from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth/guard";
 import { priceOrder } from "@/lib/orderPricing";
@@ -115,8 +115,7 @@ export function toOrderJSON(order: OrderWithItems): Order {
 export async function GET(request: Request) {
   try {
     const adminSession = await getAdminSession();
-    const cookieStore = await cookies();
-    const customerUserId = cookieStore.get("thiraala_user_id")?.value;
+    const customerUserId = await getCustomerId();
 
     if (!adminSession && !customerUserId) {
       return NextResponse.json(
@@ -209,8 +208,7 @@ export async function GET(request: Request) {
 // POST create new order
 export async function POST(request: Request) {
   try {
-    const cookieStore = await cookies();
-    const customerUserId = cookieStore.get("thiraala_user_id")?.value;
+    const customerUserId = await getCustomerId();
 
     const body = await request.json();
     // Prices, totals, fees and discounts from the browser are ignored: the

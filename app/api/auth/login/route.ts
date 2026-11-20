@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import prisma from "@/lib/prisma";
+import { setCustomerSession } from "@/lib/auth/customerSession";
 
 const dataFilePath = path.join(process.cwd(), "data", "users.json");
 
@@ -143,12 +144,8 @@ export async function POST(request: Request) {
       user: sanitizedUser,
     });
 
-    // Set cookie for session persistence
-    response.cookies.set("thiraala_user_id", matchedUser.id, {
-      path: "/",
-      maxAge: 60 * 60 * 24 * 30, // 30 days
-      sameSite: "lax",
-    });
+    // Signed, httpOnly session cookie (see lib/auth/customerSession.ts)
+    setCustomerSession(response, matchedUser.id);
 
     return response;
   } catch (error: any) {
