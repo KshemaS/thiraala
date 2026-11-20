@@ -55,6 +55,17 @@ export default function OrdersDashboardPage() {
   const [editPaymentStatus, setEditPaymentStatus] = useState<PaymentStatus>("Pending");
   const [editNotes, setEditNotes] = useState("");
 
+  // Dispatch dialog: asks for courier + tracking number before an order is
+  // marked Dispatched / In Transit (the server requires them).
+  const [dispatchOrder, setDispatchOrder] = useState<Order | null>(null);
+  const [dispatchStatus, setDispatchStatus] = useState<OrderStatus>("Dispatched");
+  const [dispatchCourier, setDispatchCourier] = useState("India Post (Speed Post)");
+  const [dispatchTracking, setDispatchTracking] = useState("");
+
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkBusy, setIsBulkBusy] = useState(false);
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
@@ -229,14 +240,32 @@ export default function OrdersDashboardPage() {
   };
 
   // Quick Status change from table row
-  const handleQuickStatusChange = async (orderId: string, newStatus: OrderStatus) => {
+  const handleQuickStatusChange = async (
+    orderId: string,
+    newStatus: OrderStatus,
+    extra: { courierName?: string; trackingNumber?: string } = {}
+  ) => {
+    const current = orders.find((o) => o.id === orderId);
+    const needsTracking = (newStatus === "Dispatched" || newStatus === "In Transit") && !current?.trackingNumber && !extra.trackingNumber;
+    if (current && needsTracking) {
+      setDispatchOrder(current);
+      setDispatchStatus(newStatus);
+      setDispatchCourier(current.courierName || "India Post (Speed Post)");
+      setDispatchTracking("");
+      return;
+    }
+    if (newStatus === "Cancelled" && !confirm(`Cancel order #${orderId}? Its stock will be put back.`)) return;
     try {
       const res = await fetch(`/api/orders/${orderId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status: newStatus, ...extra }),
       });
       const data = await res.json();
+      if (!data.success) {
+        alert(data.error || "Failed to update order");
+        return false;
+      }
       if (data.success && data.order) {
         setOrders((prev) =>
           prev.map((o) => (o.id === orderId ? data.order : o))
@@ -250,8 +279,65 @@ export default function OrdersDashboardPage() {
           window.dispatchEvent(new Event("thiraala-orders-updated"));
         }
       }
+      return true;
     } catch (err) {
       console.error("Error updating status:", err);
+      alert("Network error while updating order");
+      return false;
+    }
+  };
+
+  const handleConfirmDispatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!dispatchOrder) return;
+    const ok = await handleQuickStatusChange(dispatchOrder.id, dispatchStatus, {
+      courierName: dispatchCourier.trim(),
+      trackingNumber: dispatchTracking.trim(),
+    });
+    if (ok) setDispatchOrder(null);
+  };
+
+  const toggleSelected = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const openPackingSlips = (ids: string[]) =>
+    window.open(`/dashboard/print/slips?ids=${ids.map(encodeURIComponent).join(",")}`, "_blank");
+
+  // Apply one status to every selected order; reports which ones the server refused.
+  const handleBulkStatus = async (newStatus: OrderStatus) => {
+    const ids = [...selectedIds];
+    if (!confirm(`Mark ${ids.length} order${ids.length === 1 ? "" : "s"} as ${newStatus}?`)) return;
+    setIsBulkBusy(true);
+    const failed: string[] = [];
+    for (const id of ids) {
+      try {
+        const res = await fetch(`/api/orders/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus }),
+        });
+        const data = await res.json();
+        if (data.success && data.order) {
+          setOrders((prev) => prev.map((o) => (o.id === id ? data.order : o)));
+        } else {
+          failed.push(`${id}: ${data.error || "failed"}`);
+        }
+      } catch {
+        failed.push(`${id}: network error`);
+      }
+    }
+    setIsBulkBusy(false);
+    setSelectedIds(new Set(failed.map((f) => f.split(":")[0])));
+    window.dispatchEvent(new Event("thiraala-orders-updated"));
+    if (failed.length) {
+      alert(`${ids.length - failed.length} updated. These were not:\n\n${failed.join("\n")}`);
+    } else {
+      showToast(`${ids.length} order${ids.length === 1 ? "" : "s"} marked as ${newStatus}`);
     }
   };
 
@@ -457,12 +543,56 @@ export default function OrdersDashboardPage() {
         </div>
       </div>
 
+      {/* Bulk actions for checked orders */}
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 p-3 rounded-2xl bg-[#1E3A2C] text-white">
+          <span className="text-xs font-bold px-2">{selectedIds.size} selected</span>
+          <button
+            type="button"
+            onClick={() => openPackingSlips([...selectedIds])}
+            className="px-3 py-1.5 rounded-lg bg-white text-[#1E3A2C] text-xs font-bold hover:bg-[#FAF8F5] cursor-pointer inline-flex items-center gap-1.5"
+          >
+            <Printer className="w-3.5 h-3.5" /> Print packing slips
+          </button>
+          {(["Order Confirmed", "Delivered"] as OrderStatus[]).map((st) => (
+            <button
+              key={st}
+              type="button"
+              disabled={isBulkBusy}
+              onClick={() => handleBulkStatus(st)}
+              className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold disabled:opacity-50 cursor-pointer"
+            >
+              Mark {st}
+            </button>
+          ))}
+          {isBulkBusy && <span className="text-xs opacity-80">Updating…</span>}
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            className="ml-auto px-3 py-1.5 rounded-lg text-xs font-bold text-white/80 hover:text-white cursor-pointer"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       {/* Orders Table Container */}
       <div className="bg-white rounded-2xl border border-[#1E3A2C]/10 shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#FAF8F5] border-b border-[#1E3A2C]/10 text-[10px] font-bold uppercase tracking-wider text-[#1E3A2C]/50 select-none">
+                <th className="pl-4 py-4 w-8">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all shown orders"
+                    checked={filteredOrders.length > 0 && filteredOrders.every((o) => selectedIds.has(o.id))}
+                    onChange={(e) =>
+                      setSelectedIds(e.target.checked ? new Set(filteredOrders.map((o) => o.id)) : new Set())
+                    }
+                    className="w-4 h-4 accent-[#1E3A2C] cursor-pointer"
+                  />
+                </th>
                 <th className="p-4">Order ID & Date</th>
                 <th className="p-4">Customer Details</th>
                 <th className="p-4">Items Ordered</th>
@@ -484,6 +614,15 @@ export default function OrdersDashboardPage() {
                       key={order.id}
                       className="hover:bg-[#FAF8F5]/50 transition-colors group"
                     >
+                      <td className="pl-4 py-4 align-top">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select order ${order.id}`}
+                          checked={selectedIds.has(order.id)}
+                          onChange={() => toggleSelected(order.id)}
+                          className="w-4 h-4 accent-[#1E3A2C] cursor-pointer mt-0.5"
+                        />
+                      </td>
                       {/* Order ID */}
                       <td className="p-4">
                         <div className="flex items-center gap-1.5">
@@ -648,7 +787,7 @@ export default function OrdersDashboardPage() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={8} className="p-12 text-center text-[#1E3A2C]/50 select-none">
+                  <td colSpan={9} className="p-12 text-center text-[#1E3A2C]/50 select-none">
                     <ShoppingBag className="w-8 h-8 text-[#1E3A2C]/20 mx-auto mb-2" />
                     <p className="font-bold text-sm text-[#1E3A2C]">No matching orders found</p>
                     <p className="text-xs text-[#1E3A2C]/50 mt-1">
@@ -709,7 +848,7 @@ export default function OrdersDashboardPage() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => window.print()}
+                    onClick={() => openPackingSlips([selectedOrder.id])}
                     className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer"
                     title="Print Slip"
                   >
@@ -1129,6 +1268,64 @@ export default function OrdersDashboardPage() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Dispatch dialog: courier + tracking number */}
+      {dispatchOrder && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setDispatchOrder(null)} />
+          <form
+            onSubmit={handleConfirmDispatch}
+            className="relative w-full max-w-md bg-white rounded-2xl border border-[#1E3A2C]/10 shadow-2xl p-6 space-y-4"
+          >
+            <div>
+              <h3 className="text-base font-bold text-[#1E3A2C]">
+                Mark #{dispatchOrder.id} as {dispatchStatus}
+              </h3>
+              <p className="text-xs text-[#1E3A2C]/60 mt-1">
+                {dispatchOrder.customerName} will see these on their order tracking page.
+              </p>
+            </div>
+            <label className="block">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#1E3A2C]/60">Courier</span>
+              <input
+                type="text"
+                required
+                value={dispatchCourier}
+                onChange={(e) => setDispatchCourier(e.target.value)}
+                className="mt-1 w-full h-10 px-3 bg-[#FAF8F5] border border-[#1E3A2C]/15 rounded-xl text-sm font-semibold text-[#1E3A2C] outline-none focus:border-[#DAA87C]"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#1E3A2C]/60">Tracking / consignment number</span>
+              <input
+                type="text"
+                required
+                autoFocus
+                value={dispatchTracking}
+                onChange={(e) => setDispatchTracking(e.target.value)}
+                placeholder="e.g. EK123456789IN"
+                className="mt-1 w-full h-10 px-3 bg-[#FAF8F5] border border-[#1E3A2C]/15 rounded-xl text-sm font-semibold font-mono text-[#1E3A2C] outline-none focus:border-[#DAA87C]"
+              />
+            </label>
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setDispatchOrder(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-[#1E3A2C]/70 hover:bg-[#FAF8F5] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={!dispatchCourier.trim() || !dispatchTracking.trim()}
+                className="px-4 py-2 rounded-xl bg-[#1E3A2C] text-white text-xs font-bold disabled:opacity-50 cursor-pointer"
+              >
+                Mark as {dispatchStatus}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

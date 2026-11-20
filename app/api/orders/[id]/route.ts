@@ -210,6 +210,24 @@ export async function PATCH(
       timeline = timelineUpdate;
     }
 
+    // Shipping rules: only paid orders go out, and the customer's tracking
+    // page needs the courier + tracking number from the moment it's sent.
+    const SHIPPED = ["Dispatched", "Shipped", "In Transit"];
+    if (status !== undefined && SHIPPED.includes(newStatus) && !SHIPPED.includes(order.status)) {
+      if (newPaymentStatus !== "Paid") {
+        return NextResponse.json(
+          { success: false, code: "NOT_PAID", error: `Order ${order.humanId} hasn't been paid, so it can't be marked as ${newStatus}.` },
+          { status: 400 }
+        );
+      }
+      if (!String(newTrackingNumber || "").trim() || !String(newCourierName || "").trim()) {
+        return NextResponse.json(
+          { success: false, code: "NEEDS_TRACKING", error: `Add the courier and tracking number to mark order ${order.humanId} as ${newStatus}.` },
+          { status: 400 }
+        );
+      }
+    }
+
     // Stock follows the order's status. Orders placed before stock tracking
     // existed (stockReservedAt never set) never took stock, so leave them be.
     const tracksStock = order.stockReservedAt !== null;
