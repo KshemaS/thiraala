@@ -68,7 +68,7 @@ export function imageInputError(value: unknown): string | null {
   if (typeof value !== "string") return "must be an image.";
   const v = value.trim();
   if (isServedImageUrl(v)) return null;
-  if (isDataUrl(v)) {
+  if (v.startsWith("data:")) {
     const type = /^data:([^;,]+)/.exec(v)?.[1]?.toLowerCase();
     if (!type || !UPLOAD_TYPES.includes(type) || !v.includes(";base64,")) return "upload a JPEG, PNG, WebP, AVIF or GIF image.";
     if (v.length > MAX_DATA_URL_LENGTH) return "the image is larger than 5 MB. Please use a smaller photo.";
