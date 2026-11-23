@@ -6,7 +6,7 @@ const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/a
 /**
  * Serves a product or variant photo stored in the database as a data URL.
  * URL: /api/images/{product|variant}/{id}/{folded|worn}/{version}
- *      /api/images/{category|banner|editorial}/{id}/image/{version}
+ *      /api/images/{category|collection|banner|editorial}/{id}/image/{version}
  * The version is the row's updatedAt, so responses are cached immutably.
  */
 export async function GET(
@@ -16,13 +16,15 @@ export async function GET(
   const { type, id, kind } = await params;
   const valid =
     ((type === "product" || type === "variant") && (kind === "folded" || kind === "worn")) ||
-    ((type === "category" || type === "banner" || type === "editorial") && kind === "image");
+    (["category", "collection", "banner", "editorial"].includes(type) && kind === "image");
   if (!valid) return new Response("Not found", { status: 404 });
 
   let stored: string | null | undefined;
   try {
     if (type === "category") {
       stored = (await prisma.category.findUnique({ where: { id }, select: { image: true } }))?.image;
+    } else if (type === "collection") {
+      stored = (await prisma.collection.findUnique({ where: { id }, select: { image: true } }))?.image;
     } else if (type === "banner") {
       stored = (await prisma.heroBanner.findUnique({ where: { id }, select: { imageUrl: true } }))?.imageUrl;
     } else if (type === "editorial") {

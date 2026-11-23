@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient, ProductVariant } from "@prisma/client";
-import { imageUrl, isServedImageUrl } from "@/lib/productImages";
+import { imageInputError, imageUrl, isServedImageUrl } from "@/lib/productImages";
+import { MAX_PRICE } from "@/lib/productInput";
 
 /** A colour variant as sent to / received from the client. */
 export interface ProductVariantItem {
@@ -67,14 +68,32 @@ export function parseVariants(raw: unknown): { variants: ProductVariantItem[] } 
     if (seenNames.has(name.toLowerCase())) return { error: `Colour "${name}" is listed more than once.` };
     seenSkus.add(sku.toLowerCase());
     seenNames.add(name.toLowerCase());
+    if (name.length > 100 || sku.length > 64) return { error: `Variant "${name.slice(0, 40)}": name or SKU is too long.` };
+
+    // Blank price/MRP = use the product's. Anything entered must be sensible.
+    const bad = (label: string, value: unknown, min: number, max: number) => {
+      if (value === undefined || value === null || value === "") return null;
+      const n = Number(value);
+      return Number.isInteger(n) && n >= min && n <= max ? null : `Colour "${name}": ${label} must be a whole number from ${min} to ${max.toLocaleString("en-IN")}.`;
+    };
+    const numberError =
+      bad("price", v.priceValue, 1, MAX_PRICE) || bad("MRP", v.mrp, 1, MAX_PRICE) || bad("stock", v.stock, 0, 100_000);
+    if (numberError) return { error: numberError };
+    const vPrice = toOptionalInt(v.priceValue);
+    const vMrp = toOptionalInt(v.mrp);
+    if (vPrice && vMrp && vMrp < vPrice) return { error: `Colour "${name}": MRP can't be lower than its price.` };
+    for (const [key, label] of [["foldedImg", "folded photo"], ["wornImg", "worn photo"]] as const) {
+      const err = imageInputError(v[key]);
+      if (err) return { error: `Colour "${name}" ${label}: ${err}` };
+    }
 
     variants.push({
       id: typeof v.id === "string" && v.id ? v.id : undefined,
       name,
       sku,
       colorHex: typeof v.colorHex === "string" && v.colorHex ? v.colorHex : undefined,
-      priceValue: toOptionalInt(v.priceValue),
-      mrp: toOptionalInt(v.mrp),
+      priceValue: vPrice,
+      mrp: vMrp,
       stock: toOptionalInt(v.stock) ?? 0,
       foldedImg: typeof v.foldedImg === "string" && v.foldedImg ? v.foldedImg : undefined,
       wornImg: typeof v.wornImg === "string" && v.wornImg ? v.wornImg : undefined,

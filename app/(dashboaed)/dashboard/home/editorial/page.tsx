@@ -31,27 +31,57 @@ export default function EditorialPage() {
     title: "",
   });
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // The server saves the full list and deletes anything missing from it, so
+  // never save if the list didn't load: that would delete every photo.
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "failed">("loading");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load photos from API
-  useEffect(() => {
-    const loadPhotos = async () => {
-      try {
-        const res = await fetch("/api/editorial");
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            setPhotos(data);
-          }
-        }
-      } catch (e) {
-        console.error("Error loading editorial photos:", e);
-      }
-    };
+  const loadPhotos = async () => {
+    setLoadState("loading");
+    try {
+      const res = await fetch("/api/editorial", { cache: "no-store" });
+      const data = res.ok ? await res.json() : null;
+      if (!Array.isArray(data)) throw new Error(`Editorial photos failed to load (HTTP ${res.status})`);
+      setPhotos(data);
+      setLoadState("ready");
+    } catch (e) {
+      console.error("Error loading editorial photos:", e);
+      setLoadState("failed");
+    }
+  };
 
+  useEffect(() => {
     loadPhotos();
   }, []);
+
+  /** Saves the full list; true only if the server accepted it. */
+  const savePhotos = async (updated: EditorialPhoto[]): Promise<boolean> => {
+    if (loadState !== "ready") {
+      alert("Photos haven't loaded, so nothing was saved. Reload the list and try again.");
+      return false;
+    }
+    try {
+      const res = await fetch("/api/editorial", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        alert(data?.error || `Couldn't save photos (HTTP ${res.status}). Nothing was changed.`);
+        return false;
+      }
+      if (Array.isArray(data.data)) setPhotos(data.data);
+      window.dispatchEvent(new Event("thiraala-editorial-updated"));
+      return true;
+    } catch (e) {
+      console.error("Error saving editorial photos:", e);
+      alert("Network error: photos weren't saved. Please try again.");
+      return false;
+    }
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -92,17 +122,8 @@ export default function EditorialPage() {
       updated = [...photos, newPhoto];
     }
 
-    setPhotos(updated);
-    try {
-      await fetch("/api/editorial", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updated),
-      });
-      window.dispatchEvent(new Event("thiraala-editorial-updated"));
-    } catch (e) {
-      console.error("Error saving editorial photos:", e);
-    }
+    // Keep the form open on failure so the chosen photo isn't lost.
+    if (!(await savePhotos(updated))) return;
 
     setIsModalOpen(false);
     showToast(editingPhoto ? "Photo updated successfully!" : "Photo added successfully!");
@@ -111,17 +132,7 @@ export default function EditorialPage() {
   const handleDeletePhoto = async (id: string) => {
     if (!confirm("Are you sure you want to delete this editorial photo?")) return;
     const updated = photos.filter((p) => p.id !== id);
-    setPhotos(updated);
-    try {
-      await fetch("/api/editorial", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updated),
-      });
-      window.dispatchEvent(new Event("thiraala-editorial-updated"));
-    } catch (e) {
-      console.error("Error deleting editorial photo:", e);
-    }
+    if (!(await savePhotos(updated))) return;
     showToast("Editorial photo deleted.");
   };
 
@@ -155,6 +166,19 @@ export default function EditorialPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {loadState === "failed" && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 rounded-xl border border-red-200 bg-red-50 text-sm text-red-800">
+          <span>Editorial photos couldn&apos;t be loaded, so editing is paused to avoid deleting them by mistake.</span>
+          <button
+            type="button"
+            onClick={loadPhotos}
+            className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 cursor-pointer"
+          >
+            Try again
+          </button>
+        </div>
+      )}
 
       {/* Header */}
       <div className="bg-white rounded-2xl p-6 border border-[#1E3A2C]/10 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">

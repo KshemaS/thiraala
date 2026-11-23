@@ -56,3 +56,19 @@ export async function attachImageRefs<P extends { id: string; variants?: { id: s
       }) as unknown as WithImageRefs<P>
   );
 }
+
+/**
+ * Same idea for tables with a single `image` column (categories,
+ * collections): load rows with `omit: { image: true }`, then this returns
+ * each id's image as "data:" (an upload) or its static path, never the
+ * photo itself. A category photo can be several MB, and every list request
+ * used to pull all of them from the database.
+ */
+export async function singleImageRefs(table: "categories" | "collections", ids: string[]): Promise<Map<string, string | null>> {
+  if (ids.length === 0) return new Map();
+  const rows = await prisma.$queryRaw<{ id: string; image: string | null }[]>`
+    SELECT id, CASE WHEN image LIKE 'data:%' THEN 'data:' ELSE image END AS image
+    FROM ${Prisma.raw(`"${table}"`)}
+    WHERE id IN (${Prisma.join(ids)})`;
+  return new Map(rows.map((r) => [r.id, r.image]));
+}

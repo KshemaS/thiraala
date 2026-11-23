@@ -7,6 +7,8 @@ import Container from "@/components/Container";
 import CategoryCard from "@/components/CategoryCard";
 import { useWishlist } from "@/context/WishlistContext";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
+import RegisterModal from "@/components/RegisterModal";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trash2, ShoppingBag, ArrowRight, Heart } from "lucide-react";
@@ -15,6 +17,8 @@ export default function WishlistPage() {
   const { wishlist, removeFromWishlist, clearWishlist } = useWishlist();
   const { addToCart } = useCart();
   const [isClearing, setIsClearing] = useState(false);
+  const { isLoggedIn, isLoading: authLoading } = useAuth();
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
 
   useEffect(() => {
     document.title = "My Wishlist | thiraala";
@@ -63,7 +67,24 @@ export default function WishlistPage() {
           </div>
 
           {/* Wishlist Items Content */}
-          {wishlist.length === 0 ? (
+          {!authLoading && !isLoggedIn ? (
+            // The wishlist is for signed-in customers only.
+            <div className="flex flex-col items-center justify-center py-16 text-center max-w-md mx-auto">
+              <Heart className="w-10 h-10 text-[#DAA87C] mb-4" />
+              <h3 className="text-lg font-bold text-[#1E3A2C]">Sign in to see your wishlist</h3>
+              <p className="text-xs text-[#1E3A2C]/60 mt-2 leading-relaxed font-semibold">
+                Your saved sarees are kept with your account.
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsLoginOpen(true)}
+                className="mt-8 px-8 py-3.5 text-xs font-bold btn-animate-border btn-animate-border-dark rounded-full shadow-md text-white cursor-pointer"
+              >
+                Sign In
+              </button>
+              <RegisterModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} initialMode="login" />
+            </div>
+          ) : wishlist.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center max-w-md mx-auto">
               <div className="w-20 h-20 rounded-full bg-red-50 flex items-center justify-center text-red-400 mb-6 border border-red-100 shadow-inner">
                 <svg className="w-10 h-10 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">

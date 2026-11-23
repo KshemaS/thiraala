@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guard";
-import { duplicateCollectionError, toCollectionItem } from "../route";
+import { collectionInputError, duplicateCollectionError, slugify, toCollectionItem } from "../route";
+import { incomingImage } from "@/lib/productImages";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -26,6 +27,8 @@ export async function PUT(request: Request, { params }: Params) {
   try {
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
+    const inputError = collectionInputError(body ?? {});
+    if (inputError) return NextResponse.json({ success: false, error: inputError }, { status: 400 });
     const before = await prisma.collection.findUnique({ where: { id } });
     if (!before) return NextResponse.json({ error: "Collection not found" }, { status: 404 });
 
@@ -35,9 +38,10 @@ export async function PUT(request: Request, { params }: Params) {
         where: { id },
         data: {
           name,
-          slug: typeof body.slug === "string" && body.slug.trim() ? body.slug.trim() : undefined,
+          slug: typeof body.slug === "string" && slugify(body.slug) ? slugify(body.slug) : undefined,
           description: typeof body.description === "string" ? body.description.trim() : undefined,
-          image: typeof body.image === "string" ? body.image.trim() : undefined,
+          // The served link sent back means "unchanged".
+          image: incomingImage(body.image),
           status: body.status === "active" || body.status === "inactive" ? body.status : undefined,
           featured: body.featured !== undefined ? Boolean(body.featured) : undefined,
         },

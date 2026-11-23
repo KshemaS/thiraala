@@ -8,6 +8,20 @@ import { customerOwnsOrder, phoneMatchesOrder, publicTrackingView } from "@/lib/
 import { OutOfStockError, releaseOrderStock, reserveOrderStock } from "@/lib/stock";
 import { toOrderJSON, type OrderStatus, type TrackingEvent } from "../route";
 
+// Values the dashboard can set. "Confirmed"/"Shipped" are older names still on some orders.
+const ORDER_STATUSES = ["Pending", "Order Confirmed", "Confirmed", "Dispatched", "Shipped", "In Transit", "Delivered", "Cancelled"];
+const PAYMENT_STATUSES = ["Pending", "Paid", "Failed", "Refunded"];
+
+const badRequest = (error: string) => NextResponse.json({ success: false, error }, { status: 400 });
+/** undefined = not sent; otherwise a trimmed, length-capped string, or an error. */
+function optionalText(value: unknown, label: string, max: number): string | undefined | { error: string } {
+  if (value === undefined) return undefined;
+  if (value === null) return "";
+  if (typeof value !== "string") return { error: `${label} must be text.` };
+  if (value.trim().length > max) return { error: `${label} must be ${max} characters or fewer.` };
+  return value.trim();
+}
+
 async function findOrderByHumanId(id: string) {
   return prisma.order.findFirst({
     where: { humanId: { equals: id.trim(), mode: "insensitive" } },
@@ -68,7 +82,7 @@ export async function GET(
   } catch (error: any) {
     console.error("Error fetching order:", error);
     return NextResponse.json(
-      { success: false, error: error?.message || "Internal server error" },
+      { success: false, error: "Internal server error" },
       { status: 500 }
     );
   }
@@ -84,7 +98,8 @@ export async function PATCH(
 
   try {
     const { id } = await params;
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") return badRequest("Invalid request.");
     const order = await findOrderByHumanId(id);
 
     if (!order) {
@@ -95,15 +110,19 @@ export async function PATCH(
     }
 
     const now = new Date().toISOString();
-    const {
-      status,
-      trackingNumber,
-      courierName,
-      paymentStatus,
-      notes,
-      timelineUpdate,
-      resolveAttention,
-    } = body;
+    const { status, paymentStatus, resolveAttention } = body;
+    if (status !== undefined && !ORDER_STATUSES.includes(status)) {
+      return badRequest(`"${String(status).slice(0, 40)}" isn't a valid order status.`);
+    }
+    if (paymentStatus !== undefined && !PAYMENT_STATUSES.includes(paymentStatus)) {
+      return badRequest(`"${String(paymentStatus).slice(0, 40)}" isn't a valid payment status.`);
+    }
+    const trackingNumber = optionalText(body.trackingNumber, "Tracking number", 100);
+    const courierName = optionalText(body.courierName, "Courier name", 100);
+    const notes = optionalText(body.notes, "Notes", 2000);
+    if (typeof trackingNumber === "object") return badRequest(trackingNumber.error);
+    if (typeof courierName === "object") return badRequest(courierName.error);
+    if (typeof notes === "object") return badRequest(notes.error);
 
     let timeline = (order.trackingTimeline as unknown as TrackingEvent[]) || [];
     let newPaymentStatus = order.paymentStatus;
@@ -169,8 +188,11 @@ export async function PATCH(
       } else if (newStatus === "In Transit") {
         completeUpToIndex = 3;
       } else if (newStatus === "Delivered") {
+        // Delivery only implies payment for old cash-on-delivery orders (cash
+        // collected at the door). New orders are online-payment only and are
+        // Paid only via Razorpay (or an explicit admin change).
         completeUpToIndex = 4;
-        newPaymentStatus = "Paid";
+        if (order.paymentMethod === "COD") newPaymentStatus = "Paid";
       }
 
       if (newStatus !== "Cancelled") {
@@ -206,20 +228,18 @@ export async function PATCH(
       }
     }
 
-    if (timelineUpdate && Array.isArray(timelineUpdate)) {
-      timeline = timelineUpdate;
-    }
-
     // Shipping rules: only paid orders go out, and the customer's tracking
     // page needs the courier + tracking number from the moment it's sent.
+    // Delivered counts too, so an unpaid order can't skip straight to it.
     const SHIPPED = ["Dispatched", "Shipped", "In Transit"];
+    const SENT = [...SHIPPED, "Delivered"];
+    if (status !== undefined && newStatus !== order.status && SENT.includes(newStatus) && newPaymentStatus !== "Paid") {
+      return NextResponse.json(
+        { success: false, code: "NOT_PAID", error: `Order ${order.humanId} hasn't been paid, so it can't be marked as ${newStatus}.` },
+        { status: 400 }
+      );
+    }
     if (status !== undefined && SHIPPED.includes(newStatus) && !SHIPPED.includes(order.status)) {
-      if (newPaymentStatus !== "Paid") {
-        return NextResponse.json(
-          { success: false, code: "NOT_PAID", error: `Order ${order.humanId} hasn't been paid, so it can't be marked as ${newStatus}.` },
-          { status: 400 }
-        );
-      }
       if (!String(newTrackingNumber || "").trim() || !String(newCourierName || "").trim()) {
         return NextResponse.json(
           { success: false, code: "NEEDS_TRACKING", error: `Add the courier and tracking number to mark order ${order.humanId} as ${newStatus}.` },
@@ -228,10 +248,36 @@ export async function PATCH(
       }
     }
 
+    // Store policy: no cancellation once payment is confirmed, and no returns
+    // except damaged products (handled outside this status flow, with the
+    // customer's parcel opening video). The one exception is an order flagged
+    // for attention (e.g. paid after its item sold out), which has to be
+    // cancelled so the customer can be refunded.
+    const cancelling = newStatus === "Cancelled" && order.status !== "Cancelled";
+    if (cancelling && SENT.includes(order.status)) {
+      return NextResponse.json(
+        {
+          success: false,
+          code: "ALREADY_SHIPPED",
+          error: `Order ${order.humanId} has already been ${order.status === "Delivered" ? "delivered" : "shipped"}, so it can't be cancelled. Only damaged products can be returned, and the customer must send the parcel opening video.`,
+        },
+        { status: 400 }
+      );
+    }
+    if (cancelling && order.paymentStatus === "Paid" && !order.attentionReason) {
+      return NextResponse.json(
+        {
+          success: false,
+          code: "PAID_NO_CANCEL",
+          error: `Order ${order.humanId} is paid. Orders can't be cancelled after payment is confirmed.`,
+        },
+        { status: 400 }
+      );
+    }
+
     // Stock follows the order's status. Orders placed before stock tracking
     // existed (stockReservedAt never set) never took stock, so leave them be.
     const tracksStock = order.stockReservedAt !== null;
-    const cancelling = newStatus === "Cancelled" && order.status !== "Cancelled";
     const reviving =
       tracksStock &&
       !order.stockReserved &&

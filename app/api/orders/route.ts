@@ -3,7 +3,8 @@ import { getCustomerId } from "@/lib/auth/customerSession";
 import prisma from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth/guard";
 import { priceOrder } from "@/lib/orderPricing";
-import { nextOrderNumber } from "@/lib/counters";
+import { ensureOrderCounter, nextOrderNumber } from "@/lib/counters";
+import { EMAIL_ERROR, indianMobile, isValidEmail, PHONE_ERROR } from "@/lib/contact";
 
 // Orders for the same saree queue on its stock row; with a remote database a
 // burst of simultaneous checkouts can take longer than Prisma's 5 s default.
@@ -151,15 +152,11 @@ export async function GET(request: Request) {
         );
       }
 
-      const customerOrFilters: Prisma.OrderWhereInput[] = [{ userId: customerUserId }];
-      if (user.email) {
-        customerOrFilters.push({ email: { equals: user.email, mode: "insensitive" } });
-      }
-      if (user.phone) {
-        customerOrFilters.push({ phone: { equals: user.phone } });
-      }
-
-      andConditions.push({ OR: customerOrFilters });
+      // Only orders placed while signed in to this account. Matching on email
+      // or phone isn't safe: neither is verified at signup, so anyone could
+      // register with a guest buyer's phone and read their orders. Guest
+      // orders stay reachable via Track Order (order number + phone).
+      andConditions.push({ userId: customerUserId });
     }
 
     // Admin direct filters
@@ -216,9 +213,19 @@ export async function GET(request: Request) {
 // POST create new order
 export async function POST(request: Request) {
   try {
+    // Orders can only be placed from a customer account.
     const customerUserId = await getCustomerId();
+    if (!customerUserId || !(await prisma.user.findUnique({ where: { id: customerUserId }, select: { id: true } }))) {
+      return NextResponse.json(
+        { success: false, code: "SIGN_IN_REQUIRED", error: "Please sign in or create an account to place your order." },
+        { status: 401 }
+      );
+    }
 
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ success: false, error: "Invalid request." }, { status: 400 });
+    }
     // Prices, totals, fees and discounts from the browser are ignored: the
     // order is priced from the database (see lib/orderPricing.ts). The browser's
     // `total` is only compared, so nobody is charged an amount they didn't see.
@@ -248,6 +255,30 @@ export async function POST(request: Request) {
       );
     }
 
+    // Contact details must be real enough to deliver and to send updates.
+    const cleanPhone = indianMobile(phone);
+    if (!cleanPhone) return NextResponse.json({ success: false, error: PHONE_ERROR }, { status: 400 });
+    if (email && !isValidEmail(email)) return NextResponse.json({ success: false, error: EMAIL_ERROR }, { status: 400 });
+    const tooLong = (
+      [
+        [customerName, "Name", 100],
+        [address, "Address", 500],
+        [houseOrFlat, "House / flat", 200],
+        [street, "Street", 200],
+        [city, "City", 100],
+        [district, "District", 100],
+        [state, "State", 100],
+        [notes, "Notes", 1000],
+      ] as const
+    ).find(([v, , max]) => typeof v !== "string" || v.trim().length > max);
+    if (tooLong) {
+      const [, label, max] = tooLong;
+      return NextResponse.json({ success: false, error: `${label} must be text of ${max} characters or fewer.` }, { status: 400 });
+    }
+    if (!String(customerName).trim() || String(customerName).trim().length < 2) {
+      return NextResponse.json({ success: false, error: "Please enter your full name." }, { status: 400 });
+    }
+
     // Free up stock held by checkouts that were abandoned unpaid.
     await releaseExpiredReservations().catch((err) => console.error("Releasing expired reservations failed:", err));
 
@@ -267,9 +298,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Unique human-readable order id e.g. THR-1087, from an atomic counter so
-    // simultaneous orders never get the same number.
-    const newOrderId = await nextOrderNumber();
+    await ensureOrderCounter();
     const now = new Date().toISOString();
 
     const trackingTimeline: TrackingEvent[] = [
@@ -309,16 +338,19 @@ export async function POST(request: Request) {
     // nothing is saved and no stock moves.
     const created = await prisma.$transaction(async (tx) => {
       await reserveStock(tx, priced.lines);
+      // Unique human-readable id e.g. THR-1087, from an atomic counter. Taken
+      // here, after stock, so a failed order rolls it back (no gaps).
+      const newOrderId = await nextOrderNumber(tx);
       return tx.order.create({
       data: {
         humanId: newOrderId,
         stockReserved: true,
         stockReservedAt: new Date(),
         // Only the signed-in customer's own id; never an id from the request body.
-        userId: customerUserId || null,
+        userId: customerUserId,
         customerName: String(customerName).trim(),
-        phone: String(phone).trim(),
-        email: String(email).trim(),
+        phone: cleanPhone,
+        email: typeof email === "string" ? email.trim().toLowerCase() : "",
         address: String(address).trim(),
         houseOrFlat: houseOrFlat ? String(houseOrFlat).trim() : "",
         street: street ? String(street).trim() : "",
@@ -376,7 +408,7 @@ export async function POST(request: Request) {
     }
     console.error("Error creating order:", error);
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to create order" },
+      { success: false, error: "Failed to create order. Please try again." },
       { status: 500 }
     );
   }

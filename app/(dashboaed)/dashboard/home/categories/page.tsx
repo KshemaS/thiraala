@@ -49,36 +49,70 @@ export default function CategoriesPage() {
     status: "active",
   });
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // The server saves the full list and deletes anything missing from it, so
+  // never save if the list didn't load: that would delete every category.
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "failed">("loading");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load categories from API
-  useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        const [catRes, prodRes] = await Promise.all([
-          fetch("/api/categories"),
-          fetch("/api/products"),
-        ]);
-        if (catRes.ok) {
-          const data = await catRes.json();
-          if (Array.isArray(data)) {
-            setCategories(data);
-          }
-        }
-        if (prodRes.ok) {
-          const prodData = await prodRes.json();
-          if (Array.isArray(prodData)) {
-            setProducts(prodData);
-          }
-        }
-      } catch (e) {
-        console.error("Error loading categories:", e);
-      }
-    };
+  const loadCategories = async () => {
+    setLoadState("loading");
+    try {
+      const res = await fetch("/api/categories", { cache: "no-store" });
+      const data = res.ok ? await res.json() : null;
+      if (!Array.isArray(data)) throw new Error(`Categories failed to load (HTTP ${res.status})`);
+      setCategories(data);
+      setLoadState("ready");
+    } catch (e) {
+      console.error("Error loading categories:", e);
+      setLoadState("failed");
+    }
 
+    // Product counts only; a failure here doesn't affect saving.
+    try {
+      const prodRes = await fetch("/api/products");
+      const prodData = prodRes.ok ? await prodRes.json() : null;
+      if (Array.isArray(prodData)) setProducts(prodData);
+    } catch (e) {
+      console.error("Error loading products:", e);
+    }
+  };
+
+  useEffect(() => {
     loadCategories();
   }, []);
+
+  /**
+   * Saves the full list. Returns true only if the server accepted it; the
+   * page then shows the server's copy. On failure the page keeps what was
+   * there before and tells the admin why.
+   */
+  const saveCategories = async (updated: CategoryItem[]): Promise<boolean> => {
+    if (loadState !== "ready") {
+      alert("Categories haven't loaded, so nothing was saved. Reload the list and try again.");
+      return false;
+    }
+    try {
+      const res = await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        alert(data?.error || `Couldn't save categories (HTTP ${res.status}). Nothing was changed.`);
+        return false;
+      }
+      if (Array.isArray(data.data)) setCategories(data.data);
+      window.dispatchEvent(new Event("thiraala-categories-updated"));
+      return true;
+    } catch (e) {
+      console.error("Error saving categories:", e);
+      alert("Network error: categories weren't saved. Please try again.");
+      return false;
+    }
+  };
 
   const getProductCountForCategory = (catName: string) => {
     return products.filter(
@@ -171,17 +205,8 @@ export default function CategoriesPage() {
       updated = [...categories, newCategory];
     }
 
-    setCategories(updated);
-    try {
-      await fetch("/api/categories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updated),
-      });
-      window.dispatchEvent(new Event("thiraala-categories-updated"));
-    } catch (e) {
-      console.error("Error saving categories:", e);
-    }
+    // Keep the form open on failure so the admin doesn't lose what they typed.
+    if (!(await saveCategories(updated))) return;
 
     setIsModalOpen(false);
     showToast(
@@ -194,17 +219,7 @@ export default function CategoriesPage() {
   const handleDeleteCategory = async (id: string, name: string) => {
     if (!confirm(`Are you sure you want to delete the category "${name}"?`)) return;
     const updated = categories.filter((cat) => cat.id !== id);
-    setCategories(updated);
-    try {
-      await fetch("/api/categories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updated),
-      });
-      window.dispatchEvent(new Event("thiraala-categories-updated"));
-    } catch (e) {
-      console.error("Error deleting category:", e);
-    }
+    if (!(await saveCategories(updated))) return;
     showToast(`Category "${name}" deleted.`);
   };
 
@@ -248,6 +263,19 @@ export default function CategoriesPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {loadState === "failed" && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 rounded-xl border border-red-200 bg-red-50 text-sm text-red-800">
+          <span>Categories couldn&apos;t be loaded, so editing is paused to avoid deleting them by mistake.</span>
+          <button
+            type="button"
+            onClick={loadCategories}
+            className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 cursor-pointer"
+          >
+            Try again
+          </button>
+        </div>
+      )}
 
       {/* Header Section */}
       <div className="bg-white rounded-2xl p-6 border border-[#1E3A2C]/10 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">

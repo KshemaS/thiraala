@@ -52,7 +52,12 @@ interface LegacyOrder {
 }
 
 async function main() {
+  // Local-only file (git-ignored: it holds customer details).
   const dataFilePath = path.join(process.cwd(), "data", "orders.json");
+  if (!fs.existsSync(dataFilePath)) {
+    console.log("No data/orders.json — nothing to migrate.");
+    return;
+  }
   const content = fs.readFileSync(dataFilePath, "utf8");
   const legacyOrders: LegacyOrder[] = JSON.parse(content);
 

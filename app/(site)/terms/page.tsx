@@ -46,7 +46,7 @@ export default function TermsOfServicePage() {
                 <ul className="list-disc pl-5 space-y-1.5 text-xs sm:text-sm text-[#1E3A2C]/75">
                   <li><strong>Natural Variations:</strong> Because handloom sarees involve artisanal human craftsmanship, subtle irregularities in thread weave, motifs, or zari texture are hallmarks of authentic weaving, not manufacturing defects.</li>
                   <li><strong>Color Accuracy:</strong> We photograph sarees in true daylight conditions; however, minor color variations may occur depending on your mobile or desktop monitor calibration.</li>
-                  <li><strong>Pricing:</strong> All listed prices are in Indian Rupees (₹) and include applicable GST taxes. Delivery is free across India.</li>
+                  <li><strong>Pricing:</strong> All listed prices are in Indian Rupees (₹) and include applicable GST taxes. Delivery charges, if any, are shown at checkout before you pay.</li>
                 </ul>
               </section>
 
@@ -59,7 +59,7 @@ export default function TermsOfServicePage() {
                   Orders placed through our website are subject to stock availability. In the rare event that an ordered drape is unavailable due to artisanal loom scheduling, we will notify you immediately and issue a 100% full refund.
                 </p>
                 <p>
-                  You may cancel your order free of charge before the item has been dispatched from our Kochi fulfillment boutique. Once handed over to courier or India Post logistics, standard return guidelines apply.
+                  Orders can&apos;t be cancelled once payment is confirmed. We don&apos;t accept returns or exchanges, except for products that arrive damaged. A damaged-product return must be reported on WhatsApp (+91 8921768742) within 48 hours of delivery, with a parcel opening video; claims without the video can&apos;t be accepted. See our <Link href="/shipping-returns" className="text-[#DAA87C] font-semibold hover:underline">Shipping &amp; Returns</Link> policy.
                 </p>
               </section>
 

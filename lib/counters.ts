@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 
 /**
@@ -5,6 +6,10 @@ import prisma from "@/lib/prisma";
  * incremented atomically, so two orders placed at the same moment can never
  * get the same number. The first time it's used it starts after the highest
  * existing THR- number.
+ *
+ * The number is taken inside the transaction that saves the order, so an
+ * order that fails (e.g. out of stock) rolls the counter back too and leaves
+ * no gap in the numbering.
  */
 
 const ORDER_COUNTER = "order";
@@ -20,24 +25,25 @@ async function highestExistingOrderNumber(): Promise<number> {
   return max;
 }
 
-export async function nextOrderNumber(): Promise<string> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const row = await prisma.counter.update({
-        where: { name: ORDER_COUNTER },
-        data: { value: { increment: 1 } },
-      });
-      return `THR-${row.value}`;
-    } catch (err: any) {
-      if (err?.code !== "P2025") throw err; // P2025: counter not created yet
-    }
-    try {
-      const start = (await highestExistingOrderNumber()) + 1;
-      await prisma.counter.create({ data: { name: ORDER_COUNTER, value: start } });
-      return `THR-${start}`;
-    } catch (err: any) {
-      if (err?.code !== "P2002") throw err; // another request created it first: retry the increment
-    }
+/**
+ * Creates the counter (at the highest existing number) if it doesn't exist
+ * yet. Call before the order transaction: a failed insert inside a Postgres
+ * transaction would abort it.
+ */
+export async function ensureOrderCounter(): Promise<void> {
+  if (await prisma.counter.findUnique({ where: { name: ORDER_COUNTER } })) return;
+  try {
+    await prisma.counter.create({ data: { name: ORDER_COUNTER, value: await highestExistingOrderNumber() } });
+  } catch (err: any) {
+    if (err?.code !== "P2002") throw err; // another request created it first
   }
-  throw new Error("Could not allocate an order number.");
+}
+
+/** The next order number, taken inside the order's own transaction. */
+export async function nextOrderNumber(tx: Prisma.TransactionClient): Promise<string> {
+  const row = await tx.counter.update({
+    where: { name: ORDER_COUNTER },
+    data: { value: { increment: 1 } },
+  });
+  return `THR-${row.value}`;
 }

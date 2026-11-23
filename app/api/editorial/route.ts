@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guard";
-import { imageUrl, isServedImageUrl } from "@/lib/productImages";
+import { imageInputError, imageUrl, isServedImageUrl } from "@/lib/productImages";
 
 interface EditorialPhotoItem {
   id: string;
@@ -49,6 +49,11 @@ export async function POST(request: Request) {
     const photos: EditorialPhotoItem[] = body.filter(
       (photo) => photo && typeof photo.id === "string" && typeof photo.url === "string"
     );
+
+    for (const [i, photo] of photos.entries()) {
+      const err = imageInputError(photo.url) || (photo.url.trim() ? null : "a photo is required.");
+      if (err) return NextResponse.json({ success: false, error: `Photo ${i + 1}: ${err}` }, { status: 400 });
+    }
 
     await prisma.$transaction([
       prisma.editorialPhoto.deleteMany({ where: { id: { notIn: photos.map((photo) => photo.id) } } }),

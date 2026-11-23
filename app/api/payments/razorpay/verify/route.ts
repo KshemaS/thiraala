@@ -57,7 +57,7 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error("Error verifying Razorpay payment:", error);
     return NextResponse.json(
-      { success: false, error: error?.message || "Internal server error" },
+      { success: false, error: "Couldn't confirm the payment right now. If money was taken, it will be confirmed automatically shortly." },
       { status: 500 }
     );
   }

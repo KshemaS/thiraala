@@ -2,15 +2,16 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { setCustomerSession } from "@/lib/auth/customerSession";
 import { hashCustomerPassword } from "@/lib/auth/customerPassword";
+import { indianMobile, PHONE_ERROR } from "@/lib/contact";
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
 const DUPLICATE = "An account with this email address already exists. Please log in or use a different email.";
 
 export async function GET() {
   return NextResponse.json({
     status: "active",
     endpoint: "/api/auth/signup",
-    description: "Website customer signup API. Send a POST request with firstName, lastName, email, and password.",
+    description: "Website customer signup API. Send a POST request with firstName, lastName, email, password and optional phone.",
   });
 }
 
@@ -34,12 +35,21 @@ export async function POST(request: Request) {
     if (!EMAIL_RE.test(cleanEmail)) {
       return NextResponse.json({ success: false, error: "Please enter a valid email address." }, { status: 400 });
     }
-    const hasPassword = password !== undefined && password !== null && password !== "";
-    if (hasPassword && (typeof password !== "string" || password.length < 6)) {
+    // A password is required: an account without one could be created for
+    // anyone's email address and used straight away (the signup signs in).
+    if (typeof password !== "string" || password.length < 6) {
       return NextResponse.json(
         { success: false, error: "Password must be at least 6 characters long." },
         { status: 400 }
       );
+    }
+    if (password.length > 200) {
+      return NextResponse.json({ success: false, error: "Password is too long." }, { status: 400 });
+    }
+    const hasPhone = typeof phone === "string" && phone.trim() !== "";
+    const phoneDigits = hasPhone ? indianMobile(phone) : null;
+    if (hasPhone && !phoneDigits) {
+      return NextResponse.json({ success: false, error: PHONE_ERROR }, { status: 400 });
     }
 
     if (await prisma.user.findUnique({ where: { email: cleanEmail } })) {
@@ -50,11 +60,11 @@ export async function POST(request: Request) {
     try {
       user = await prisma.user.create({
         data: {
-          firstName: firstName.trim(),
-          lastName: typeof lastName === "string" && lastName.trim() ? lastName.trim() : null,
+          firstName: firstName.trim().slice(0, 100),
+          lastName: typeof lastName === "string" && lastName.trim() ? lastName.trim().slice(0, 100) : null,
           email: cleanEmail,
-          passwordHash: hasPassword ? await hashCustomerPassword(password) : null,
-          phone: typeof phone === "string" && phone.trim() ? phone.trim() : null,
+          passwordHash: await hashCustomerPassword(password),
+          phone: phoneDigits || null,
           role: "customer",
         },
       });

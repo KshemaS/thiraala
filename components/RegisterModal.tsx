@@ -11,6 +11,8 @@ interface RegisterModalProps {
   onClose: () => void;
   initialMode?: "login" | "register";
   onRegisterSuccess?: (user: UserData) => void;
+  /** Optional line shown above the form, e.g. why sign-in is needed. */
+  notice?: string;
 }
 
 export default function RegisterModal({
@@ -18,9 +20,10 @@ export default function RegisterModal({
   onClose,
   initialMode = "login",
   onRegisterSuccess,
+  notice,
 }: RegisterModalProps) {
   const { login, signup } = useAuth();
-  const [mode, setMode] = useState<"login" | "register" | "forgot">(initialMode);
+  const [mode, setMode] = useState<"login" | "register">(initialMode);
 
   // Form states
   const [firstName, setFirstName] = useState("");
@@ -31,13 +34,11 @@ export default function RegisterModal({
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [forgotSuccessMessage, setForgotSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       setMode(initialMode);
       setErrorMessage(null);
-      setForgotSuccessMessage(null);
     }
   }, [isOpen, initialMode]);
 
@@ -45,7 +46,6 @@ export default function RegisterModal({
     e.preventDefault();
     setIsSubmitting(true);
     setErrorMessage(null);
-    setForgotSuccessMessage(null);
 
     // Strict client-side email format check requiring domain extension (TH-023)
     const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
@@ -56,14 +56,6 @@ export default function RegisterModal({
     }
 
     try {
-      if (mode === "forgot") {
-        setForgotSuccessMessage(
-          "Password reset link has been dispatched to your email. You can also reach our boutique directly at thiraala@gmail.com or WhatsApp +91 8921768742 for instant assistance."
-        );
-        setIsSubmitting(false);
-        return;
-      }
-
       if (mode === "login") {
         const res = await login(email, password);
         if (!res.success || !res.user) {
@@ -155,7 +147,6 @@ export default function RegisterModal({
             </button>
 
             {/* Mode Switcher Tabs */}
-            {mode !== "forgot" ? (
               <div className="flex bg-[#1E3A2C]/5 p-1 rounded-2xl border border-[#1E3A2C]/10 select-none">
                 <button
                   type="button"
@@ -186,52 +177,25 @@ export default function RegisterModal({
                   Create Account
                 </button>
               </div>
-            ) : (
-              <div className="flex items-center gap-2 select-none">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode("login");
-                    setErrorMessage(null);
-                    setForgotSuccessMessage(null);
-                  }}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[#1E3A2C]/70 hover:text-[#1E3A2C] cursor-pointer"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  <span>Back to Sign In</span>
-                </button>
-              </div>
-            )}
 
             {/* Header */}
             <div className="text-center select-none">
               <h3 className="text-2xl font-bold text-[#1E3A2C] tracking-tight">
                 {mode === "login"
                   ? "Welcome Back"
-                  : mode === "register"
-                  ? "Create Account"
-                  : "Reset Password"}
+                  : "Create Account"}
               </h3>
               <p className="text-xs text-[#1E3A2C]/65 mt-1 font-semibold">
                 {mode === "login"
                   ? "Sign in to proceed seamlessly with your order"
-                  : mode === "register"
-                  ? "Register to save your drapes and customize collections"
-                  : "Enter your registered email to receive reset instructions"}
+                  : "Register to save your drapes and customize collections"}
               </p>
               <div className="w-10 h-0.5 bg-[#DAA87C] mx-auto mt-2.5 rounded-full"></div>
             </div>
 
             {/* Success Message Alert */}
-            {forgotSuccessMessage && (
-              <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-medium flex items-center gap-2.5">
-                <svg className="w-4 h-4 flex-shrink-0 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span>{forgotSuccessMessage}</span>
-              </div>
+            {notice && (
+              <p className="mt-4 px-3 py-2 rounded-xl bg-[#DAA87C]/10 text-[#1E3A2C] text-xs font-semibold text-center">{notice}</p>
             )}
 
             {/* Error Message Alert */}
@@ -308,8 +272,7 @@ export default function RegisterModal({
                 </div>
               )}
 
-              {mode !== "forgot" && (
-                <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
                     <label className="block text-[11px] font-bold text-[#1E3A2C]/80 uppercase tracking-wider leading-relaxed select-none">
                       Password *
@@ -343,23 +306,7 @@ export default function RegisterModal({
                       )}
                     </button>
                   </div>
-                  {mode === "login" && (
-                    <div className="flex justify-end pt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMode("forgot");
-                          setErrorMessage(null);
-                          setForgotSuccessMessage(null);
-                        }}
-                        className="text-[11px] font-semibold text-[#DAA87C] hover:text-[#1E3A2C] transition-colors cursor-pointer"
-                      >
-                        Forgot password?
-                      </button>
-                    </div>
-                  )}
                 </div>
-              )}
 
               <button
                 type="submit"
@@ -373,21 +320,13 @@ export default function RegisterModal({
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                     <span>
-                      {mode === "login"
-                        ? "Signing In..."
-                        : mode === "register"
-                        ? "Creating Account..."
-                        : "Sending Link..."}
+                      {mode === "login" ? "Signing In..." : "Creating Account..."}
                     </span>
                   </>
                 ) : (
                   <>
                     <span>
-                      {mode === "login"
-                        ? "Sign In"
-                        : mode === "register"
-                        ? "Register"
-                        : "Send Reset Link"}
+                      {mode === "login" ? "Sign In" : "Register"}
                     </span>
                     <svg className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
@@ -413,7 +352,7 @@ export default function RegisterModal({
                     Create Account
                   </button>
                 </p>
-              ) : mode === "register" ? (
+              ) : (
                 <p>
                   Already have an account?{" "}
                   <button
@@ -421,21 +360,6 @@ export default function RegisterModal({
                     onClick={() => {
                       setMode("login");
                       setErrorMessage(null);
-                    }}
-                    className="text-[#DAA87C] font-bold hover:underline cursor-pointer ml-1"
-                  >
-                    Sign In
-                  </button>
-                </p>
-              ) : (
-                <p>
-                  Remember your password?{" "}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMode("login");
-                      setErrorMessage(null);
-                      setForgotSuccessMessage(null);
                     }}
                     className="text-[#DAA87C] font-bold hover:underline cursor-pointer ml-1"
                   >
