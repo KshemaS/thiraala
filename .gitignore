@@ -48,3 +48,6 @@ next-env.d.ts
 # customer data (names, phones, addresses, password hashes) — never commit
 /data/orders.json
 /data/users.json
+
+# e2e run state (test product id, counter to restore)
+/e2e/.e2e-state.json

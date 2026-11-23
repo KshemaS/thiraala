@@ -1,14 +1,18 @@
 import { test, expect } from "@playwright/test";
+import { readState } from "./testData";
 
-const SAMPLE_ITEM = {
-  id: "test-item-1",
-  productId: "test-product-1",
-  name: "Test Saree",
-  price: "₹1999",
-  priceValue: 1999,
+// The in-stock product global-setup created for this run. Read lazily:
+// Playwright loads this file to list the tests before global-setup runs.
+const product = () => readState().product;
+const sampleItem = () => ({
+  id: product().id,
+  productId: product().id,
+  name: product().name,
   quantity: 1,
-};
+});
 
+// No `total`: the server prices the order itself (price + delivery), and a
+// total sent by the browser is only compared against that.
 function sampleOrderPayload() {
   return {
     customerName: "API Test Customer",
@@ -20,9 +24,7 @@ function sampleOrderPayload() {
     city: "Kochi",
     district: "Ernakulam",
     state: "Kerala",
-    total: 1999,
-    subtotal: 1999,
-    items: [SAMPLE_ITEM],
+    items: [sampleItem()],
   };
 }
 
@@ -66,7 +68,9 @@ test.describe("POST /api/orders", () => {
     expect(body.order.paymentStatus).toBe("Pending");
     expect(body.order.status).toBe("Pending");
     expect(body.order.items).toHaveLength(1);
-    expect(body.order.items[0].name).toBe(SAMPLE_ITEM.name);
+    expect(body.order.items[0].name).toBe(product().name);
+    // Priced from the database, not from anything the browser sent.
+    expect(body.order.subtotal).toBe(product().priceValue);
   });
 
   test("rejects a request missing required fields", async ({ request }) => {
@@ -147,7 +151,7 @@ test.describe("POST /api/payments/razorpay/order", () => {
     const body = await response.json();
     expect(body.success).toBe(true);
     expect(body.razorpayOrderId).toMatch(/^order_/);
-    expect(body.amount).toBe(1999 * 100);
+    expect(body.amount).toBe(order.total * 100);
 
     // A retry reuses the same Razorpay order, so a payment against it can't be lost.
     const retry = await request.post("/api/payments/razorpay/order", { data: { orderId: order.id } });

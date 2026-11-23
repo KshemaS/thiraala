@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { readState } from "./testData";
 
 const TEST_CUSTOMER = {
   name: "Test Customer",
@@ -22,9 +23,8 @@ const TEST_CUSTOMER = {
 // adjustments the first time this actually executes. Requires RAZORPAY_KEY_ID /
 // RAZORPAY_KEY_SECRET to be set to TEST MODE keys — never run this against live keys.
 test("guest can complete a Razorpay checkout end-to-end", async ({ page }) => {
-  // 1. Add the first available product to the cart from its product page.
-  await page.goto("/products");
-  await page.locator('a[href^="/products/"]').first().click();
+  // 1. Add the run's in-stock test product (see global-setup) to the cart.
+  await page.goto(`/products/${readState().product.slug}`);
   await page.getByRole("button", { name: /buy now/i }).click();
 
   // 2. Go to cart, proceed to checkout. Checkout requires a logged-in account
@@ -34,7 +34,8 @@ test("guest can complete a Razorpay checkout end-to-end", async ({ page }) => {
   await page.getByRole("button", { name: /proceed to checkout/i }).click();
 
   const uniqueEmail = `e2e-${Date.now()}@thiraala.com`;
-  await page.getByRole("button", { name: /create account/i }).click();
+  // The sign-in box has a "Create Account" tab and a link at the bottom; use the tab.
+  await page.getByRole("button", { name: /create account/i }).first().click();
   await page.getByPlaceholder("First name").fill("E2E");
   await page.getByPlaceholder("Last name").fill("Tester");
   await page.getByPlaceholder("Enter your email address").fill(uniqueEmail);
@@ -46,7 +47,8 @@ test("guest can complete a Razorpay checkout end-to-end", async ({ page }) => {
 
   // 3. Fill the checkout form.
   await page.getByPlaceholder("Enter your full name").fill(TEST_CUSTOMER.name);
-  await page.getByPlaceholder("10-digit mobile").fill(TEST_CUSTOMER.phone);
+  // exact: the closed sign-up box keeps a "10-digit mobile number…" field in the page.
+  await page.getByPlaceholder("10-digit mobile", { exact: true }).fill(TEST_CUSTOMER.phone);
   await page.getByPlaceholder("For tracking receipt").fill(TEST_CUSTOMER.email);
   await page.getByPlaceholder("6-digit Pincode").fill(TEST_CUSTOMER.pincode);
   await page
