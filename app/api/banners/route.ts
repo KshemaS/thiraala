@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guard";
-import { imageUrl, isServedImageUrl } from "@/lib/productImages";
+import { imageInputError, imageUrl, isServedImageUrl } from "@/lib/productImages";
 
 const BANNER_KEYS = ["image1", "image2", "image3"] as const;
 type BannerKey = (typeof BANNER_KEYS)[number];
@@ -45,6 +45,11 @@ export async function POST(request: Request) {
       if (typeof value !== "string" || isServedImageUrl(value)) return [];
       return [{ key, value, order: index + 1 }];
     });
+
+    for (const { key, value } of changes) {
+      const err = imageInputError(value);
+      if (err) return NextResponse.json({ success: false, error: `Banner ${key.slice(-1)}: ${err}` }, { status: 400 });
+    }
 
     if (changes.length > 0) {
       await prisma.$transaction(

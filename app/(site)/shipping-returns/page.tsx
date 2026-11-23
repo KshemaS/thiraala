@@ -7,7 +7,7 @@ import { Truck, RotateCcw, Clock, MapPin, CheckCircle } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Shipping & Returns Policy",
-  description: "Learn about thiraala shipping timelines, delivery across Kerala and India, free shipping policy, and hassle-free returns.",
+  description: "thiraala shipping timelines across Kerala and India, and our returns policy: no cancellation after payment; damaged products only, reported on WhatsApp with a parcel opening video.",
 };
 
 export default function ShippingReturnsPage() {
@@ -22,27 +22,19 @@ export default function ShippingReturnsPage() {
             <div className="text-center space-y-3">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#1E3A2C]/5 text-[#1E3A2C] text-xs font-semibold uppercase tracking-wider">
                 <Truck className="w-3.5 h-3.5 text-[#DAA87C]" />
-                <span>Delivery & Exchanges</span>
+                <span>Delivery & Returns</span>
               </div>
               <h1 className="text-3xl sm:text-4xl font-bold text-[#1E3A2C] tracking-tight">
                 Shipping & Returns
               </h1>
               <div className="w-12 h-1 bg-[#DAA87C] mx-auto my-3 rounded-full"></div>
               <p className="text-xs sm:text-sm text-[#1E3A2C]/60">
-                Transparent delivery schedules, authentic packaging, and 7-day hassle-free returns.
+                Transparent delivery schedules, careful packaging, and a clear damaged-product policy.
               </p>
             </div>
 
             {/* Quick Highlights Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <div className="bg-white p-6 rounded-2xl border border-stone-200/60 shadow-xs flex flex-col items-center text-center space-y-2">
-                <div className="w-12 h-12 rounded-full bg-[#1E3A2C]/5 text-[#1E3A2C] flex items-center justify-center mb-1">
-                  <Truck className="w-5 h-5 text-[#DAA87C]" />
-                </div>
-                <h3 className="font-bold text-sm text-[#1E3A2C]">Free Delivery Across India</h3>
-                <p className="text-xs text-[#1E3A2C]/70">No minimum order amount. We deliver free across all Indian states and postal codes via India Post.</p>
-              </div>
-
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="bg-white p-6 rounded-2xl border border-stone-200/60 shadow-xs flex flex-col items-center text-center space-y-2">
                 <div className="w-12 h-12 rounded-full bg-[#1E3A2C]/5 text-[#1E3A2C] flex items-center justify-center mb-1">
                   <Clock className="w-5 h-5 text-[#DAA87C]" />
@@ -55,8 +47,8 @@ export default function ShippingReturnsPage() {
                 <div className="w-12 h-12 rounded-full bg-[#1E3A2C]/5 text-[#1E3A2C] flex items-center justify-center mb-1">
                   <RotateCcw className="w-5 h-5 text-[#DAA87C]" />
                 </div>
-                <h3 className="font-bold text-sm text-[#1E3A2C]">7-Day Return Policy</h3>
-                <p className="text-xs text-[#1E3A2C]/70">Hassle-free return or exchange within 7 days of receiving your saree parcel.</p>
+                <h3 className="font-bold text-sm text-[#1E3A2C]">Damaged Product Returns</h3>
+                <p className="text-xs text-[#1E3A2C]/70">Only damaged products can be returned, via WhatsApp. A parcel opening video is mandatory.</p>
               </div>
             </div>
 
@@ -80,31 +72,34 @@ export default function ShippingReturnsPage() {
               <section className="space-y-3">
                 <h2 className="text-lg font-bold text-[#1E3A2C] flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 text-[#DAA87C]" />
-                  2. 7-Day Return & Exchange Policy
+                  2. Cancellations & Returns
                 </h2>
                 <p>
-                  We want you to love your drape. If you are not satisfied with your purchase, you may initiate a return or exchange within <strong>7 days</strong> of parcel delivery.
+                  <strong>No cancellations after payment.</strong> Once your payment is confirmed, the order can&apos;t be cancelled.
                 </p>
                 <p>
-                  <strong>Conditions for Return:</strong>
+                  <strong>No returns or exchanges</strong>, except for products that arrive damaged.
+                </p>
+                <p>
+                  <strong>Conditions for a damaged-product return:</strong>
                 </p>
                 <ul className="list-disc pl-5 space-y-1.5 text-xs sm:text-sm text-[#1E3A2C]/75">
-                  <li>The saree must be unworn, unwashed, and with all original boutique tags and fold packaging intact.</li>
-                  <li>Blouse pieces attached with the saree must be unstitched and uncut.</li>
-                  <li>Damaged or defective parcels reported with parcel opening video/photos within 48 hours receive immediate priority replacements.</li>
+                  <li>A <strong>parcel opening video is mandatory</strong>: record one continuous, unedited video from the sealed parcel until the damage is visible. Claims without this video can&apos;t be accepted.</li>
+                  <li>Report the damage on <strong>WhatsApp</strong> with the video and your Order ID within <strong>48 hours</strong> of delivery.</li>
+                  <li>The saree must be unworn, unwashed, and returned with its original tags and packaging.</li>
                 </ul>
               </section>
 
               <section className="space-y-3">
                 <h2 className="text-lg font-bold text-[#1E3A2C]">
-                  3. How to Initiate a Return
+                  3. How to Report a Damaged Product
                 </h2>
                 <p>
-                  To request a return or exchange, simply contact our support team with your Order ID:
+                  Damaged-product returns are handled on WhatsApp. Send your Order ID, the parcel opening video and a short note about the damage to:
                 </p>
                 <div className="p-4 rounded-2xl bg-[#fcfbfa] border border-[#1E3A2C]/10 text-xs sm:text-sm space-y-1">
-                  <p><strong>WhatsApp Support:</strong> <a href="https://wa.me/918921768742" target="_blank" rel="noopener noreferrer" className="text-[#DAA87C] font-semibold hover:underline">+91 8921768742</a></p>
-                  <p><strong>Email:</strong> <a href="mailto:thiraala@gmail.com" className="text-[#DAA87C] font-semibold hover:underline">thiraala@gmail.com</a></p>
+                  <p><strong>WhatsApp:</strong> <a href={`https://wa.me/918921768742?text=${encodeURIComponent("Hi, I received a damaged saree. Order ID: ")}`} target="_blank" rel="noopener noreferrer" className="text-[#DAA87C] font-semibold hover:underline">+91 8921768742</a></p>
+                  <p>Our team will check the video and reply with the next steps for the return.</p>
                   <p><strong>Support Hours:</strong> Monday to Saturday: 10:00 AM – 6:00 PM</p>
                 </div>
               </section>

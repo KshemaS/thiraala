@@ -1,20 +1,17 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCustomerId } from "@/lib/auth/customerSession";
+import { imageUrl } from "@/lib/productImages";
+import { attachImageRefs, OMIT_PHOTOS } from "@/lib/imageRefs";
 
 /**
- * The signed-in customer's wishlist (guests keep theirs in the browser).
+ * The signed-in customer's wishlist (sign-in is required to use one).
  * The customer always comes from the signed session cookie; a `userId` in
  * the request is ignored, so nobody can read or change another customer's
  * wishlist.
  */
 
-const MAX_TEXT = 500;
-const MAX_URL = 2048;
-
-const text = (v: unknown, max = MAX_TEXT) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
-// Only short links (e.g. /api/images/...); never multi-MB base64 photos.
-const imageRef = (v: unknown) => (typeof v === "string" && v && !v.startsWith("data:") && v.length <= MAX_URL ? v : null);
+const text = (v: unknown, max = 500) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
 
 const notSignedIn = () =>
   NextResponse.json({ success: false, error: "Please sign in to use your wishlist." }, { status: 401 });
@@ -58,7 +55,8 @@ export async function GET() {
   }
 }
 
-// POST { productId, name, price, foldedImg?, wornImg?, category? } — add one item.
+// POST { productId } — add one item. Only real products on sale can be saved,
+// and their name, price and photos come from the database, not the request.
 export async function POST(request: Request) {
   try {
     const userId = await getCustomerId();
@@ -66,13 +64,18 @@ export async function POST(request: Request) {
 
     const body = await request.json().catch(() => null);
     const productId = text(body?.productId ?? body?.id, 200);
-    const name = text(body?.name);
     if (!productId) {
       return NextResponse.json({ success: false, error: "Product ID is required to add to wishlist." }, { status: 400 });
     }
-    if (!name) {
-      return NextResponse.json({ success: false, error: "Product name is required." }, { status: 400 });
+
+    const found = await prisma.product.findFirst({
+      where: { id: productId, status: "active" },
+      omit: OMIT_PHOTOS,
+    });
+    if (!found) {
+      return NextResponse.json({ success: false, error: "This saree isn't available any more." }, { status: 404 });
     }
+    const [product] = await attachImageRefs([found]);
 
     const existing = await prisma.wishlistItem.findFirst({ where: { userId, productId } });
     if (existing) {
@@ -82,12 +85,12 @@ export async function POST(request: Request) {
     const item = await prisma.wishlistItem.create({
       data: {
         userId,
-        productId,
-        name,
-        price: text(body?.price, 50) || "",
-        foldedImg: imageRef(body?.foldedImg) ?? imageRef(body?.img),
-        wornImg: imageRef(body?.wornImg) ?? imageRef(body?.img),
-        category: text(body?.category, 200),
+        productId: product.id,
+        name: product.name,
+        price: product.price,
+        foldedImg: imageUrl("product", product.id, "folded", product.foldedImg, product.updatedAt) ?? null,
+        wornImg: imageUrl("product", product.id, "worn", product.wornImg, product.updatedAt) ?? null,
+        category: product.categoryName,
       },
     });
     return NextResponse.json({ success: true, message: "Added to wishlist.", item: toJSON(item) }, { status: 201 });

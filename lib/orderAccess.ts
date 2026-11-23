@@ -1,4 +1,3 @@
-import prisma from "@/lib/prisma";
 import type { Order, OrderItem } from "@prisma/client";
 
 /**
@@ -13,13 +12,13 @@ import type { Order, OrderItem } from "@prisma/client";
 /** Last 10 digits, so "+91 98765 43210" and "9876543210" match. */
 export const normalizePhone = (phone: string | null | undefined) => (phone || "").replace(/\D/g, "").slice(-10);
 
-export async function customerOwnsOrder(customerId: string, order: Pick<Order, "userId" | "email" | "phone">) {
-  if (order.userId && order.userId === customerId) return true;
-  const user = await prisma.user.findUnique({ where: { id: customerId }, select: { email: true, phone: true } });
-  if (!user) return false;
-  if (user.email && order.email && user.email.toLowerCase() === order.email.toLowerCase()) return true;
-  const phone = normalizePhone(user.phone);
-  return phone.length === 10 && phone === normalizePhone(order.phone);
+/**
+ * Only orders placed while signed in to this account. Email and phone aren't
+ * verified at signup, so matching on them would let anyone register with a
+ * guest buyer's details and read that buyer's full order and address.
+ */
+export async function customerOwnsOrder(customerId: string, order: Pick<Order, "userId">) {
+  return !!order.userId && order.userId === customerId;
 }
 
 export function phoneMatchesOrder(phone: string, order: Pick<Order, "phone">) {

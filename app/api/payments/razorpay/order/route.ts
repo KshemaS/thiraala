@@ -2,37 +2,50 @@ import { NextResponse } from "next/server";
 import Razorpay from "razorpay";
 import prisma from "@/lib/prisma";
 import { OutOfStockError, reserveOrderStock } from "@/lib/stock";
+import { getCustomerId } from "@/lib/auth/customerSession";
+import { customerOwnsOrder } from "@/lib/orderAccess";
 
-// POST create a Razorpay order for an already-created, Pending app order.
-// Hit by the customer's browser during checkout — no admin auth required.
+const NOT_FOUND = "Order not found.";
+
+/**
+ * POST { orderId } — start (or resume) payment for a Pending order.
+ * Orders can only be placed signed in, so the caller must be the signed-in
+ * customer the order belongs to. Order numbers are sequential, so the number
+ * alone must not be enough to touch someone's order.
+ *
+ * One Razorpay order is created per app order and reused on every retry.
+ * Creating a new one each time overwrote razorpayOrderId, so a payment made
+ * against the earlier Razorpay order couldn't be matched by verify or the
+ * webhook, and was silently lost.
+ */
 export async function POST(request: Request) {
   try {
-    const { orderId } = await request.json();
+    const body = await request.json().catch(() => null);
+    const orderId = typeof body?.orderId === "string" ? body.orderId.trim() : "";
 
     if (!orderId) {
+      return NextResponse.json({ success: false, error: "orderId is required" }, { status: 400 });
+    }
+
+    const customerId = await getCustomerId();
+    if (!customerId) {
       return NextResponse.json(
-        { success: false, error: "orderId is required" },
-        { status: 400 }
+        { success: false, code: "SIGN_IN_REQUIRED", error: "Please sign in to pay for your order." },
+        { status: 401 }
       );
     }
 
     const order = await prisma.order.findFirst({
-      where: { humanId: { equals: String(orderId).trim(), mode: "insensitive" } },
+      where: { humanId: { equals: orderId, mode: "insensitive" } },
       include: { items: true },
     });
-
-    if (!order) {
-      return NextResponse.json(
-        { success: false, error: "Order not found" },
-        { status: 404 }
-      );
+    // Someone else's order looks the same as a missing one.
+    if (!order || !(await customerOwnsOrder(customerId, order))) {
+      return NextResponse.json({ success: false, error: NOT_FOUND }, { status: 404 });
     }
 
     if (order.paymentStatus === "Paid") {
-      return NextResponse.json(
-        { success: false, error: "Order is already paid" },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: "Order is already paid" }, { status: 400 });
     }
 
     if (order.status === "Cancelled") {
@@ -40,6 +53,27 @@ export async function POST(request: Request) {
         { success: false, error: "This order was cancelled. Please place a new order." },
         { status: 409 }
       );
+    }
+
+    const instance = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID!,
+      key_secret: process.env.RAZORPAY_KEY_SECRET!,
+    });
+    const amountInPaise = Math.round(order.total * 100);
+
+    // Reuse the Razorpay order from an earlier attempt (Razorpay allows
+    // several payment attempts on one order).
+    let razorpayOrderId: string | null = null;
+    if (order.razorpayOrderId) {
+      const existing = await instance.orders.fetch(order.razorpayOrderId);
+      if (existing.status === "paid") {
+        // Money was taken; verify/webhook will mark the order Paid. Don't let them pay twice.
+        return NextResponse.json(
+          { success: false, error: "We've already received your payment and are confirming it. Please check your order in a minute." },
+          { status: 409 }
+        );
+      }
+      if (Number(existing.amount) === amountInPaise) razorpayOrderId = existing.id;
     }
 
     // Retrying payment after the stock hold expired (or after a failed
@@ -58,27 +92,19 @@ export async function POST(request: Request) {
       throw err;
     }
 
-    const instance = new Razorpay({
-      key_id: process.env.RAZORPAY_KEY_ID!,
-      key_secret: process.env.RAZORPAY_KEY_SECRET!,
-    });
-
-    const amountInPaise = Math.round(order.total * 100);
-
-    const razorpayOrder = await instance.orders.create({
-      amount: amountInPaise,
-      currency: "INR",
-      receipt: order.humanId,
-    });
-
-    await prisma.order.update({
-      where: { id: order.id },
-      data: { razorpayOrderId: razorpayOrder.id },
-    });
+    if (!razorpayOrderId) {
+      const razorpayOrder = await instance.orders.create({
+        amount: amountInPaise,
+        currency: "INR",
+        receipt: order.humanId,
+      });
+      razorpayOrderId = razorpayOrder.id;
+      await prisma.order.update({ where: { id: order.id }, data: { razorpayOrderId } });
+    }
 
     return NextResponse.json({
       success: true,
-      razorpayOrderId: razorpayOrder.id,
+      razorpayOrderId,
       amount: amountInPaise,
       currency: "INR",
       keyId: process.env.RAZORPAY_KEY_ID,

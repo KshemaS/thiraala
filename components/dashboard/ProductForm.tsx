@@ -307,7 +307,8 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
 
     const payload = {
       ...formData,
-      mrp: typeof formData.mrp === "number" && formData.mrp > 0 ? formData.mrp : undefined,
+      // Blank MRP = no MRP (null clears it on edit; undefined would keep the old one).
+      mrp: typeof formData.mrp === "number" && formData.mrp > 0 ? formData.mrp : null,
       highlights: formData.highlights
         ? formData.highlights
             .split("\n")

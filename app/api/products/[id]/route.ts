@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Prisma, Product, ProductVariant } from "@prisma/client";
 import prisma from "@/lib/prisma";
-import { requireAdmin } from "@/lib/auth/guard";
+import { getAdminSession, requireAdmin } from "@/lib/auth/guard";
 import {
   formatVariant,
   parseVariants,
@@ -9,7 +9,8 @@ import {
   variantSkuConflict,
   variantsIncludeSlim,
 } from "@/lib/productVariants";
-import { imageUrl, incomingImage } from "@/lib/productImages";
+import { imageUrl } from "@/lib/productImages";
+import { parseProductFields } from "@/lib/productInput";
 import { attachImageRefs, OMIT_PHOTOS } from "@/lib/imageRefs";
 import { ProductItem } from "../route";
 
@@ -73,7 +74,8 @@ export async function GET(
 
   try {
     const product = await findProduct(id, true);
-    if (!product) {
+    // Hidden products look the same as missing ones to everyone but the admin.
+    if (!product || (product.status !== "active" && !(await getAdminSession()))) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
     return NextResponse.json(formatProduct(product));
@@ -92,12 +94,24 @@ export async function PUT(
 
   try {
     const { id } = await params;
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ success: false, error: "Invalid request." }, { status: 400 });
+    }
 
     const existing = await findProduct(id);
     if (!existing) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
+
+    const checked = parseProductFields(body, {
+      requireCore: false,
+      current: { priceValue: existing.priceValue, mrp: existing.mrp, name: existing.name, sku: existing.sku },
+    });
+    if ("error" in checked) {
+      return NextResponse.json({ success: false, error: checked.error }, { status: 400 });
+    }
+    const f = checked.fields;
 
     // Variants are only touched when the request includes them.
     let variants = null;
@@ -109,57 +123,56 @@ export async function PUT(
       variants = parsed.variants;
     }
 
+    // Another product already using the new SKU or slug: say so plainly.
+    const changes = [
+      f.sku && f.sku !== existing.sku ? { sku: f.sku } : null,
+      f.slug && f.slug !== existing.slug ? { slug: f.slug } : null,
+    ].filter((c): c is { sku: string } | { slug: string } => !!c);
+    if (changes.length) {
+      const clash = await prisma.product.findFirst({
+        where: { id: { not: existing.id }, OR: changes },
+        select: { sku: true, name: true },
+      });
+      if (clash) {
+        const field = clash.sku === f.sku ? `SKU "${f.sku}"` : `URL slug "${f.slug}"`;
+        return NextResponse.json(
+          { success: false, error: `${field} is already used by "${clash.name}". Please choose another.` },
+          { status: 409 }
+        );
+      }
+    }
+
     const hasVariants = variants ? variants.length > 0 : existing.variants.length > 0;
     // With variants, product stock is always the total of the variants' stock.
     const stock = variants && variants.length
       ? variants.reduce((sum, v) => sum + v.stock, 0)
       : hasVariants
         ? undefined
-        : body.stock !== undefined
-          ? Math.max(0, Number(body.stock) || 0)
-          : undefined;
+        : f.stock;
 
     const data: Prisma.ProductUpdateInput = {
-      name: body.name !== undefined ? body.name : undefined,
-      subtitle: body.subtitle !== undefined ? body.subtitle : undefined,
-      slug: body.slug !== undefined ? body.slug : undefined,
-      price: body.price !== undefined ? body.price : undefined,
-      priceValue: body.priceValue !== undefined ? Number(body.priceValue) : undefined,
-      mrp: body.mrp !== undefined ? (body.mrp === "" || body.mrp === null ? null : Number(body.mrp)) : undefined,
-      rating: body.rating !== undefined ? (body.rating === "" || body.rating === null ? null : Number(body.rating)) : undefined,
-      ratingCount:
-        body.ratingCount !== undefined
-          ? body.ratingCount === "" || body.ratingCount === null
-            ? null
-            : Number(body.ratingCount)
-          : undefined,
-      selectedColor: body.selectedColor !== undefined ? body.selectedColor : undefined,
-      categoryName: body.category !== undefined ? body.category : undefined,
-      collectionName: body.collection !== undefined ? body.collection : undefined,
+      name: f.name,
+      sku: f.sku,
+      slug: f.slug,
+      price: f.price,
+      priceValue: f.priceValue,
+      mrp: f.mrp,
+      rating: f.rating,
+      ratingCount: f.ratingCount,
+      categoryName: f.categoryName,
+      collectionName: f.collectionName,
       stock,
-      fabric: body.fabric !== undefined ? body.fabric : undefined,
-      sareeFabric: body.sareeFabric !== undefined ? body.sareeFabric : undefined,
-      color: body.color !== undefined ? body.color : undefined,
-      pattern: body.pattern !== undefined ? body.pattern : undefined,
-      border: body.border !== undefined ? body.border : undefined,
-      blouse: body.blouse !== undefined ? body.blouse : undefined,
-      occasion: body.occasion !== undefined ? body.occasion : undefined,
-      sareeLength: body.sareeLength !== undefined ? body.sareeLength : undefined,
-      blouseLength: body.blouseLength !== undefined ? body.blouseLength : undefined,
-      careInstructions: body.careInstructions !== undefined ? body.careInstructions : undefined,
-      highlights:
-        body.highlights !== undefined
-          ? Array.isArray(body.highlights)
-            ? body.highlights.join("\n")
-            : body.highlights
-          : undefined,
-      description: body.description !== undefined ? body.description : undefined,
+      ...f.text,
+      // These two have defaults and can't be emptied.
+      sareeLength: f.text.sareeLength ?? undefined,
+      blouseLength: f.text.blouseLength ?? undefined,
+      highlights: f.highlights,
       // The form sends back the served URL when a photo wasn't changed.
-      foldedImg: incomingImage(body.foldedImg),
-      wornImg: incomingImage(body.wornImg),
-      status: body.status !== undefined ? body.status : undefined,
-      featured: body.featured !== undefined ? Boolean(body.featured) : undefined,
-      isNewArrival: body.isNewArrival !== undefined ? Boolean(body.isNewArrival) : undefined,
+      foldedImg: f.foldedImg,
+      wornImg: f.wornImg,
+      status: f.status,
+      featured: f.featured,
+      isNewArrival: f.isNewArrival,
     };
 
     const updated = await prisma.$transaction(async (tx) => {
@@ -177,7 +190,7 @@ export async function PUT(
   } catch (error: any) {
     console.error("Error updating product:", error);
     return NextResponse.json(
-      { success: false, error: variantSkuConflict(error) || error.message || "Failed to update product" },
+      { success: false, error: variantSkuConflict(error) || "Failed to update product" },
       { status: 500 }
     );
   }
@@ -218,7 +231,7 @@ export async function DELETE(
   } catch (error: any) {
     console.error("Error deleting product:", error);
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to delete product" },
+      { success: false, error: "Failed to delete product" },
       { status: 500 }
     );
   }

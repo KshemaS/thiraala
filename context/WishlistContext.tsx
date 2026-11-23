@@ -1,7 +1,15 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
+import RegisterModal from "@/components/RegisterModal";
+
+/**
+ * The wishlist is for signed-in customers only, kept on the server
+ * (/api/wishlist). A guest who taps the heart is asked to sign in, and the
+ * saree is saved as soon as they do.
+ */
+const OLD_GUEST_KEY = "thiraala_guest_wishlist";
 
 export interface SareeProduct {
   id: number | string;
@@ -35,6 +43,10 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
   const [wishlist, setWishlist] = useState<SareeProduct[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [toast, setToast] = useState<{ message: string; show: boolean }>({ message: "", show: false });
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  // The saree a guest tried to save; added once they sign in.
+  const pendingRef = useRef<SareeProduct | null>(null);
+  const signedInRef = useRef(false);
 
   const showToast = (message: string) => {
     setToast({ message, show: true });
@@ -45,41 +57,17 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
     return user?.id || user?.email || null;
   }, [user]);
 
-  // Fetch wishlist from local storage for guests, or API for authenticated users
+  // Load the signed-in customer's wishlist from the API (guests have none)
   const refreshWishlist = useCallback(async () => {
     try {
       const userId = getUserId();
       if (!userId) {
-        if (typeof window !== "undefined") {
-          try {
-            const stored = localStorage.getItem("thiraala_guest_wishlist");
-            if (stored) {
-              const parsed = JSON.parse(stored);
-              if (Array.isArray(parsed)) {
-                // Filter out corrupted or broken items (e.g. price '?' or missing names)
-                const validItems = parsed.filter(
-                  (item: any) =>
-                    item &&
-                    item.name &&
-                    item.price &&
-                    item.price !== "?" &&
-                    !String(item.price).includes("NaN") &&
-                    item.name !== "Mayil Peacock Motif" &&
-                    item.name !== "Gopuram Classic Kasavu"
-                );
-                setWishlist(validItems);
-                if (validItems.length !== parsed.length) {
-                  localStorage.setItem("thiraala_guest_wishlist", JSON.stringify(validItems));
-                }
-              } else {
-                setWishlist([]);
-              }
-            } else {
-              setWishlist([]);
-            }
-          } catch {
-            setWishlist([]);
-          }
+        setWishlist([]);
+        // Guest wishlists used to live in the browser; drop the leftovers.
+        try {
+          localStorage.removeItem(OLD_GUEST_KEY);
+        } catch {
+          // storage unavailable
         }
         return;
       }
@@ -114,57 +102,65 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
     }
   }, [getUserId]);
 
-  // Initial load: Fetch from API or localStorage
+  // Initial load (and again whenever the signed-in customer changes)
   useEffect(() => {
     refreshWishlist();
   }, [refreshWishlist]);
 
-  // CREATE: Add item to wishlist
+  /** Saves one saree on the server; returns false if it was refused. */
+  const saveToServer = async (product: SareeProduct): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/wishlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // The server takes name, price and photos from the product itself.
+        body: JSON.stringify({ productId: product.productId ?? product.id }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        showToast(data?.error || "Couldn't save to your wishlist. Please try again.");
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error("Failed to add to wishlist:", err);
+      showToast("Couldn't save to your wishlist. Please try again.");
+      return false;
+    }
+  };
+
+  // CREATE: Add item to wishlist (signed-in customers only)
   const addToWishlist = async (product: SareeProduct) => {
+    if (!getUserId()) {
+      pendingRef.current = product;
+      setIsLoginOpen(true);
+      return;
+    }
+
     const exists = wishlist.some((item) => String(item.id) === String(product.id));
     if (exists) {
       showToast(`${product.name} is already in your wishlist`);
       return;
     }
 
-    // Optimistic UI update
-    const updated = [product, ...wishlist];
-    setWishlist(updated);
+    // Optimistic UI update, undone if the server refuses.
+    const before = wishlist;
+    setWishlist([product, ...wishlist]);
     showToast(`${product.name} added to wishlist`);
-
-    const userId = getUserId();
-    if (!userId) {
-      if (typeof window !== "undefined") {
-        try {
-          localStorage.setItem("thiraala_guest_wishlist", JSON.stringify(updated));
-        } catch {
-          // ignore
-        }
-      }
-      return;
-    }
-
-    // API call (POST /api/wishlist)
-    try {
-      await fetch("/api/wishlist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          productId: product.id,
-          name: product.name,
-          price: product.price,
-          foldedImg: typeof product.foldedImg === "string" ? product.foldedImg : null,
-          wornImg: typeof product.wornImg === "string" ? product.wornImg : null,
-          img: typeof product.img === "string" ? product.img : null,
-          altFolded: product.altFolded || product.name,
-          altWorn: product.altWorn || product.name,
-          category: product.category,
-        }),
-      });
-    } catch (err) {
-      console.error("Failed to sync add to wishlist API:", err);
-    }
+    if (!(await saveToServer(product))) setWishlist(before);
   };
+
+  // After a guest signs in from the heart button, save the saree they chose.
+  useEffect(() => {
+    const pending = pendingRef.current;
+    if (!user || !pending) return;
+    pendingRef.current = null;
+    (async () => {
+      if (await saveToServer(pending)) showToast(`${pending.name} added to wishlist`);
+      await refreshWishlist();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   // DELETE: Remove item from wishlist
   const removeFromWishlist = async (id: number | string) => {
@@ -179,17 +175,7 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
       showToast("Removed from wishlist");
     }
 
-    const userId = getUserId();
-    if (!userId) {
-      if (typeof window !== "undefined") {
-        try {
-          localStorage.setItem("thiraala_guest_wishlist", JSON.stringify(updated));
-        } catch {
-          // ignore
-        }
-      }
-      return;
-    }
+    if (!getUserId()) return;
 
     // API call (DELETE /api/wishlist?productId=...)
     try {
@@ -211,17 +197,7 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
     setWishlist([]);
     showToast("Wishlist cleared");
 
-    const userId = getUserId();
-    if (!userId) {
-      if (typeof window !== "undefined") {
-        try {
-          localStorage.removeItem("thiraala_guest_wishlist");
-        } catch {
-          // ignore
-        }
-      }
-      return;
-    }
+    if (!getUserId()) return;
 
     // API call (DELETE /api/wishlist?clearAll=true)
     try {
@@ -274,6 +250,22 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
       }}
     >
       {children}
+      <RegisterModal
+        isOpen={isLoginOpen}
+        // Called before onClose on a successful sign-in; keeps the saree so the
+        // effect above saves it once the signed-in user arrives.
+        onRegisterSuccess={() => {
+          signedInRef.current = true;
+        }}
+        onClose={() => {
+          setIsLoginOpen(false);
+          // Closed without signing in: forget the saree.
+          if (!signedInRef.current) pendingRef.current = null;
+          signedInRef.current = false;
+        }}
+        initialMode="login"
+        notice="Please sign in to save sarees to your wishlist."
+      />
       {/* Premium Toast Notification */}
       <div
         className={`fixed bottom-6 right-6 z-[200] pointer-events-none transition-all duration-500 transform ${

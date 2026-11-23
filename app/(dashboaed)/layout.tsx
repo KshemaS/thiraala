@@ -649,19 +649,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-3 sm:gap-4">
-            {/* Search Input Simulation */}
-            <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#1E3A2C]/10 bg-[#FAF8F5] w-64">
-              <svg className="w-4 h-4 text-[#1E3A2C]/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search analytics, SKUs..."
-                className="text-xs bg-transparent border-none outline-none w-full text-[#1E3A2C]"
-                disabled
-              />
-            </div>
-
             {/* Notification Badge */}
             <button className="p-2.5 rounded-full hover:bg-[#1E3A2C]/5 text-[#1E3A2C] transition-all relative">
               <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

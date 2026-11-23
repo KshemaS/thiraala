@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAdmin } from "@/lib/auth/guard";
-import { imageUrl, incomingImage } from "@/lib/productImages";
+import { getAdminSession, requireAdmin } from "@/lib/auth/guard";
+import { imageUrl } from "@/lib/productImages";
+import { parseProductFields, productSlug } from "@/lib/productInput";
 import { attachImageRefs, OMIT_PHOTOS } from "@/lib/imageRefs";
 import {
   formatVariant,
@@ -53,29 +54,14 @@ export interface ProductItem {
   variants?: ProductVariantItem[];
 }
 
-/** Trimmed string, or null when blank/missing. */
-function text(value: unknown): string | null {
-  if (value === undefined || value === null) return null;
-  const s = String(value).trim();
-  return s ? s : null;
-}
-
-function optionalNumber(value: unknown): number | null {
-  if (value === undefined || value === null || value === "") return null;
-  const n = Number(value);
-  return Number.isFinite(n) && n >= 0 ? n : null;
-}
-
-function optionalInt(value: unknown): number | null {
-  const n = optionalNumber(value);
-  return n === null ? null : Math.round(n);
-}
-
 export async function GET() {
   try {
+    // Hidden (inactive) products and drafts are for the dashboard only.
+    const isAdmin = !!(await getAdminSession());
     // Photos aren't loaded, only whether each exists (lib/imageRefs.ts).
     const dbProducts = await attachImageRefs(
       await prisma.product.findMany({
+        where: isAdmin ? undefined : { status: "active" },
         orderBy: { createdAt: "desc" },
         omit: OMIT_PHOTOS,
         include: variantsIncludeSlim,
@@ -140,14 +126,16 @@ export async function POST(request: Request) {
   if (unauthorized) return unauthorized;
 
   try {
-    const body = await request.json();
-
-    if (!body.name || !body.sku) {
-      return NextResponse.json(
-        { success: false, error: "Product name and SKU are required." },
-        { status: 400 }
-      );
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ success: false, error: "Invalid request." }, { status: 400 });
     }
+
+    const checked = parseProductFields(body, { requireCore: true });
+    if ("error" in checked) {
+      return NextResponse.json({ success: false, error: checked.error }, { status: 400 });
+    }
+    const f = checked.fields;
 
     const parsed = parseVariants(body.variants);
     if ("error" in parsed) {
@@ -155,82 +143,59 @@ export async function POST(request: Request) {
     }
     const variants = parsed.variants;
 
-    const newId = body.id || `prod_${Date.now()}`;
-    const slug = body.slug || body.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-
-    const newProduct: ProductItem = {
-      ...body,
-      id: newId,
-      slug,
-      status: body.status || "active",
-      // With variants, product stock is the total of the variants' stock.
-      stock: variants.length
-        ? variants.reduce((sum, v) => sum + v.stock, 0)
-        : Number(body.stock) >= 0
-          ? Number(body.stock)
-          : 0,
-      priceValue: Number(body.priceValue) || (body.price ? Number(String(body.price).replace(/[^0-9]/g, "")) : 0),
-      variants,
-    };
+    const id = typeof body.id === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(body.id) ? body.id : undefined;
+    // Blank or non-English (e.g. Malayalam) slugs fall back to the name, then the SKU.
+    const slug = f.slug ?? productSlug(f.name, f.sku);
+    // With variants, product stock is the total of the variants' stock.
+    const stock = variants.length ? variants.reduce((sum, v) => sum + v.stock, 0) : f.stock ?? 0;
 
     // Refuse to reuse a SKU or URL slug instead of overwriting that product.
     const clash = await prisma.product.findFirst({
-      where: { OR: [{ sku: newProduct.sku }, { slug }] },
+      where: { OR: [{ sku: f.sku! }, { slug }] },
       select: { sku: true, slug: true, name: true },
     });
     if (clash) {
-      const field = clash.sku === newProduct.sku ? `SKU "${newProduct.sku}"` : `URL slug "${slug}"`;
+      const field = clash.sku === f.sku ? `SKU "${f.sku}"` : `URL slug "${slug}"`;
       return NextResponse.json(
         { success: false, error: `${field} is already used by "${clash.name}". Please choose another.` },
         { status: 409 }
       );
     }
 
+    let saved;
     try {
-      await prisma.$transaction(async (tx) => {
-        const saved = await tx.product.create({
+      saved = await prisma.$transaction(async (tx) => {
+        const created = await tx.product.create({
           data: {
-            id: typeof newProduct.id === "string" ? newProduct.id : undefined,
-            sku: newProduct.sku,
-            name: newProduct.name,
-            subtitle: text(body.subtitle),
+            id,
+            sku: f.sku!,
+            name: f.name!,
             slug,
-            price: newProduct.price || "₹0",
-            priceValue: Number(newProduct.priceValue) || 0,
-            mrp: optionalInt(body.mrp),
-            rating: optionalNumber(body.rating),
-            ratingCount: optionalInt(body.ratingCount),
-            selectedColor: text(body.selectedColor),
-            categoryName: newProduct.category || "General",
-            categoryId: newProduct.categoryId || null,
-            collectionName: newProduct.collection || null,
-            collectionId: newProduct.collectionId || null,
-            stock: newProduct.stock ?? 0,
-            fabric: text(body.fabric),
-            sareeFabric: text(body.sareeFabric),
-            color: text(body.color),
-            pattern: text(body.pattern),
-            border: text(body.border),
-            blouse: text(body.blouse),
-            occasion: text(body.occasion),
-            sareeLength: text(body.sareeLength) ?? undefined,
-            blouseLength: text(body.blouseLength) ?? undefined,
-            careInstructions: text(body.careInstructions),
-            highlights: Array.isArray(body.highlights)
-              ? body.highlights.map(String).map((h: string) => h.trim()).filter(Boolean).join("\n") || null
-              : text(body.highlights),
-            description: text(body.description),
+            price: f.price!,
+            priceValue: f.priceValue!,
+            mrp: f.mrp ?? null,
+            rating: f.rating ?? null,
+            ratingCount: f.ratingCount ?? null,
+            categoryName: f.categoryName || "General",
+            categoryId: typeof body.categoryId === "string" && body.categoryId ? body.categoryId : null,
+            collectionName: f.collectionName ?? null,
+            collectionId: typeof body.collectionId === "string" && body.collectionId ? body.collectionId : null,
+            stock,
+            ...f.text,
+            sareeLength: f.text.sareeLength ?? undefined,
+            blouseLength: f.text.blouseLength ?? undefined,
+            highlights: f.highlights ?? null,
             // A served URL only refers to another row's photo; never store it.
-            foldedImg: incomingImage(body.foldedImg) ?? null,
-            wornImg: incomingImage(body.wornImg) ?? null,
-            altFolded: text(body.altFolded),
-            altWorn: text(body.altWorn),
-            status: newProduct.status || "active",
-            featured: Boolean(body.featured),
-            isNewArrival: Boolean(body.isNewArrival),
+            foldedImg: f.foldedImg ?? null,
+            wornImg: f.wornImg ?? null,
+            status: f.status ?? "active",
+            featured: f.featured ?? false,
+            isNewArrival: f.isNewArrival ?? false,
           },
+          select: { id: true, sku: true, slug: true, name: true },
         });
-        await syncVariants(tx, saved.id, variants);
+        await syncVariants(tx, created.id, variants);
+        return created;
       });
     } catch (dbErr) {
       console.error("Could not save product:", dbErr);
@@ -240,12 +205,9 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ success: true, product: newProduct });
+    return NextResponse.json({ success: true, product: { ...saved, priceValue: f.priceValue, price: f.price, stock } });
   } catch (error: any) {
     console.error("Error creating product:", error);
-    return NextResponse.json(
-      { success: false, error: error.message || "Failed to create product" },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: "Failed to create product" }, { status: 500 });
   }
 }

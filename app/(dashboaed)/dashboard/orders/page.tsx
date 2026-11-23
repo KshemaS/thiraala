@@ -35,6 +35,20 @@ import {
 } from "lucide-react";
 import { Order, OrderStatus, PaymentStatus } from "@/app/api/orders/route";
 
+/**
+ * Store policy (enforced by the server too): no cancelling once payment is
+ * confirmed or the parcel has left; only damaged products can be returned,
+ * with the customer's parcel opening video. An order flagged for attention
+ * (e.g. paid after its item sold out) may still be cancelled to refund it.
+ */
+const SENT_STATUSES = ["Dispatched", "Shipped", "In Transit", "Delivered"];
+function cancelBlockedReason(o: Order): string | null {
+  if (o.status === "Cancelled") return null;
+  if (SENT_STATUSES.includes(o.status)) return "Already shipped: only damaged products can be returned (opening video required)";
+  if (o.paymentStatus === "Paid" && !o.attentionReason) return "Paid orders can't be cancelled";
+  return null;
+}
+
 export default function OrdersDashboardPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -253,6 +267,10 @@ export default function OrdersDashboardPage() {
       setDispatchCourier(current.courierName || "India Post (Speed Post)");
       setDispatchTracking("");
       return;
+    }
+    if (newStatus === "Cancelled" && current && cancelBlockedReason(current)) {
+      alert(`Order #${orderId} can't be cancelled. ${cancelBlockedReason(current)}.`);
+      return false;
     }
     if (newStatus === "Cancelled" && !confirm(`Cancel order #${orderId}? Its stock will be put back.`)) return;
     try {
@@ -748,7 +766,9 @@ export default function OrdersDashboardPage() {
                             <option value="Dispatched">Dispatched</option>
                             <option value="In Transit">In Transit</option>
                             <option value="Delivered">Delivered</option>
-                            <option value="Cancelled">Cancelled</option>
+                            <option value="Cancelled" disabled={!!cancelBlockedReason(order)}>
+                              {cancelBlockedReason(order) ? "Cancelled (not allowed)" : "Cancelled"}
+                            </option>
                           </select>
                         </div>
                       </td>
@@ -1043,8 +1063,13 @@ export default function OrdersDashboardPage() {
                         <option value="Dispatched">Dispatched</option>
                         <option value="In Transit">In Transit</option>
                         <option value="Delivered">Delivered</option>
-                        <option value="Cancelled">Cancelled</option>
+                        <option value="Cancelled" disabled={!!cancelBlockedReason(selectedOrder)}>
+                          {cancelBlockedReason(selectedOrder) ? "Cancelled (not allowed)" : "Cancelled"}
+                        </option>
                       </select>
+                      {cancelBlockedReason(selectedOrder) && (
+                        <p className="text-[10px] text-[#1E3A2C]/50">{cancelBlockedReason(selectedOrder)}.</p>
+                      )}
                     </div>
 
                     {/* Courier Name */}

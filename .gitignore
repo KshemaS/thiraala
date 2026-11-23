@@ -44,3 +44,7 @@ env.local
 *.tsbuildinfo
 next-env.d.ts
 .neon
+
+# customer data (names, phones, addresses, password hashes) — never commit
+/data/orders.json
+/data/users.json

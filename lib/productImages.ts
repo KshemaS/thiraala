@@ -10,7 +10,7 @@
  * strings when they're listed in images.localPatterns.
  */
 
-export type ImageOwner = "product" | "variant" | "category" | "banner" | "editorial";
+export type ImageOwner = "product" | "variant" | "category" | "collection" | "banner" | "editorial";
 export type ImageKind = "folded" | "worn" | "image";
 
 const SERVED_PREFIX = "/api/images/";
@@ -52,6 +52,30 @@ export function incomingImage(value: unknown): string | null | undefined {
   if (value === null) return null;
   const s = String(value).trim();
   return s ? s : null;
+}
+
+const UPLOAD_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif", "image/gif"];
+/** ~5 MB of image data (base64 adds a third), matching the dashboard's upload limit. */
+const MAX_DATA_URL_LENGTH = Math.ceil((5 * 1024 * 1024 * 4) / 3) + 100;
+
+/**
+ * Why an image value from a form can't be stored, or null if it's fine.
+ * Allowed: nothing, a served link ("unchanged"), a site path (/images/…),
+ * an https link, or an uploaded JPEG/PNG/WebP/AVIF/GIF up to ~5 MB.
+ */
+export function imageInputError(value: unknown): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string") return "must be an image.";
+  const v = value.trim();
+  if (isServedImageUrl(v)) return null;
+  if (isDataUrl(v)) {
+    const type = /^data:([^;,]+)/.exec(v)?.[1]?.toLowerCase();
+    if (!type || !UPLOAD_TYPES.includes(type) || !v.includes(";base64,")) return "upload a JPEG, PNG, WebP, AVIF or GIF image.";
+    if (v.length > MAX_DATA_URL_LENGTH) return "the image is larger than 5 MB. Please use a smaller photo.";
+    return null;
+  }
+  if ((v.startsWith("/") && !v.startsWith("//")) || /^https:\/\//i.test(v)) return v.length <= 2048 ? null : "the link is too long.";
+  return "must be an uploaded image, a site path or an https link.";
 }
 
 /** Splits "data:image/png;base64,AAAA" into its type and bytes. */

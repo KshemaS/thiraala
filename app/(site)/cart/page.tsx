@@ -7,6 +7,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Container from "@/components/Container";
 import RegisterModal from "@/components/RegisterModal";
+import { EMAIL_ERROR, indianMobile, isValidEmail, PHONE_ERROR } from "@/lib/contact";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -214,6 +215,23 @@ export default function CartPage() {
     e.preventDefault();
     if (cart.length === 0) return;
 
+    // Orders need an account (the server refuses guests too).
+    if (!user) {
+      setIsCheckoutOpen(false);
+      setIsAuthModalOpen(true);
+      return;
+    }
+
+    if (!indianMobile(phone)) {
+      alert(PHONE_ERROR);
+      return;
+    }
+
+    if (email.trim() && !isValidEmail(email)) {
+      alert(EMAIL_ERROR);
+      return;
+    }
+
     if (!houseOrFlat.trim()) {
       alert("Please provide your house name or flat name & number.");
       return;
@@ -301,6 +319,12 @@ export default function CartPage() {
       });
 
       const orderData = await orderResponse.json();
+      if (orderResponse.status === 401) {
+        setIsSubmitting(false);
+        setIsCheckoutOpen(false);
+        setIsAuthModalOpen(true);
+        return;
+      }
       if (!orderData.success || !orderData.order) {
         // Prices changed since the bag was filled: update the bag so the
         // customer sees (and can accept) the current total.
@@ -636,6 +660,7 @@ export default function CartPage() {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         initialMode="login"
+        notice="Please sign in or create an account to place your order."
         onRegisterSuccess={(loggedInUser) => {
           setIsAuthModalOpen(false);
           // Auto-fill delivery form and open checkout

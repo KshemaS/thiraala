@@ -26,8 +26,35 @@ function sampleOrderPayload() {
   };
 }
 
+type Api = import("@playwright/test").APIRequestContext;
+
+/**
+ * Orders can only be placed signed in: creates a fresh customer account on
+ * this request context, whose cookies keep it signed in for the test.
+ */
+async function signIn(request: Api) {
+  const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const response = await request.post("/api/auth/signup", {
+    data: { firstName: "API", lastName: "Tester", email: `api-test-${unique}@thiraala.com`, password: "test-password-123" },
+  });
+  expect(response.ok()).toBeTruthy();
+}
+
+async function createOrder(request: Api) {
+  await signIn(request);
+  const response = await request.post("/api/orders", { data: sampleOrderPayload() });
+  expect(response.ok()).toBeTruthy();
+  return (await response.json()).order;
+}
+
 test.describe("POST /api/orders", () => {
+  test("refuses to create an order without signing in", async ({ request }) => {
+    const response = await request.post("/api/orders", { data: sampleOrderPayload() });
+    expect(response.status()).toBe(401);
+  });
+
   test("creates an order that starts Pending/Pending, never auto-Paid", async ({ request }) => {
+    await signIn(request);
     const response = await request.post("/api/orders", { data: sampleOrderPayload() });
     expect(response.ok()).toBeTruthy();
 
@@ -43,6 +70,7 @@ test.describe("POST /api/orders", () => {
   });
 
   test("rejects a request missing required fields", async ({ request }) => {
+    await signIn(request);
     const response = await request.post("/api/orders", {
       data: { customerName: "No Items Customer" },
     });
@@ -52,9 +80,14 @@ test.describe("POST /api/orders", () => {
     expect(body.success).toBe(false);
   });
 
-  test("created order can be fetched back by its human id", async ({ request }) => {
-    const createResponse = await request.post("/api/orders", { data: sampleOrderPayload() });
-    const { order } = await createResponse.json();
+  test("rejects a nonsense phone number", async ({ request }) => {
+    await signIn(request);
+    const response = await request.post("/api/orders", { data: { ...sampleOrderPayload(), phone: "abc" } });
+    expect(response.status()).toBe(400);
+  });
+
+  test("created order can be fetched back by its owner", async ({ request }) => {
+    const order = await createOrder(request);
 
     const getResponse = await request.get(`/api/orders/${order.id}`);
     expect(getResponse.ok()).toBeTruthy();
@@ -66,9 +99,8 @@ test.describe("POST /api/orders", () => {
 });
 
 test.describe("PATCH /api/orders/[id] admin guard", () => {
-  test("rejects an unauthenticated status update with 401", async ({ request }) => {
-    const createResponse = await request.post("/api/orders", { data: sampleOrderPayload() });
-    const { order } = await createResponse.json();
+  test("rejects a non-admin status update with 401", async ({ request }) => {
+    const order = await createOrder(request);
 
     const patchResponse = await request.patch(`/api/orders/${order.id}`, {
       data: { status: "Dispatched" },
@@ -83,35 +115,49 @@ test.describe("POST /api/payments/razorpay/order", () => {
     expect(response.status()).toBe(400);
   });
 
+  test("needs sign-in", async ({ request }) => {
+    const response = await request.post("/api/payments/razorpay/order", { data: { orderId: "THR-999999" } });
+    expect(response.status()).toBe(401);
+  });
+
   test("404s for an order id that doesn't exist", async ({ request }) => {
-    const response = await request.post("/api/payments/razorpay/order", {
-      data: { orderId: "THR-999999" },
-    });
+    await signIn(request);
+    const response = await request.post("/api/payments/razorpay/order", { data: { orderId: "THR-999999" } });
     expect(response.status()).toBe(404);
+  });
+
+  test("another customer can't start payment on someone else's order", async ({ request, playwright, baseURL }) => {
+    const order = await createOrder(request);
+
+    const stranger = await playwright.request.newContext({ baseURL });
+    await signIn(stranger);
+    const response = await stranger.post("/api/payments/razorpay/order", { data: { orderId: order.id } });
+    expect(response.status()).toBe(404);
+    await stranger.dispose();
   });
 
   test("creates a Razorpay order for a real Pending order (requires valid RAZORPAY_KEY_ID/SECRET)", async ({
     request,
   }) => {
-    const createResponse = await request.post("/api/orders", { data: sampleOrderPayload() });
-    const { order } = await createResponse.json();
+    const order = await createOrder(request);
 
-    const response = await request.post("/api/payments/razorpay/order", {
-      data: { orderId: order.id },
-    });
+    const response = await request.post("/api/payments/razorpay/order", { data: { orderId: order.id } });
     expect(response.ok()).toBeTruthy();
 
     const body = await response.json();
     expect(body.success).toBe(true);
     expect(body.razorpayOrderId).toMatch(/^order_/);
     expect(body.amount).toBe(1999 * 100);
+
+    // A retry reuses the same Razorpay order, so a payment against it can't be lost.
+    const retry = await request.post("/api/payments/razorpay/order", { data: { orderId: order.id } });
+    expect((await retry.json()).razorpayOrderId).toBe(body.razorpayOrderId);
   });
 });
 
 test.describe("POST /api/payments/razorpay/verify", () => {
   test("rejects a bad signature instead of marking the order Paid", async ({ request }) => {
-    const createResponse = await request.post("/api/orders", { data: sampleOrderPayload() });
-    const { order } = await createResponse.json();
+    const order = await createOrder(request);
 
     const razorpayOrderResponse = await request.post("/api/payments/razorpay/order", {
       data: { orderId: order.id },

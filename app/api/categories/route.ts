@@ -1,18 +1,24 @@
 import { NextResponse } from "next/server";
-import type { Category } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guard";
-import { imageUrl, isServedImageUrl } from "@/lib/productImages";
+import { imageInputError, imageUrl, isServedImageUrl } from "@/lib/productImages";
+import { singleImageRefs } from "@/lib/imageRefs";
 
-// Uploaded category photos are base64 in the database; send a short link
-// (served by /api/images/category/…) instead of megabytes of text.
-const toJSON = (c: Category) => ({ ...c, image: imageUrl("category", c.id, "image", c.image, c.updatedAt) ?? null });
+/**
+ * All categories with their photo as a short link (served by
+ * /api/images/category/…). Uploaded photos are base64 in the database, up to
+ * several MB each, so the photo column itself is never loaded here.
+ */
+async function listCategories() {
+  const rows = await prisma.category.findMany({ orderBy: { createdAt: "asc" }, omit: { image: true } });
+  const refs = await singleImageRefs("categories", rows.map((c) => c.id));
+  return rows.map((c) => ({ ...c, image: imageUrl("category", c.id, "image", refs.get(c.id), c.updatedAt) ?? null }));
+}
 
 // GET — all categories (database only).
 export async function GET() {
   try {
-    const categories = await prisma.category.findMany({ orderBy: { createdAt: "asc" } });
-    return NextResponse.json(categories.map(toJSON));
+    return NextResponse.json(await listCategories());
   } catch (err) {
     console.error("Failed to load categories:", err);
     return NextResponse.json({ success: false, error: "Unable to load categories." }, { status: 500 });
@@ -42,10 +48,14 @@ export async function POST(request: Request) {
 
     const incoming = body
       .filter((c) => c && typeof c.name === "string" && c.name.trim())
-      .map((c) => ({
+      .map((c, i) => ({
         id: typeof c.id === "string" ? c.id : undefined,
         name: c.name.trim() as string,
-        slug: ((typeof c.slug === "string" && c.slug.trim()) || slugify(c.name)) as string,
+        // Typed slug, else from the name; a Malayalam-only name gives nothing,
+        // so fall back to one based on the (stable) id.
+        slug: (slugify(typeof c.slug === "string" ? c.slug : "") ||
+          slugify(c.name) ||
+          `category-${slugify(typeof c.id === "string" ? c.id : "").slice(-8) || i + 1}`) as string,
         description: typeof c.description === "string" && c.description.trim() ? c.description.trim() : null,
         // undefined = keep the stored photo; null = no photo
         image: isServedImageUrl(c.image)
@@ -55,6 +65,14 @@ export async function POST(request: Request) {
             : null,
         status: c.status === "inactive" ? "inactive" : "active",
       }));
+
+    for (const c of incoming) {
+      const err = imageInputError(c.image);
+      if (err) return NextResponse.json({ success: false, error: `Category "${c.name}" photo: ${err}` }, { status: 400 });
+      if (c.name.length > 100 || c.slug.length > 120 || (c.description?.length ?? 0) > 1000) {
+        return NextResponse.json({ success: false, error: `Category "${c.name.slice(0, 40)}": name, slug or description is too long.` }, { status: 400 });
+      }
+    }
 
     const names = new Set<string>();
     for (const c of incoming) {
@@ -95,8 +113,7 @@ export async function POST(request: Request) {
       { maxWait: 15_000, timeout: 30_000 }
     );
 
-    const saved = await prisma.category.findMany({ orderBy: { createdAt: "asc" } });
-    return NextResponse.json({ success: true, data: saved.map(toJSON) });
+    return NextResponse.json({ success: true, data: await listCategories() });
   } catch (error: any) {
     console.error("Error saving categories:", error);
     const duplicate = error?.code === "P2002";

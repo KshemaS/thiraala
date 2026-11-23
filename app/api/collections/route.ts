@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import type { Collection } from "@prisma/client";
 import prisma from "@/lib/prisma";
-import { requireAdmin } from "@/lib/auth/guard";
+import { getAdminSession, requireAdmin } from "@/lib/auth/guard";
+import { imageInputError, imageUrl, incomingImage } from "@/lib/productImages";
+import { singleImageRefs } from "@/lib/imageRefs";
 
 export interface CollectionItem {
   id: string;
@@ -13,13 +15,17 @@ export interface CollectionItem {
   featured?: boolean;
 }
 
-export function toCollectionItem(c: Collection): CollectionItem {
+/**
+ * `image` may be the stored value or just its ref ("data:" for an upload);
+ * either way the client gets a short link, never the base64 photo itself.
+ */
+export function toCollectionItem(c: Omit<Collection, "image"> & { image: string | null | undefined }): CollectionItem {
   return {
     id: c.id,
     name: c.name,
     slug: c.slug,
     description: c.description || "",
-    image: c.image || "",
+    image: imageUrl("collection", c.id, "image", c.image, c.updatedAt) || "",
     status: c.status === "inactive" ? "inactive" : "active",
     featured: c.featured,
   };
@@ -38,11 +44,27 @@ export function duplicateCollectionError(err: unknown) {
     : null;
 }
 
-// GET — all collections (database only).
+/** Why a collection's fields can't be saved, or null. */
+export function collectionInputError(body: Record<string, unknown>): string | null {
+  const err = imageInputError(body.image);
+  if (err) return `Cover photo: ${err}`;
+  if (typeof body.name === "string" && body.name.trim().length > 100) return "Name must be 100 characters or fewer.";
+  if (typeof body.description === "string" && body.description.length > 2000) return "Description must be 2000 characters or fewer.";
+  return null;
+}
+
+// GET — collections (database only). Hidden ones are for the dashboard only.
+// The photo column isn't loaded: uploads are served by /api/images/collection/….
 export async function GET() {
   try {
-    const collections = await prisma.collection.findMany({ orderBy: { createdAt: "desc" } });
-    return NextResponse.json(collections.map(toCollectionItem));
+    const isAdmin = !!(await getAdminSession());
+    const rows = await prisma.collection.findMany({
+      where: isAdmin ? undefined : { status: "active" },
+      orderBy: { createdAt: "desc" },
+      omit: { image: true },
+    });
+    const refs = await singleImageRefs("collections", rows.map((c) => c.id));
+    return NextResponse.json(rows.map((c) => toCollectionItem({ ...c, image: refs.get(c.id) })));
   } catch (err) {
     console.error("Failed to load collections:", err);
     return NextResponse.json({ success: false, error: "Unable to load collections." }, { status: 500 });
@@ -60,13 +82,16 @@ export async function POST(request: Request) {
     if (!name) {
       return NextResponse.json({ success: false, error: "Please enter a collection name." }, { status: 400 });
     }
+    const inputError = collectionInputError(body);
+    if (inputError) return NextResponse.json({ success: false, error: inputError }, { status: 400 });
 
     const created = await prisma.collection.create({
       data: {
         name,
-        slug: (typeof body.slug === "string" && body.slug.trim()) || slugify(name),
+        // Malayalam-only names slugify to nothing; fall back to a unique one.
+        slug: slugify(typeof body.slug === "string" ? body.slug : "") || slugify(name) || `collection-${Date.now().toString(36)}`,
         description: typeof body.description === "string" ? body.description.trim() : "",
-        image: typeof body.image === "string" ? body.image.trim() : "",
+        image: incomingImage(body.image) ?? null,
         status: body.status === "inactive" ? "inactive" : "active",
         featured: Boolean(body.featured),
       },
