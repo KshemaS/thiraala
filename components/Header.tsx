@@ -3,13 +3,32 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import Container from "@/components/Container";
 import RegisterModal from "@/components/RegisterModal";
 import { useWishlist } from "@/context/WishlistContext";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 
+const DESKTOP_NAV = [
+  { href: "/about", label: "About" },
+  { href: "/products", label: "Products" },
+  { href: "/orders", label: "Orders" },
+  { href: "/contact", label: "Contact" },
+];
+
+const MOBILE_NAV = [
+  { href: "/about", label: "About Thiraala" },
+  { href: "/products", label: "Products & Collections" },
+  { href: "/orders", label: "My Orders" },
+  { href: "/track-order", label: "Track Shipment" },
+  { href: "/contact", label: "Contact Us" },
+];
+
 export default function Header() {
+  const pathname = usePathname() || "/";
+  // A section counts as current on its own pages too (e.g. /products/lilly-blossom).
+  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   const [isVisible, setIsVisible] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -92,30 +111,23 @@ export default function Header() {
 
           {/* Center Pill Menu Capsule (Desktop) */}
           <nav className="hidden lg:flex items-center gap-2 px-2 py-1.5 rounded-full nav-capsule">
-            <Link
-              href="/about"
-              className="px-4 py-1.5 text-[13px] font-semibold text-[#1E3A2C]/70 hover:text-[#DAA87C] transition-colors cursor-pointer"
-            >
-              About
-            </Link>
-            <Link
-              href="/products"
-              className="px-4 py-1.5 text-[13px] font-semibold text-[#1E3A2C]/70 hover:text-[#DAA87C] transition-colors cursor-pointer"
-            >
-              Products
-            </Link>
-            <Link
-              href="/orders"
-              className="px-4 py-1.5 text-[13px] font-semibold text-[#1E3A2C]/70 hover:text-[#DAA87C] transition-colors cursor-pointer"
-            >
-              Orders
-            </Link>
-            <Link
-              href="/contact"
-              className="px-4 py-1.5 text-[13px] font-semibold text-[#1E3A2C]/70 hover:text-[#DAA87C] transition-colors cursor-pointer"
-            >
-              Contact
-            </Link>
+            {DESKTOP_NAV.map(({ href, label }) => {
+              const active = isActive(href);
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-colors cursor-pointer ${
+                    active
+                      ? "bg-[#1E3A2C] text-white shadow-xs"
+                      : "text-[#1E3A2C]/70 hover:text-[#DAA87C]"
+                  }`}
+                >
+                  {label}
+                </Link>
+              );
+            })}
           </nav>
 
           {/* Right side CTA & Shopping bag */}
@@ -267,46 +279,25 @@ export default function Header() {
         {isMobileNavOpen && (
           <div className="lg:hidden fixed inset-x-0 top-[56px] sm:top-[68px] bg-[#fcfbfa]/98 backdrop-blur-md border-b border-[#1E3A2C]/15 shadow-xl z-40 p-5 animate-fade-in">
             <nav className="flex flex-col gap-2">
-              <Link
-                href="/about"
-                onClick={() => setIsMobileNavOpen(false)}
-                className="px-4 py-3 rounded-xl text-sm font-bold text-[#1E3A2C] hover:bg-[#1E3A2C]/5 transition-colors flex items-center justify-between"
-              >
-                <span>About Thiraala</span>
-                <span className="text-[#DAA87C]">→</span>
-              </Link>
-              <Link
-                href="/products"
-                onClick={() => setIsMobileNavOpen(false)}
-                className="px-4 py-3 rounded-xl text-sm font-bold text-[#1E3A2C] hover:bg-[#1E3A2C]/5 transition-colors flex items-center justify-between"
-              >
-                <span>Products & Collections</span>
-                <span className="text-[#DAA87C]">→</span>
-              </Link>
-              <Link
-                href="/orders"
-                onClick={() => setIsMobileNavOpen(false)}
-                className="px-4 py-3 rounded-xl text-sm font-bold text-[#1E3A2C] hover:bg-[#1E3A2C]/5 transition-colors flex items-center justify-between"
-              >
-                <span>My Orders</span>
-                <span className="text-[#DAA87C]">→</span>
-              </Link>
-              <Link
-                href="/track-order"
-                onClick={() => setIsMobileNavOpen(false)}
-                className="px-4 py-3 rounded-xl text-sm font-bold text-[#1E3A2C] hover:bg-[#1E3A2C]/5 transition-colors flex items-center justify-between"
-              >
-                <span>Track Shipment</span>
-                <span className="text-[#DAA87C]">→</span>
-              </Link>
-              <Link
-                href="/contact"
-                onClick={() => setIsMobileNavOpen(false)}
-                className="px-4 py-3 rounded-xl text-sm font-bold text-[#1E3A2C] hover:bg-[#1E3A2C]/5 transition-colors flex items-center justify-between"
-              >
-                <span>Contact Us</span>
-                <span className="text-[#DAA87C]">→</span>
-              </Link>
+              {MOBILE_NAV.map(({ href, label }) => {
+                const active = isActive(href);
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={() => setIsMobileNavOpen(false)}
+                    aria-current={active ? "page" : undefined}
+                    className={`px-4 py-3 rounded-xl text-sm font-bold transition-colors flex items-center justify-between border-l-4 ${
+                      active
+                        ? "bg-[#1E3A2C]/10 text-[#1E3A2C] border-[#DAA87C]"
+                        : "text-[#1E3A2C] border-transparent hover:bg-[#1E3A2C]/5"
+                    }`}
+                  >
+                    <span>{label}</span>
+                    <span className="text-[#DAA87C]">{active ? "•" : "→"}</span>
+                  </Link>
+                );
+              })}
 
               {/* Sign up / User Profile Section inside Hamburger Menu Drawer */}
               <div className="pt-3 mt-1 border-t border-[#1E3A2C]/10 flex flex-col gap-2">

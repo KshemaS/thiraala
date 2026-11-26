@@ -54,9 +54,16 @@ function OrdersContent() {
   }, []);
 
   const fetchOrders = useCallback(async () => {
+    // Guests have no order history here; they use Track Order instead.
+    if (!user) {
+      setOrders([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
-      const params = new URLSearchParams();
+      // Always the signed-in customer's own orders, never the admin view.
+      const params = new URLSearchParams({ mine: "1" });
 
       if (selectedStatus !== "All") {
         params.set("status", selectedStatus);
@@ -64,9 +71,6 @@ function OrdersContent() {
 
       if (searchQuery.trim()) {
         params.set("search", searchQuery.trim());
-      } else if (user?.email) {
-        // Automatically retrieve customer's personal orders
-        params.set("email", user.email);
       }
 
       const res = await fetch(`/api/orders?${params.toString()}`);

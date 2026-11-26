@@ -123,7 +123,10 @@ export function toOrderJSON(order: OrderWithItems, opts: { admin?: boolean } = {
 // GET all orders
 export async function GET(request: Request) {
   try {
-    const adminSession = await getAdminSession();
+    // ?mine=1 (the shop's "My Orders" page): only the signed-in customer's own
+    // orders, even in a browser that is also signed in to the dashboard.
+    const mine = new URL(request.url).searchParams.get("mine") === "1";
+    const adminSession = mine ? null : await getAdminSession();
     const customerUserId = await getCustomerId();
 
     if (!adminSession && !customerUserId) {
