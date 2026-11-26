@@ -14,6 +14,7 @@ export interface CategoryProduct {
   altFolded?: string;
   altWorn?: string;
   alt?: string;
+  soldOut?: boolean;
 }
 
 interface CategoryCardProps {
@@ -64,13 +65,14 @@ export default function CategoryCard({ product, actionLabel = "Shop Now" }: Cate
             <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
           </svg>
         </button>
+        {product.soldOut && <OutOfStockBadge />}
         {imageSrc && (
           <Image
             src={typeof imageSrc === "string" ? imageSrc : imageSrc.src}
             alt={imageAlt}
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            className="object-cover transition-transform duration-500 group-hover:scale-105 pointer-events-none"
+            className={`object-cover transition-transform duration-500 group-hover:scale-105 pointer-events-none ${product.soldOut ? "opacity-60 grayscale-40" : ""}`}
             unoptimized={typeof imageSrc === "string" && imageSrc.startsWith("data:")}
           />
         )}
@@ -89,9 +91,9 @@ export default function CategoryCard({ product, actionLabel = "Shop Now" }: Cate
           <span className="text-base sm:text-lg font-bold text-[#0c2b1c] shrink-0">
             {product.price}
           </span>
-          
+
           <span className="text-[10px] sm:text-[11px] font-bold text-[#1E3A2C] group-hover:text-[#0c2b1c] flex items-center gap-1 transition-colors shrink-0">
-            {actionLabel}
+            {product.soldOut ? "View Details" : actionLabel}
             <svg className="w-3 sm:w-3.5 h-3 sm:h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
             </svg>
@@ -99,5 +101,14 @@ export default function CategoryCard({ product, actionLabel = "Shop Now" }: Cate
         </div>
       </div>
     </Link>
+  );
+}
+
+/** Top-left label over a product photo. Also used by ProductCard. */
+export function OutOfStockBadge() {
+  return (
+    <span className="absolute top-3 left-3 z-20 px-2.5 py-1 rounded-full bg-neutral-900/85 text-white text-[10px] sm:text-[11px] font-bold uppercase tracking-wider shadow-md pointer-events-none">
+      Out of stock
+    </span>
   );
 }

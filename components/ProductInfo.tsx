@@ -44,6 +44,11 @@ export default function ProductInfo({
   const hasVariants = variants.length > 0;
   const selectedVariant = variants.find((v) => v.id === selectedVariantId);
   const isVariantSoldOut = hasVariants && (selectedVariant?.stock ?? 0) <= 0;
+  // Products without colours carry their own stock.
+  const isSoldOut = hasVariants
+    ? isVariantSoldOut
+    : typeof product.stock === "number" && product.stock <= 0;
+  const otherColourInStock = hasVariants && variants.some((v) => v.stock > 0);
   const [pincode, setPincode] = useState("");
   const [isCheckingPincode, setIsCheckingPincode] = useState(false);
   const [pincodeStatus, setPincodeStatus] = useState<PincodeCheckResult | null>(null);
@@ -127,6 +132,7 @@ export default function ProductInfo({
 
   // Buy Now handler: Adds to cart and redirects directly to cart page
   const handleBuyNow = () => {
+    if (isSoldOut) return;
     addToCart(product, 1);
     router.push("/cart");
   };
@@ -181,6 +187,15 @@ export default function ProductInfo({
         <p className="text-emerald-700 text-xs font-semibold">
           inclusive of all taxes
         </p>
+        {isSoldOut && (
+          <p
+            role="status"
+            className="inline-flex items-center gap-1.5 mt-2 px-3 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold uppercase tracking-wider"
+          >
+            <AlertCircle className="w-3.5 h-3.5" />
+            {otherColourInStock ? "This colour is out of stock" : "Out of stock"}
+          </p>
+        )}
       </div>
 
       {/* 4. MORE COLOURS (Only shown if product has variants) */}
@@ -250,26 +265,37 @@ export default function ProductInfo({
       {/* 6. ACTION CTAS (ADD TO BAG, BUY NOW & WISHLIST) */}
       <div className="space-y-2 pt-2">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* ADD TO BAG Button */}
-          <button
-            type="button"
-            onClick={() => addToCart(product, 1)}
-            disabled={isVariantSoldOut}
-            className="w-full bg-white hover:bg-neutral-50 text-[#1E3A2C] border-2 border-[#1E3A2C] text-xs font-bold uppercase tracking-wider py-3.5 px-3 rounded-md flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <ShoppingBag className="w-4 h-4 text-[#1E3A2C]" />
-            <span>ADD TO BAG</span>
-          </button>
+          {isSoldOut ? (
+            /* Sold out: one disabled button in place of Add to Bag + Buy Now */
+            <button
+              type="button"
+              disabled
+              className="sm:col-span-2 w-full bg-neutral-200 text-neutral-500 border-2 border-neutral-200 text-xs font-bold uppercase tracking-wider py-3.5 px-3 rounded-md flex items-center justify-center gap-2 cursor-not-allowed"
+            >
+              <span>OUT OF STOCK</span>
+            </button>
+          ) : (
+            <>
+              {/* ADD TO BAG Button */}
+              <button
+                type="button"
+                onClick={() => addToCart(product, 1)}
+                className="w-full bg-white hover:bg-neutral-50 text-[#1E3A2C] border-2 border-[#1E3A2C] text-xs font-bold uppercase tracking-wider py-3.5 px-3 rounded-md flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
+              >
+                <ShoppingBag className="w-4 h-4 text-[#1E3A2C]" />
+                <span>ADD TO BAG</span>
+              </button>
 
-          {/* BUY NOW Button */}
-          <button
-            type="button"
-            onClick={handleBuyNow}
-            disabled={isVariantSoldOut}
-            className="w-full bg-[#1E3A2C] hover:bg-[#162e22] text-white text-xs font-bold uppercase tracking-wider py-3.5 px-3 rounded-md flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <span>BUY NOW</span>
-          </button>
+              {/* BUY NOW Button */}
+              <button
+                type="button"
+                onClick={handleBuyNow}
+                className="w-full bg-[#1E3A2C] hover:bg-[#162e22] text-white text-xs font-bold uppercase tracking-wider py-3.5 px-3 rounded-md flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+              >
+                <span>BUY NOW</span>
+              </button>
+            </>
+          )}
 
           {/* WISHLIST Button */}
           <button
@@ -290,6 +316,14 @@ export default function ProductInfo({
             <span>{isWishlisted ? "WISHLISTED" : "WISHLIST"}</span>
           </button>
         </div>
+
+        {isSoldOut && (
+          <p className="text-xs text-neutral-600 text-center sm:text-left">
+            {otherColourInStock
+              ? "Pick another colour above, or wishlist this one to find it again later."
+              : "Add it to your wishlist to find it again when it's back."}
+          </p>
+        )}
 
         {buyNowNotice && (
           <p className="text-xs text-emerald-700 font-semibold text-center animate-fade-in">

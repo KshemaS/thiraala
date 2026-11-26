@@ -107,6 +107,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
+  const stockMessage = (name: string, left: number) =>
+    left <= 0 ? `Sorry, ${name} is out of stock` : `Only ${left} left in stock`;
+
   const addToCart = (product: any, quantity: number = 1) => {
     let updated: CartItem[];
     const existingIndex = cart.findIndex((item) => String(item.id) === String(product.id));
@@ -118,7 +121,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const currentQty = cart[existingIndex].quantity;
       const newQty = currentQty + quantity;
       if (newQty > stockLimit) {
-        showToast(`Only ${stockLimit} left in stock`);
+        showToast(stockMessage(product.name, stockLimit));
         return;
       }
       updated = [...cart];
@@ -131,7 +134,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       showToast(`${product.name} quantity increased in bag (${newQty})`);
     } else {
       if (quantity > stockLimit) {
-        showToast(`Only ${stockLimit} left in stock`);
+        showToast(stockMessage(product.name, stockLimit));
         return;
       }
       updated = [
@@ -174,7 +177,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const stockLimit = typeof targetItem?.stock === "number" ? targetItem.stock : 10;
     
     if (quantity > stockLimit) {
-      showToast(`Only ${stockLimit} left in stock`);
+      showToast(stockMessage(targetItem?.name ?? "This item", stockLimit));
       return;
     }
     const updated = cart.map((item) =>

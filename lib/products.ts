@@ -37,6 +37,8 @@ export interface UnifiedProduct {
   highlights?: string[] | string;
   description?: string;
   stock?: number;
+  /** True when nothing can be bought: no stock, or every colour sold out. */
+  soldOut?: boolean;
   status?: string;
   featured?: boolean;
   isNewArrival?: boolean;
@@ -71,6 +73,9 @@ export const getAllUnifiedProducts = cache(async (): Promise<UnifiedProduct[]> =
     // Serve uploaded (base64) photos by URL instead of inlining them.
     const folded = imageUrl("product", p.id, "folded", p.foldedImg, p.updatedAt);
     const worn = imageUrl("product", p.id, "worn", p.wornImg, p.updatedAt);
+    const variants = p.variants || [];
+    const stock = p.stock ?? 10;
+    const soldOut = variants.length > 0 ? variants.every((v: any) => (v.stock ?? 0) <= 0) : stock <= 0;
     return {
       id: p.id,
       sku: p.sku,
@@ -106,12 +111,13 @@ export const getAllUnifiedProducts = cache(async (): Promise<UnifiedProduct[]> =
           ? p.highlights.split("\n").filter(Boolean)
           : p.highlights
         : undefined,
-      stock: p.stock ?? 10,
+      stock,
+      soldOut,
       description: p.description || "",
       status: p.status || "active",
       featured: Boolean(p.featured),
       isNewArrival: Boolean(p.isNewArrival),
-      variants: (p.variants || []).map(formatVariant),
+      variants: variants.map(formatVariant),
     };
   });
 });

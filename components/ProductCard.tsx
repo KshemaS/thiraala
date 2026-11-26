@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image, { StaticImageData } from "next/image";
 import { useWishlist } from "@/context/WishlistContext";
+import { OutOfStockBadge } from "@/components/CategoryCard";
 
 export interface SareeProduct {
   id: number | string;
@@ -14,6 +15,7 @@ export interface SareeProduct {
   altWorn?: string;
   category?: string;
   priority?: boolean;
+  soldOut?: boolean;
 }
 
 interface ProductCardProps {
@@ -68,6 +70,13 @@ export default function ProductCard({ saree }: ProductCardProps) {
             />
           </svg>
         </button>
+
+        {saree.soldOut && (
+          <>
+            <OutOfStockBadge />
+            <span className="absolute inset-0 z-10 bg-white/40 pointer-events-none" />
+          </>
+        )}
 
         {/* Folded Saree (Initially shown) */}
         <Image

@@ -42,6 +42,7 @@ export default async function RelatedProducts({ product }: { product: any }) {
               img: item.img || item.wornImg,
               altFolded: item.altFolded || item.name,
               altWorn: item.altWorn || item.name,
+              soldOut: item.soldOut,
             }}
           />
         ))}

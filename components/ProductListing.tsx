@@ -590,6 +590,7 @@ export default function ProductListing() {
                         img: saree.img || saree.wornImg,
                         altFolded: saree.altFolded || saree.name,
                         altWorn: saree.altWorn || saree.name,
+                        soldOut: saree.soldOut,
                       }}
                     />
                   ))}
