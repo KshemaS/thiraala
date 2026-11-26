@@ -303,6 +303,19 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
       return;
     }
 
+    // A new product published to the shop needs at least one photo of its own
+    // (the shop shows a neutral "photo coming soon" image otherwise). Edits of
+    // existing photo-less products still save, so stock/price can be updated.
+    const hasPhoto =
+      Boolean(formData.foldedImg.trim() || formData.wornImg.trim()) ||
+      variants.some((v) => v.foldedImg || v.wornImg);
+    if (!isEdit && formData.status === "active" && !hasPhoto) {
+      setErrorMessage(
+        'Please add at least one photo (folded or draped) before publishing, or set Publishing Status to "Draft (Hidden)" to save it without photos.'
+      );
+      return;
+    }
+
     setIsSubmitting(true);
 
     const payload = {

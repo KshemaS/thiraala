@@ -233,7 +233,7 @@ export default function NewArrivals() {
                   const imgSrc =
                     typeof saree.img === "string"
                       ? saree.img
-                      : saree.img?.src || saree.wornImg || saree.foldedImg || "/images/gopura.jpeg";
+                      : saree.img?.src || saree.wornImg || saree.foldedImg || "/images/no-photo.svg";
                   const imgAlt = saree.alt || saree.altWorn || saree.name;
 
                   return (

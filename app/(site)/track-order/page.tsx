@@ -427,7 +427,7 @@ function TrackOrderContent() {
                       <div key={idx} className={`flex items-center gap-3.5 ${idx > 0 ? "pt-3.5" : ""}`}>
                         <div className="relative w-14 h-16 rounded-xl overflow-hidden bg-[#FAF8F5] border border-[#1E3A2C]/10 flex-shrink-0">
                           <img
-                            src={item.foldedImg || "/images/folded-gopuram.jpeg"}
+                            src={item.foldedImg || "/images/no-photo.svg"}
                             alt={item.name}
                             className="w-full h-full object-cover"
                           />

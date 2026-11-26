@@ -522,7 +522,7 @@ export default function CartPage() {
 
                 <div className="space-y-4">
                   {cart.map((item) => {
-                    const imgSource = item.foldedImg?.src || item.foldedImg || item.wornImg?.src || item.wornImg;
+                    const imgSource = item.foldedImg?.src || item.foldedImg || item.wornImg?.src || item.wornImg || "/images/no-photo.svg";
                     return (
                       <motion.div
                         key={item.id}

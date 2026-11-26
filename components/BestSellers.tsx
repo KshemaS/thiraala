@@ -154,7 +154,7 @@ export default function BestSellers() {
               const wornSrc =
                 typeof saree.wornImg === "string"
                   ? saree.wornImg
-                  : saree.wornImg?.src || saree.foldedImg || "/images/gopura.jpeg";
+                  : saree.wornImg?.src || saree.foldedImg || "/images/no-photo.svg";
               const altText = saree.altWorn || saree.alt || saree.name;
 
               return (

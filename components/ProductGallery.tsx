@@ -4,11 +4,12 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import { SareeProduct } from "@/data/products";
 import { UnifiedProduct } from "@/lib/products";
+import { NO_PHOTO } from "@/lib/placeholder";
 
 const getImgSrc = (img: any): string => {
-  if (!img) return "/images/folded-gopuram.jpeg";
+  if (!img) return NO_PHOTO;
   if (typeof img === "string") return img;
-  return img.src || "/images/folded-gopuram.jpeg";
+  return img.src || NO_PHOTO;
 };
 
 export default function ProductGallery({ product }: { product: SareeProduct | UnifiedProduct | any }) {
@@ -22,11 +23,12 @@ export default function ProductGallery({ product }: { product: SareeProduct | Un
   const wornSrc = getImgSrc(product.wornImg);
   const foldedSrc = getImgSrc(product.foldedImg);
   const activeSrc = getImgSrc(activeImage);
+  const noPhotos = wornSrc === NO_PHOTO && foldedSrc === NO_PHOTO;
 
   return (
     <div className="lg:col-span-7 flex flex-col-reverse sm:flex-row gap-4 w-full lg:sticky lg:top-24 self-start">
-      {/* Vertical Stack of Thumbnails */}
-      <div className="flex flex-row sm:flex-col gap-3 sm:w-24 w-full flex-shrink-0">
+      {/* Vertical Stack of Thumbnails (none when there are no photos) */}
+      <div className={`flex flex-row sm:flex-col gap-3 sm:w-24 w-full flex-shrink-0 ${noPhotos ? "hidden" : ""}`}>
         <button
           onClick={() => setActiveImage(product.wornImg)}
           className={`relative aspect-[4/5] sm:w-24 w-1/2 rounded-xl overflow-hidden border-2 bg-stone-50 transition-all cursor-pointer ${
@@ -65,7 +67,13 @@ export default function ProductGallery({ product }: { product: SareeProduct | Un
       <div className="flex-1 relative aspect-[4/5] w-full overflow-hidden rounded-[24px] sm:rounded-[32px] border border-[#1E3A2C]/5 bg-stone-50/50 shadow-sm select-none h-[380px] sm:h-[500px] lg:h-[600px]">
         <Image
           src={activeSrc}
-          alt={activeImage === product.wornImg ? product.altWorn || product.name : product.altFolded || product.name}
+          alt={
+            activeSrc === NO_PHOTO
+              ? `No photo of ${product.name} yet`
+              : activeImage === product.wornImg
+                ? product.altWorn || product.name
+                : product.altFolded || product.name
+          }
           fill
           sizes="(max-width: 1024px) 100vw, 700px"
           className="object-cover transition-all duration-700 hover:scale-[1.03]"

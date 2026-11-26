@@ -503,7 +503,7 @@ export default function ProductsListPage() {
                       <div className="flex items-center gap-3">
                         <div className="relative w-12 h-14 rounded-lg overflow-hidden border border-[#1E3A2C]/10 bg-[#FAF8F5] flex-shrink-0">
                           <Image
-                            src={product.foldedImg || "/images/folded-gopuram.jpeg"}
+                            src={product.foldedImg || "/images/no-photo.svg"}
                             alt={product.name}
                             fill
                             className="object-cover"

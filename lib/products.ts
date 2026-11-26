@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { formatVariant, variantsIncludeSlim, type ProductVariantItem } from "@/lib/productVariants";
 import { imageUrl } from "@/lib/productImages";
 import { attachImageRefs, OMIT_PHOTOS } from "@/lib/imageRefs";
+import { ownPhotos } from "@/lib/placeholder";
 
 export interface UnifiedProduct {
   id: number | string;
@@ -73,6 +74,7 @@ export const getAllUnifiedProducts = cache(async (): Promise<UnifiedProduct[]> =
     // Serve uploaded (base64) photos by URL instead of inlining them.
     const folded = imageUrl("product", p.id, "folded", p.foldedImg, p.updatedAt);
     const worn = imageUrl("product", p.id, "worn", p.wornImg, p.updatedAt);
+    const photos = ownPhotos(resolveImgPath(folded, ""), resolveImgPath(worn, ""));
     const variants = p.variants || [];
     const stock = p.stock ?? 10;
     const soldOut = variants.length > 0 ? variants.every((v: any) => (v.stock ?? 0) <= 0) : stock <= 0;
@@ -91,9 +93,8 @@ export const getAllUnifiedProducts = cache(async (): Promise<UnifiedProduct[]> =
       selectedColor: p.selectedColor || undefined,
       category: p.categoryName || "Handloom Saree",
       collection: p.collectionName || undefined,
-      foldedImg: resolveImgPath(folded, "/images/folded-gopuram.jpeg"),
-      wornImg: resolveImgPath(worn, "/images/gopura.jpeg"),
-      img: resolveImgPath(worn || folded, "/images/gopura.jpeg"),
+      ...photos,
+      img: photos.wornImg,
       altFolded: p.altFolded || p.name,
       altWorn: p.altWorn || p.name,
       fabric: p.fabric || "Cotton",

@@ -5,6 +5,7 @@ import ProductGallery from "@/components/ProductGallery";
 import ProductInfo from "@/components/ProductInfo";
 import type { UnifiedProduct } from "@/lib/products";
 import type { ProductVariantItem } from "@/lib/productVariants";
+import { ownPhotos } from "@/lib/placeholder";
 
 /**
  * Product photos + details, sharing the selected colour variant so picking a
@@ -51,8 +52,10 @@ function withVariant(product: UnifiedProduct, v: ProductVariantItem | undefined)
     mrp,
     discountPercent: mrp && mrp > priceValue ? Math.round(((mrp - priceValue) / mrp) * 100) : undefined,
     stock: v.stock,
-    foldedImg: v.foldedImg || product.foldedImg,
-    wornImg: v.wornImg || product.wornImg,
+    // The colour's own photos when it has any, else the product's.
+    ...(v.foldedImg || v.wornImg
+      ? ownPhotos(v.foldedImg, v.wornImg)
+      : { foldedImg: product.foldedImg, wornImg: product.wornImg }),
     altFolded: `${product.name} in ${v.name}, folded`,
     altWorn: `${product.name} in ${v.name}, draped`,
   };

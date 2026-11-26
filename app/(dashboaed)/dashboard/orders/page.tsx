@@ -699,7 +699,7 @@ export default function OrdersDashboardPage() {
                           <div className="flex items-center gap-2.5">
                             <div className="relative w-10 h-12 rounded-lg overflow-hidden bg-[#FAF8F5] border border-[#1E3A2C]/10 flex-shrink-0">
                               <img
-                                src={firstItem.foldedImg || "/images/folded-gopuram.jpeg"}
+                                src={firstItem.foldedImg || "/images/no-photo.svg"}
                                 alt={firstItem.name}
                                 className="w-full h-full object-cover"
                               />
@@ -1259,7 +1259,7 @@ export default function OrdersDashboardPage() {
                       <div key={idx} className={`flex items-center gap-4 ${idx > 0 ? "pt-3.5" : ""}`}>
                         <div className="relative w-14 h-16 rounded-xl overflow-hidden bg-[#FAF8F5] border border-[#1E3A2C]/10 flex-shrink-0">
                           <img
-                            src={item.foldedImg || "/images/folded-gopuram.jpeg"}
+                            src={item.foldedImg || "/images/no-photo.svg"}
                             alt={item.name}
                             className="w-full h-full object-cover"
                           />

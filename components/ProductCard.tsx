@@ -35,12 +35,12 @@ export default function ProductCard({ saree }: ProductCardProps) {
   const foldedSrc =
     typeof saree.foldedImg === "string"
       ? saree.foldedImg
-      : (saree.foldedImg as any)?.src || "/images/folded-gopuram.jpeg";
+      : (saree.foldedImg as any)?.src || "/images/no-photo.svg";
 
   const wornSrc =
     typeof saree.wornImg === "string"
       ? saree.wornImg
-      : (saree.wornImg as any)?.src || "/images/gopura.jpeg";
+      : (saree.wornImg as any)?.src || "/images/no-photo.svg";
 
   return (
     <Link

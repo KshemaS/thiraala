@@ -321,7 +321,7 @@ function OrdersContent() {
                   {/* Order Items Body */}
                   <div className="p-6 divide-y divide-[#1E3A2C]/5">
                     {order.items.map((item, idx) => {
-                      const itemImg = item.wornImg || item.foldedImg || "/images/gopura.jpeg";
+                      const itemImg = item.wornImg || item.foldedImg || "/images/no-photo.svg";
                       return (
                         <div
                           key={`${item.id}-${idx}`}
