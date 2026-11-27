@@ -109,7 +109,7 @@ export async function POST(request: Request) {
       currency: "INR",
       keyId: process.env.RAZORPAY_KEY_ID,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error creating Razorpay order:", error);
     return NextResponse.json(
       { success: false, error: "Failed to create payment order" },

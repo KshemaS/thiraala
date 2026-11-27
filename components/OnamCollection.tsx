@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
 import Container from "@/components/Container";
+import type { FilteredProduct } from "@/app/api/products/filter/route";
+
 
 interface CollectionData {
   id: string;
@@ -23,7 +25,7 @@ export default function OnamCollection() {
     slug: "onam-collection",
     description: "Welcome the season of abundance with our signature sarees. From fine golden Kasavu borders to custom floral weaves, celebrate in simple elegance.",
   });
-  const [collectionProducts, setCollectionProducts] = useState<any[]>([]);
+  const [collectionProducts, setCollectionProducts] = useState<FilteredProduct[]>([]);
 
   const loadCollectionAndProducts = useCallback(async () => {
     try {
@@ -69,6 +71,7 @@ export default function OnamCollection() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data from the server when this opens; the data arrives asynchronously
     loadCollectionAndProducts();
 
     const handleUpdate = () => loadCollectionAndProducts();
@@ -142,7 +145,7 @@ export default function OnamCollection() {
   return (
     <section className="w-full mt-[60px] md:mt-[80px] lg:mt-[140px] mb-[80px] lg:mb-[140px] select-none overflow-hidden">
       <Container>
-        <motion.div
+        <m.div
           variants={containerVariants}
           initial="hidden"
           whileInView="show"
@@ -150,7 +153,7 @@ export default function OnamCollection() {
           className="space-y-16"
         >
           {/* Centered Heading and Description (Dynamically from Dashboard) */}
-          <motion.div className="text-center max-w-2xl mx-auto" variants={itemVariants}>
+          <m.div className="text-center max-w-2xl mx-auto" variants={itemVariants}>
             <h2 className="text-[#1E3A2C] font-bold text-3xl sm:text-4xl tracking-tight">
               {collectionInfo.name}
             </h2>
@@ -159,14 +162,14 @@ export default function OnamCollection() {
               {collectionInfo.description ||
                 "Welcome the season of abundance with our signature sarees. From fine golden Kasavu borders to custom floral weaves, celebrate in simple elegance."}
             </p>
-          </motion.div>
+          </m.div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-20 md:gap-10">
             {collectionProducts.map((saree, idx) => {
               const col = idx % 3;
               const cardVariant = col === 0 ? leftVariant : col === 2 ? rightVariant : centerVariant;
               return (
-                <motion.div
+                <m.div
                   key={saree.id}
                   variants={cardVariant}
                 >
@@ -175,7 +178,7 @@ export default function OnamCollection() {
                       ...saree,
                     }}
                   />
-                </motion.div>
+                </m.div>
               );
             })}
           </div>
@@ -192,7 +195,7 @@ export default function OnamCollection() {
               </svg>
             </Link>
           </div>
-        </motion.div>
+        </m.div>
       </Container>
     </section>
   );

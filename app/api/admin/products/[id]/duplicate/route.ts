@@ -1,3 +1,4 @@
+import { refreshesShop } from "@/lib/revalidateShop";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guard";
@@ -15,7 +16,7 @@ async function freeValue(base: string, taken: (v: string) => Promise<boolean>) {
  * POST — copies a product (details, photos, colours) as a new hidden draft
  * with stock 0, so it can be edited before it appears in the shop.
  */
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handlePOST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const unauthorized = await requireAdmin();
   if (unauthorized) return unauthorized;
 
@@ -69,3 +70,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ success: false, error: "Unable to duplicate the product." }, { status: 500 });
   }
 }
+
+export const POST = refreshesShop(handlePOST);

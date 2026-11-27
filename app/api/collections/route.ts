@@ -1,3 +1,4 @@
+import { refreshesShop } from "@/lib/revalidateShop";
 import { NextResponse } from "next/server";
 import type { Collection } from "@prisma/client";
 import prisma from "@/lib/prisma";
@@ -72,7 +73,7 @@ export async function GET() {
 }
 
 // POST { name, slug?, description?, image?, status?, featured? } — create one collection.
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const unauthorized = await requireAdmin();
   if (unauthorized) return unauthorized;
 
@@ -104,3 +105,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: "Failed to save collection" }, { status: 500 });
   }
 }
+
+export const POST = refreshesShop(handlePOST);

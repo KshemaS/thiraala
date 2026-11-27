@@ -1,3 +1,4 @@
+import { errorCode } from "@/lib/errors";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { setCustomerSession } from "@/lib/auth/customerSession";
@@ -68,9 +69,9 @@ export async function POST(request: Request) {
           role: "customer",
         },
       });
-    } catch (err: any) {
+    } catch (err) {
       // Two sign-ups with the same email at the same moment.
-      if (err?.code === "P2002") return NextResponse.json({ success: false, error: DUPLICATE }, { status: 409 });
+      if (errorCode(err) === "P2002") return NextResponse.json({ success: false, error: DUPLICATE }, { status: 409 });
       throw err;
     }
 

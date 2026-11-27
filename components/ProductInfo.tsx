@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { SareeProduct } from "@/data/products";
-import { UnifiedProduct } from "@/lib/products";
+import type { UnifiedProduct } from "@/lib/products";
 import type { ProductVariantItem } from "@/lib/productVariants";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
@@ -24,7 +23,8 @@ export interface PincodeCheckResult {
 }
 
 interface ProductInfoProps {
-  product: SareeProduct | UnifiedProduct | any;
+  /** With a colour selected, `id` is the per-colour cart key and `productId` the product's own id. */
+  product: UnifiedProduct & { productId?: number | string; variantId?: string };
   /** Colour variants; the picker is shown only when there are any. */
   variants?: ProductVariantItem[];
   selectedVariantId?: string;
@@ -52,7 +52,6 @@ export default function ProductInfo({
   const [pincode, setPincode] = useState("");
   const [isCheckingPincode, setIsCheckingPincode] = useState(false);
   const [pincodeStatus, setPincodeStatus] = useState<PincodeCheckResult | null>(null);
-  const [buyNowNotice, setBuyNowNotice] = useState<string | null>(null);
 
   // The wishlist is per product, not per colour.
   const wishlistProduct = product.productId ? { ...product, id: product.productId } : product;
@@ -151,7 +150,7 @@ export default function ProductInfo({
       </div>
 
       {/* 2. RATINGS BADGE (only when the product has a real rating) */}
-      {product.rating > 0 && product.ratingCount > 0 && (
+      {(product.rating ?? 0) > 0 && (product.ratingCount ?? 0) > 0 && (
         <div>
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-neutral-300 text-[11px] text-neutral-800 bg-white shadow-2xs font-medium">
             <span className="font-bold">{product.rating}</span>
@@ -325,11 +324,6 @@ export default function ProductInfo({
           </p>
         )}
 
-        {buyNowNotice && (
-          <p className="text-xs text-emerald-700 font-semibold text-center animate-fade-in">
-            {buyNowNotice}
-          </p>
-        )}
       </div>
 
       {/* Divider */}

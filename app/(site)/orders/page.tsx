@@ -16,12 +16,10 @@ import {
   CheckCircle2,
   Clock,
   Search,
-  ExternalLink,
   ChevronRight,
   Copy,
   Check,
   ShoppingBag,
-  RotateCcw,
   MapPin,
   Calendar,
   CreditCard,
@@ -49,9 +47,6 @@ function OrdersContent() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
-  useEffect(() => {
-    document.title = "My Orders | thiraala";
-  }, []);
 
   const fetchOrders = useCallback(async () => {
     // Guests have no order history here; they use Track Order instead.
@@ -93,6 +88,7 @@ function OrdersContent() {
   }, [selectedStatus, searchQuery, user]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data from the server when this opens; the data arrives asynchronously
     fetchOrders();
 
     const handleUpdate = () => fetchOrders();

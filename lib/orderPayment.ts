@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { OutOfStockError, releaseOrderStock, reserveOrderStock } from "@/lib/stock";
+import { queueOrderEmail } from "@/lib/orderEmails";
 
 interface TrackingEvent {
   title: string;
@@ -49,8 +50,10 @@ export async function markOrderPaid(
   const warning =
     order.status === "Cancelled" ? CANCELLED_PAID_NOTE : !stockOk ? STOCK_CONFLICT_NOTE : null;
 
-  return prisma.order.update({
-    where: { id: order.id },
+  // Conditional on still being unpaid: the client verify call and the webhook
+  // can arrive together, and only the one that flips the status sends emails.
+  const flipped = await prisma.order.updateMany({
+    where: { id: order.id, paymentStatus: { not: "Paid" } },
     data: {
       paymentStatus: "Paid",
       status: stockOk && order.status === "Pending" ? "Order Confirmed" : order.status,
@@ -59,8 +62,9 @@ export async function markOrderPaid(
       ...(warning ? { attentionReason: warning } : {}),
       trackingTimeline: timeline as unknown as Prisma.InputJsonValue,
     },
-    include: { items: true },
   });
+  if (flipped.count === 1) queueOrderEmail("paid", order.id);
+  return prisma.order.findUnique({ where: { id: order.id }, include: { items: true } });
 }
 
 /** A failed payment frees the order's stock straight away. */

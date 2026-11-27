@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+
+import { errorMessage } from "@/lib/errors";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import {
   Package,
   Plus,
@@ -16,7 +18,6 @@ import {
   Layers,
   AlertCircle,
   Check,
-  X,
   Loader2,
   RefreshCw,
   Sparkles,
@@ -27,12 +28,33 @@ import {
 import { useRouter } from "next/navigation";
 import { ProductItem } from "@/app/api/products/route";
 
+const PAGE_SIZE = 50;
+
 export default function ProductsListPage() {
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedStockFilter, setSelectedStockFilter] = useState<"All" | "InStock" | "OutOfStock" | "NewArrivals">("All");
+
+  // One page of products at a time; search and filters run on the server.
+  const [page, setPage] = useState(1);
+  const [filteredCount, setFilteredCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [metrics, setMetrics] = useState({ total: 0, inStock: 0, outOfStock: 0, totalCategories: 0 });
+  const [categoryNames, setCategoryNames] = useState<string[]>([]);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+  // Changing the search or a filter goes back to page 1.
+  const filterKey = `${debouncedSearch}|${selectedCategory}|${selectedStockFilter}`;
+  const [pageFor, setPageFor] = useState(filterKey);
+  if (pageFor !== filterKey) {
+    setPageFor(filterKey);
+    setPage(1);
+  }
 
   // Deletion modal state
   const [deletingProduct, setDeletingProduct] = useState<ProductItem | null>(null);
@@ -46,15 +68,23 @@ export default function ProductsListPage() {
   const [isBulkBusy, setIsBulkBusy] = useState(false);
   const [priceDialog, setPriceDialog] = useState<{ mode: "set" | "percent"; value: string } | null>(null);
 
-  // Fetch products
-  const fetchProducts = async () => {
+  // Fetch the current page of products
+  const fetchProducts = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/products");
+      const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
+      if (debouncedSearch) params.set("q", debouncedSearch);
+      if (selectedCategory !== "All") params.set("category", selectedCategory);
+      if (selectedStockFilter !== "All") params.set("stock", selectedStockFilter);
+      const res = await fetch(`/api/products?${params}`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) {
-          setProducts(data);
+        if (data.success && Array.isArray(data.products)) {
+          setProducts(data.products);
+          setFilteredCount(data.filteredCount);
+          setTotalPages(data.totalPages);
+          setMetrics(data.metrics);
+          setCategoryNames(data.categories);
         }
       }
     } catch (err) {
@@ -62,9 +92,10 @@ export default function ProductsListPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [page, debouncedSearch, selectedCategory, selectedStockFilter]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads the current page from the server; the data arrives asynchronously
     fetchProducts();
 
     const handleProductsUpdated = () => {
@@ -75,7 +106,7 @@ export default function ProductsListPage() {
     return () => {
       window.removeEventListener("thiraala-products-updated", handleProductsUpdated);
     };
-  }, []);
+  }, [fetchProducts]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -207,56 +238,23 @@ export default function ProductsListPage() {
       setPriceDialog(null);
       await fetchProducts();
       window.dispatchEvent(new Event("thiraala-products-updated"));
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err) {
+      alert(errorMessage(err));
     } finally {
       setIsBulkBusy(false);
     }
   };
 
-  // Extract categories for filter
-  const categoriesList = useMemo(() => {
-    const set = new Set(products.map((p) => p.category).filter(Boolean));
-    return ["All", ...Array.from(set)];
-  }, [products]);
-
-  // Metrics
-  const metrics = useMemo(() => {
-    const total = products.length;
-    const inStock = products.filter((p) => (p.stock ?? 0) > 0).length;
-    const outOfStock = products.filter((p) => (p.stock ?? 0) === 0).length;
-    const totalCategories = new Set(products.map((p) => p.category)).size;
-
-    return { total, inStock, outOfStock, totalCategories };
-  }, [products]);
-
-  // Filtered Products
-  const filteredProducts = useMemo(() => {
-    return products.filter((p) => {
-      const matchesSearch =
-        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (p.fabric && p.fabric.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (p.collection && p.collection.toLowerCase().includes(searchQuery.toLowerCase()));
-
-      const matchesCategory =
-        selectedCategory === "All" || p.category === selectedCategory;
-
-      const matchesStock =
-        selectedStockFilter === "All" ||
-        (selectedStockFilter === "InStock" && (p.stock ?? 0) > 0) ||
-        (selectedStockFilter === "OutOfStock" && (p.stock ?? 0) === 0) ||
-        (selectedStockFilter === "NewArrivals" && Boolean(p.isNewArrival));
-
-      return matchesSearch && matchesCategory && matchesStock;
-    });
-  }, [products, searchQuery, selectedCategory, selectedStockFilter]);
+  // Categories for the filter, counts over all products (both from the
+  // server), and this page's products (already searched and filtered).
+  const categoriesList = ["All", ...categoryNames];
+  const filteredProducts = products;
 
   return (
     <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-6">
       {/* Toast */}
       {toastMessage && (
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
@@ -264,7 +262,7 @@ export default function ProductsListPage() {
         >
           <Check className="w-4 h-4 text-[#DAA87C]" />
           <span>{toastMessage}</span>
-        </motion.div>
+        </m.div>
       )}
 
       {/* Page Header */}
@@ -281,7 +279,7 @@ export default function ProductsListPage() {
             <Package className="w-6 h-6 text-[#DAA87C]" />
             <span>Products Catalog</span>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#1E3A2C]/5 text-[#1E3A2C] font-semibold">
-              {products.length} {products.length === 1 ? "Item" : "Items"}
+              {metrics.total} {metrics.total === 1 ? "Item" : "Items"}
             </span>
           </h1>
           <p className="text-xs text-[#1E3A2C]/60 mt-1">
@@ -291,7 +289,7 @@ export default function ProductsListPage() {
 
         <div className="flex items-center gap-3 self-start sm:self-auto">
           <button
-            onClick={fetchProducts}
+            onClick={() => fetchProducts()}
             disabled={isLoading}
             className="p-2.5 rounded-xl border border-[#1E3A2C]/15 bg-white text-[#1E3A2C] hover:bg-[#FAF8F5] transition-all cursor-pointer"
             title="Refresh list"
@@ -705,6 +703,38 @@ export default function ProductsListPage() {
             </table>
           </div>
         )}
+
+        {/* Pages */}
+        {filteredCount > 0 && (
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-[#1E3A2C]/10 text-xs text-[#1E3A2C]/70">
+            <span>
+              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredCount)} of {filteredCount}
+            </span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1 || isLoading}
+                  className="h-8 px-3 rounded-lg border border-[#1E3A2C]/15 bg-white font-semibold disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <span className="font-semibold">
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages || isLoading}
+                  className="h-8 px-3 rounded-lg border border-[#1E3A2C]/15 bg-white font-semibold disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Bulk price dialog */}
@@ -776,7 +806,7 @@ export default function ProductsListPage() {
       <AnimatePresence>
         {deletingProduct && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1E3A2C]/40 backdrop-blur-xs">
-            <motion.div
+            <m.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
@@ -833,7 +863,7 @@ export default function ProductsListPage() {
                 </button>
                 )}
               </div>
-            </motion.div>
+            </m.div>
           </div>
         )}
       </AnimatePresence>

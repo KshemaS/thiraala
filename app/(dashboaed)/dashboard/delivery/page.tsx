@@ -1,5 +1,7 @@
 "use client";
 
+
+import { errorMessage } from "@/lib/errors";
 import { useEffect, useState } from "react";
 import { Truck, Loader2, Check, AlertCircle, Calculator } from "lucide-react";
 
@@ -34,6 +36,13 @@ export default function DeliveryChargesPage() {
   const [testCount, setTestCount] = useState(1);
   const [testResult, setTestResult] = useState<string | null>(null);
 
+  const applyStateZones = (list: ZoneRate[]) => {
+    const map: Record<string, string> = {};
+    for (const z of list) for (const st of z.states) map[st] = z.key;
+    setStateZones(map);
+    setSavedStateZones(map);
+  };
+
   useEffect(() => {
     (async () => {
       try {
@@ -42,8 +51,8 @@ export default function DeliveryChargesPage() {
         if (!res.ok || !data.success) throw new Error(data.error || "Unable to load delivery charges.");
         setRates(data.rates.map(toDraft));
         applyStateZones(data.rates);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err) {
+        setError(errorMessage(err));
       } finally {
         setIsLoading(false);
       }
@@ -53,13 +62,6 @@ export default function DeliveryChargesPage() {
   const update = (key: string, patch: Partial<Draft>) => {
     setSaved(false);
     setRates((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
-  };
-
-  const applyStateZones = (list: ZoneRate[]) => {
-    const map: Record<string, string> = {};
-    for (const z of list) for (const st of z.states) map[st] = z.key;
-    setStateZones(map);
-    setSavedStateZones(map);
   };
 
   const changedStates = Object.keys(stateZones).filter((st) => stateZones[st] !== savedStateZones[st]);
@@ -79,8 +81,8 @@ export default function DeliveryChargesPage() {
       applyStateZones(data.rates);
       setStatesSaved(true);
       setTestResult(null);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(errorMessage(err));
     } finally {
       setIsSavingStates(false);
     }
@@ -109,8 +111,8 @@ export default function DeliveryChargesPage() {
       applyStateZones(data.rates);
       setSaved(true);
       setTestResult(null);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(errorMessage(err));
     } finally {
       setIsSaving(false);
     }

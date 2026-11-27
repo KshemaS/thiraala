@@ -1,10 +1,12 @@
 "use client";
 
+
+import { errorMessage as messageOf } from "@/lib/errors";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import {
   Upload,
   Check,
@@ -17,7 +19,6 @@ import {
   AlertCircle,
   Loader2,
   Trash2,
-  ImageIcon,
   Ruler,
   Percent,
 } from "lucide-react";
@@ -43,16 +44,6 @@ interface CollectionOption {
   status?: string;
 }
 
-const DEFAULT_CATEGORIES = [
-  "Tissue Set Saree",
-  "Cotton Set Saree",
-  "Mul Mul Cotton",
-  "Mul Chanderi",
-  "Cotton Saree",
-  "Cotton Set Mund",
-  "Kasavu Saree",
-];
-
 interface ProductFormProps {
   initialData?: ProductItem | null;
   isEdit?: boolean;
@@ -60,7 +51,7 @@ interface ProductFormProps {
 
 export default function ProductForm({ initialData, isEdit = false }: ProductFormProps) {
   const router = useRouter();
-  const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+  const [categories, setCategories] = useState<string[]>(initialData?.category ? [initialData.category] : []);
   const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [customCategoryName, setCustomCategoryName] = useState("");
   const [collectionsList, setCollectionsList] = useState<CollectionOption[]>([]);
@@ -95,29 +86,29 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
     isNewArrival: boolean;
   }>({
     name: initialData?.name || "",
-    subtitle: (initialData as any)?.subtitle || "",
+    subtitle: initialData?.subtitle || "",
     sku: initialData?.sku || "",
     slug: initialData?.slug || "",
     price: initialData?.price || "",
     priceValue: initialData?.priceValue || 0,
-    mrp: (initialData as any)?.mrp !== undefined && (initialData as any)?.mrp !== null ? Number((initialData as any).mrp) : "",
-    category: initialData?.category || DEFAULT_CATEGORIES[0],
+    mrp: initialData?.mrp !== undefined && initialData?.mrp !== null ? Number(initialData!.mrp) : "",
+    category: initialData?.category || "",
     collection: initialData?.collection || (initialData?.collections && initialData.collections[0]) || "",
     stock: initialData?.stock !== undefined ? initialData.stock : 10,
     fabric: initialData?.fabric || "",
-    sareeFabric: (initialData as any)?.sareeFabric || "",
+    sareeFabric: initialData?.sareeFabric || "",
     color: initialData?.color || "",
-    selectedColor: (initialData as any)?.selectedColor || initialData?.color || "",
+    selectedColor: initialData?.selectedColor || initialData?.color || "",
     pattern: initialData?.pattern || "",
-    border: (initialData as any)?.border || "",
-    blouse: (initialData as any)?.blouse || "",
-    occasion: (initialData as any)?.occasion || "",
-    sareeLength: (initialData as any)?.sareeLength || "5.5 metres",
-    blouseLength: (initialData as any)?.blouseLength || "0.8 metres",
-    careInstructions: (initialData as any)?.careInstructions || "",
-    highlights: Array.isArray((initialData as any)?.highlights)
-      ? (initialData as any).highlights.join("\n")
-      : ((initialData as any)?.highlights as string) || "",
+    border: initialData?.border || "",
+    blouse: initialData?.blouse || "",
+    occasion: initialData?.occasion || "",
+    sareeLength: initialData?.sareeLength || "5.5 metres",
+    blouseLength: initialData?.blouseLength || "0.8 metres",
+    careInstructions: initialData?.careInstructions || "",
+    highlights: Array.isArray(initialData?.highlights)
+      ? initialData!.highlights.join("\n")
+      : (initialData?.highlights as string) || "",
     description: initialData?.description || "",
     foldedImg: initialData?.foldedImg || "",
     wornImg: initialData?.wornImg || "",
@@ -144,13 +135,19 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
         const res = await fetch("/api/categories");
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
+          if (Array.isArray(data)) {
+            // Only real categories. An edited product whose category was since
+            // deleted keeps it as an option, so saving doesn't silently move it.
             const apiCatNames = data.map((c: CategoryOption) => c.name.trim()).filter(Boolean);
-            const combined = Array.from(new Set([...apiCatNames, ...DEFAULT_CATEGORIES]));
+            const current = initialData?.category?.trim();
+            const combined = current && !apiCatNames.some((n: string) => n.toLowerCase() === current.toLowerCase())
+              ? [current, ...apiCatNames]
+              : apiCatNames;
             setCategories(combined);
 
-            if (!initialData?.category && combined.length > 0) {
-              setFormData((prev) => ({ ...prev, category: combined[0] }));
+            if (!initialData?.category) {
+              if (combined.length > 0) setFormData((prev) => ({ ...prev, category: combined[0] }));
+              else setIsCustomCategory(true); // no categories yet: type the first one
             }
           }
         }
@@ -372,9 +369,9 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
       setTimeout(() => {
         router.push("/dashboard/products");
       }, 1000);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Save product error:", err);
-      setErrorMessage(err.message || "An unexpected error occurred while saving.");
+      setErrorMessage(messageOf(err, "An unexpected error occurred while saving."));
       setIsSubmitting(false);
     }
   };
@@ -383,7 +380,7 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
     <form onSubmit={handleSubmit} className="space-y-8 max-w-6xl pb-16">
       {/* Notifications */}
       {errorMessage && (
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 flex items-center gap-3 text-xs font-semibold"
@@ -397,18 +394,18 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
           >
             <X className="w-4 h-4" />
           </button>
-        </motion.div>
+        </m.div>
       )}
 
       {successMessage && (
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center gap-3 text-xs font-semibold"
         >
           <Check className="w-4 h-4 flex-shrink-0 text-emerald-600" />
           <span>{successMessage}</span>
-        </motion.div>
+        </m.div>
       )}
 
       {/* Main Grid: 2 Columns */}

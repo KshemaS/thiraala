@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import {
   Edit3,
   Check,
@@ -25,18 +25,6 @@ const DEFAULT_IMAGES: BannerImages = {
   image2: "",
   image3: "",
 };
-
-// Quick pickable presets from the project images
-const PRESET_OPTIONS = [
-  { label: "Honey Saree", path: "/images/honey.jpeg" },
-  { label: "Kshema Saree", path: "/images/kshe.jpeg" },
-  { label: "Swathi Saree", path: "/images/swa.jpeg" },
-  { label: "Cream Gold Saree", path: "/images/saree-cream-gold.png" },
-  { label: "Green Gold Saree", path: "/images/saree-green-gold.png" },
-  { label: "Emerald Saree", path: "/images/saree-emerald-designer.png" },
-  { label: "Shoot Editorial", path: "/images/shoot.png" },
-  { label: "Products Weave", path: "/images/products-bg.png" },
-];
 
 export default function HomeBannerPage() {
   const [images, setImages] = useState<BannerImages>(DEFAULT_IMAGES);
@@ -144,7 +132,7 @@ export default function HomeBannerPage() {
       {/* Toast Alert */}
       <AnimatePresence>
         {toastMessage && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
@@ -154,7 +142,7 @@ export default function HomeBannerPage() {
               <Check className="w-3.5 h-3.5 stroke-[3]" />
             </div>
             <span>{toastMessage}</span>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 
@@ -376,7 +364,7 @@ export default function HomeBannerPage() {
         {isEditModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             {/* Backdrop */}
-            <motion.div
+            <m.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -385,7 +373,7 @@ export default function HomeBannerPage() {
             />
 
             {/* Modal Box */}
-            <motion.div
+            <m.div
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -514,7 +502,7 @@ export default function HomeBannerPage() {
                   </button>
                 </div>
               </div>
-            </motion.div>
+            </m.div>
           </div>
         )}
       </AnimatePresence>

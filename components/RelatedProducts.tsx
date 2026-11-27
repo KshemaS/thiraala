@@ -1,21 +1,8 @@
 import CategoryCard from "@/components/CategoryCard";
-import { getAllUnifiedProducts } from "@/lib/products";
+import { getRelatedProducts, type UnifiedProduct } from "@/lib/products";
 
-export default async function RelatedProducts({ product }: { product: any }) {
-  const all = await getAllUnifiedProducts();
-
-  // Filter related products (same category, up to 3 items)
-  let relatedProducts = all
-    .filter((item) => item.category === product.category && String(item.id) !== String(product.id))
-    .slice(0, 3);
-
-  // Fallback related products if count is low
-  if (relatedProducts.length < 3) {
-    const additional = all.filter(
-      (item) => String(item.id) !== String(product.id) && !relatedProducts.some((p) => String(p.id) === String(item.id))
-    );
-    relatedProducts.push(...additional.slice(0, 3 - relatedProducts.length));
-  }
+export default async function RelatedProducts({ product }: { product: Pick<UnifiedProduct, "id" | "category"> }) {
+  const relatedProducts = await getRelatedProducts(product, 3);
 
   return (
     <div className="border-t border-[#1E3A2C]/10 pt-16 mt-16 space-y-10">

@@ -15,7 +15,7 @@ import prisma from "@/lib/prisma";
  */
 
 /** "track" = public order lookups (order number + phone); "contact" = Contact-form messages (every message counts, to stop floods). */
-export type ThrottleScope = "admin" | "customer" | "track" | "contact";
+export type ThrottleScope = "admin" | "customer" | "track" | "contact" | "reset";
 
 const WINDOW_MS = 15 * 60 * 1000;
 const LOCK_MS = 15 * 60 * 1000;

@@ -1,19 +1,10 @@
+import { refreshesShop } from "@/lib/revalidateShop";
+import { errorCode } from "@/lib/errors";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guard";
-import { imageInputError, imageUrl, isServedImageUrl } from "@/lib/productImages";
-import { singleImageRefs } from "@/lib/imageRefs";
-
-/**
- * All categories with their photo as a short link (served by
- * /api/images/category/…). Uploaded photos are base64 in the database, up to
- * several MB each, so the photo column itself is never loaded here.
- */
-async function listCategories() {
-  const rows = await prisma.category.findMany({ orderBy: { createdAt: "asc" }, omit: { image: true } });
-  const refs = await singleImageRefs("categories", rows.map((c) => c.id));
-  return rows.map((c) => ({ ...c, image: imageUrl("category", c.id, "image", refs.get(c.id), c.updatedAt) ?? null }));
-}
+import { imageInputError, isServedImageUrl } from "@/lib/productImages";
+import { listCategories } from "@/lib/categories";
 
 // GET — all categories (database only).
 export async function GET() {
@@ -36,7 +27,7 @@ const slugify = (s: string) =>
  * renames it on the products that use it. An image sent back as its served
  * link means "unchanged".
  */
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const unauthorized = await requireAdmin();
   if (unauthorized) return unauthorized;
 
@@ -114,12 +105,14 @@ export async function POST(request: Request) {
     );
 
     return NextResponse.json({ success: true, data: await listCategories() });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error saving categories:", error);
-    const duplicate = error?.code === "P2002";
+    const duplicate = errorCode(error) === "P2002";
     return NextResponse.json(
       { success: false, error: duplicate ? "Two categories can't have the same name or URL slug." : "Failed to save categories" },
       { status: duplicate ? 409 : 500 }
     );
   }
 }
+
+export const POST = refreshesShop(handlePOST);

@@ -1,73 +1,30 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import Container from "@/components/Container";
-import { motion } from "framer-motion";
-import CategoryCard, { CategoryProduct } from "@/components/CategoryCard";
+import type { FilteredProduct } from "@/app/api/products/filter/route";
+
+import { m } from "framer-motion";
+import CategoryCard from "@/components/CategoryCard";
 
 
-interface CategoryItem {
-  id: string;
-  name: string;
-  slug: string;
-  description?: string;
-  image?: string;
-  status?: string;
-}
+import type { HomeCategory } from "@/lib/homeData";
 
-export default function CategoryTabs() {
-  const [categories, setCategories] = useState<CategoryItem[]>([]);
-  const [activeTab, setActiveTab] = useState("");
-  const [allProducts, setAllProducts] = useState<any[]>([]);
-
-  const fetchCategories = useCallback(async () => {
-    try {
-      const res = await fetch("/api/categories");
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          const active = data.filter((c: CategoryItem) => c.status !== "inactive");
-          setCategories(active);
-          if (active.length > 0 && !active.some((c: CategoryItem) => c.slug === activeTab)) {
-            setActiveTab(active[0].slug);
-          }
-        }
-      }
-    } catch (e) {
-      console.error("Failed to load categories:", e);
-    }
-  }, [activeTab]);
-
-  const fetchProducts = useCallback(async () => {
-    try {
-      const res = await fetch("/api/products/filter?limit=all");
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && Array.isArray(data.products)) {
-          setAllProducts(data.products);
-        }
-      }
-    } catch (e) {
-      console.error("Failed to load products for categories:", e);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchCategories();
-    fetchProducts();
-
-    const handleUpdate = () => {
-      fetchCategories();
-      fetchProducts();
-    };
-    window.addEventListener("thiraala-categories-updated", handleUpdate);
-    window.addEventListener("thiraala-products-updated", handleUpdate);
-
-    return () => {
-      window.removeEventListener("thiraala-categories-updated", handleUpdate);
-      window.removeEventListener("thiraala-products-updated", handleUpdate);
-    };
-  }, [fetchCategories, fetchProducts]);
+/**
+ * Category tabs on the home page. Categories and their products come from the
+ * server with the page (lib/homeData.ts), so switching tabs loads nothing.
+ */
+export default function CategoryTabs({
+  categories,
+  productsByCategory,
+  fallback,
+}: {
+  categories: HomeCategory[];
+  productsByCategory: Record<string, FilteredProduct[]>;
+  /** Shown for a category with no products yet. */
+  fallback: FilteredProduct[];
+}) {
+  const [activeTab, setActiveTab] = useState(categories[0]?.slug ?? "");
 
   if (categories.length === 0) {
     return null;
@@ -76,16 +33,8 @@ export default function CategoryTabs() {
   // Find active category item
   const currentCategory = categories.find((c) => c.slug === activeTab) || categories[0];
 
-  // Match products by category name or fallback to allProducts
-  const activeProducts = currentCategory
-    ? allProducts.filter(
-        (s) =>
-          (s.category || "").toLowerCase().trim() === currentCategory.name.toLowerCase().trim() ||
-          (s.category || "").toLowerCase().includes(currentCategory.slug.toLowerCase().replace(/-/g, " "))
-      )
-    : [];
-
-  const displayProducts = activeProducts.length > 0 ? activeProducts : allProducts.slice(0, 3);
+  const activeProducts = (currentCategory && productsByCategory[currentCategory.slug]) || [];
+  const displayProducts = activeProducts.length > 0 ? activeProducts : fallback.slice(0, 3);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -148,7 +97,7 @@ export default function CategoryTabs() {
   return (
     <section className="w-full mb-[140px] select-none overflow-hidden">
       <Container>
-        <motion.div
+        <m.div
           variants={containerVariants}
           initial="hidden"
           whileInView="show"
@@ -156,7 +105,7 @@ export default function CategoryTabs() {
           className="flex flex-col"
         >
           {/* Centered Section Heading */}
-          <motion.div className="text-center max-w-2xl mx-auto mb-10" variants={itemVariants}>
+          <m.div className="text-center max-w-2xl mx-auto mb-10" variants={itemVariants}>
             <h2 className="text-[#1E3A2C] font-bold text-3xl sm:text-4xl tracking-tight">
               Top Categories
             </h2>
@@ -164,10 +113,10 @@ export default function CategoryTabs() {
             <p className="text-[#1E3A2C]/70 text-sm sm:text-base leading-relaxed">
               Explore our curated range of fabrics and designs. From light, breezy handwoven cottons to luxurious tissue silks, discover the perfect drape for your signature look.
             </p>
-          </motion.div>
+          </m.div>
 
           {/* Category Tabs Header Bar */}
-          <motion.div className="flex flex-col items-center mb-12" variants={itemVariants}>
+          <m.div className="flex flex-col items-center mb-12" variants={itemVariants}>
             <div className="relative flex items-center justify-start md:justify-center gap-4 md:gap-6 overflow-x-auto no-scrollbar border-b border-[#1E3A2C]/10 w-full pb-4 whitespace-nowrap select-none px-4 md:px-0">
               {categories.map((tab) => (
                 <button
@@ -190,7 +139,7 @@ export default function CategoryTabs() {
                 </button>
               ))}
             </div>
-          </motion.div>
+          </m.div>
 
           {/* Product Card Grid (Using the CategoryCard component) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10 mb-12">
@@ -198,23 +147,23 @@ export default function CategoryTabs() {
               const col = idx % 3;
               const cardVariant = col === 0 ? leftVariant : col === 2 ? rightVariant : centerVariant;
               return (
-                <motion.div
+                <m.div
                   key={product.id}
                   variants={cardVariant}
                 >
                   <CategoryCard product={product} />
-                </motion.div>
+                </m.div>
               );
             })}
           </div>
 
           {/* Centered 'View More' CTA button */}
-          <motion.div className="text-center mt-12" variants={itemVariants}>
+          <m.div className="text-center mt-12" variants={itemVariants}>
             <button className="inline-flex items-center justify-center btn-animate-border btn-animate-border-light px-8 py-3 rounded-full font-bold text-xs tracking-wider uppercase transition-all duration-300 hover:scale-[1.02] cursor-pointer shadow-sm shadow-[#1E3A2C]/5">
               View More Categories
             </button>
-          </motion.div>
-        </motion.div>
+          </m.div>
+        </m.div>
       </Container>
     </section>
   );

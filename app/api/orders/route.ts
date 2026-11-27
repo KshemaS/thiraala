@@ -120,7 +120,29 @@ export function toOrderJSON(order: OrderWithItems, opts: { admin?: boolean } = {
   };
 }
 
-// GET all orders
+/** Order counts by step and revenue (all orders except cancelled), worked out in the database. */
+async function orderMetrics() {
+  const [byStatus, revenue, attention] = await Promise.all([
+    prisma.order.groupBy({ by: ["status"], _count: { _all: true } }),
+    prisma.order.aggregate({ where: { status: { not: "Cancelled" } }, _sum: { total: true } }),
+    prisma.order.count({ where: { attentionReason: { not: null } } }),
+  ]);
+  const n = (...names: string[]) => byStatus.filter((r) => names.includes(r.status)).reduce((sum, r) => sum + r._count._all, 0);
+  return {
+    total: byStatus.reduce((sum, r) => sum + r._count._all, 0),
+    pending: n("Pending"),
+    confirmed: n("Order Confirmed", "Confirmed"),
+    dispatched: n("Dispatched", "Shipped"),
+    inTransit: n("In Transit"),
+    delivered: n("Delivered"),
+    cancelled: n("Cancelled"),
+    attention,
+    revenue: revenue._sum.total ?? 0,
+  };
+}
+export type OrderMetrics = Awaited<ReturnType<typeof orderMetrics>>;
+
+// GET orders (admin: all, optionally one page at a time; customer: their own)
 export async function GET(request: Request) {
   try {
     // ?mine=1 (the shop's "My Orders" page): only the signed-in customer's own
@@ -170,11 +192,23 @@ export async function GET(request: Request) {
       if (phone) {
         where.phone = { contains: phone };
       }
+      // Packing slips: just the chosen orders (?ids=THR-1001,THR-1002).
+      const ids = searchParams.get("ids")?.split(",").map((x) => x.trim()).filter(Boolean).slice(0, 200);
+      if (ids?.length) where.humanId = { in: ids, mode: "insensitive" };
     }
 
     if (status && status !== "All") {
-      where.status = { equals: status, mode: "insensitive" };
+      // Older orders use "Confirmed" / "Shipped" for the same steps.
+      const aliases: Record<string, string[]> = { "Order Confirmed": ["Order Confirmed", "Confirmed"], Dispatched: ["Dispatched", "Shipped"] };
+      where.status = aliases[status] ? { in: aliases[status] } : { equals: status, mode: "insensitive" };
     }
+
+    // Dashboard payment filter.
+    const payment = adminSession ? searchParams.get("payment") : null;
+    if (payment === "Paid") where.paymentStatus = "Paid";
+    else if (payment === "Unpaid") where.paymentStatus = "Pending";
+    else if (payment === "Failed") where.paymentStatus = "Failed";
+    else if (payment === "Attention") where.attentionReason = { not: null };
 
     if (search) {
       const q = search;
@@ -193,6 +227,30 @@ export async function GET(request: Request) {
       where.AND = andConditions;
     }
 
+    // Dashboard paging: ?page=N&limit=M returns one page plus totals and the
+    // overview counts, so the list stays fast however many orders there are.
+    const pageParam = adminSession ? parseInt(searchParams.get("page") || "", 10) : NaN;
+    if (adminSession && pageParam > 0) {
+      const limit = Math.min(200, Math.max(1, parseInt(searchParams.get("limit") || "50", 10) || 50));
+      const focusId = searchParams.get("focus")?.trim();
+      const [orders, filteredCount, metrics, focus] = await Promise.all([
+        prisma.order.findMany({ where, include: { items: true }, orderBy: { createdAt: "desc" }, skip: (pageParam - 1) * limit, take: limit }),
+        prisma.order.count({ where }),
+        orderMetrics(),
+        focusId ? prisma.order.findFirst({ where: { humanId: { equals: focusId, mode: "insensitive" } }, include: { items: true } }) : null,
+      ]);
+      return NextResponse.json({
+        success: true,
+        orders: orders.map((o) => toOrderJSON(o, { admin: true })),
+        filteredCount,
+        page: pageParam,
+        limit,
+        totalPages: Math.max(1, Math.ceil(filteredCount / limit)),
+        metrics,
+        focus: focus ? toOrderJSON(focus, { admin: true }) : null,
+      });
+    }
+
     const orders = await prisma.order.findMany({
       where,
       include: { items: true },
@@ -204,7 +262,7 @@ export async function GET(request: Request) {
       count: orders.length,
       orders: orders.map((o) => toOrderJSON(o, { admin: !!adminSession })),
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error fetching orders:", error);
     return NextResponse.json(
       { success: false, error: "Failed to fetch orders" },
@@ -402,7 +460,7 @@ export async function POST(request: Request) {
       },
       { status: 201 }
     );
-  } catch (error: any) {
+  } catch (error) {
     if (error instanceof OutOfStockError) {
       return NextResponse.json(
         { success: false, error: error.message, code: "OUT_OF_STOCK" },

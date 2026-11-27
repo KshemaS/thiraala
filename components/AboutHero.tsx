@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { motion } from "framer-motion";
-import aboutHeroBg from "../public/images/product-bg.png";
+import { m } from "framer-motion";
+import aboutHeroBg from "../public/images/product-bg.webp";
 import Container from "./Container";
 
 export default function AboutHero() {
@@ -44,31 +44,31 @@ export default function AboutHero() {
 
       {/* Subtle flowing SVG background representing saree waves */}
       <Container className="relative z-10 text-left w-full">
-        <motion.div
+        <m.div
           className="py-12 sm:py-10 md:py-20"
           variants={containerVariants}
           initial="hidden"
           animate="show"
         >
-          <motion.h1
+          <m.h1
             className="text-4xl lg:text-6xl font-bold text-[#1E3A2C] tracking-tight leading-none mb-6 select-none max-w-[600px]"
             variants={itemVariants}
           >
             Behind the Weaves of thiraala
-          </motion.h1>
+          </m.h1>
 
-          <motion.div
+          <m.div
             className="w-16 h-1.5 bg-[#DAA87C] mb-8 rounded-full"
             variants={itemVariants}
           />
 
-          <motion.p
+          <m.p
             className="max-w-2xl text-[#1E3A2C]/85 text-base sm:text-lg leading-relaxed font-normal"
             variants={itemVariants}
           >
             Welcome to thiraala. Discover our journey in bringing back the simple, lightweight elegance of everyday sarees—crafted with love, comfort, and traditional heritage.
-          </motion.p>
-        </motion.div>
+          </m.p>
+        </m.div>
       </Container>
     </section>
   );

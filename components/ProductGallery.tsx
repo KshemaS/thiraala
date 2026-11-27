@@ -1,24 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Image from "next/image";
-import { SareeProduct } from "@/data/products";
-import { UnifiedProduct } from "@/lib/products";
-import { NO_PHOTO } from "@/lib/placeholder";
+import type { SareeProduct } from "@/data/products";
+import type { UnifiedProduct } from "@/lib/products";
+import { NO_PHOTO, photoSrc } from "@/lib/placeholder";
 
-const getImgSrc = (img: any): string => {
-  if (!img) return NO_PHOTO;
-  if (typeof img === "string") return img;
-  return img.src || NO_PHOTO;
-};
+const getImgSrc = (img: unknown): string => photoSrc(img);
 
-export default function ProductGallery({ product }: { product: SareeProduct | UnifiedProduct | any }) {
-  const [activeImage, setActiveImage] = useState(product.wornImg);
-
-  // Sync active image when product changes
-  useEffect(() => {
-    setActiveImage(product.wornImg);
-  }, [product]);
+export default function ProductGallery({ product }: { product: SareeProduct | UnifiedProduct }) {
+  // The photo the shopper clicked, remembered per product: picking another
+  // colour (a new product object) goes back to its worn photo.
+  type Photo = typeof product.wornImg;
+  const [picked, setPicked] = useState<{ product: typeof product; img: Photo } | null>(null);
+  const activeImage = picked && picked.product === product ? picked.img : product.wornImg;
+  const setActiveImage = (img: Photo) => setPicked({ product, img });
 
   const wornSrc = getImgSrc(product.wornImg);
   const foldedSrc = getImgSrc(product.foldedImg);

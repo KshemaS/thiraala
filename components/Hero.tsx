@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import Container from "@/components/Container";
 
 export default function Hero() {
@@ -214,7 +214,7 @@ export default function Hero() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-12 items-center w-full">
 
           {/* Left Column: Headings & Subtext */}
-          <motion.div
+          <m.div
             className="lg:col-span-5 flex flex-col justify-between h-full min-h-[auto] lg:min-h-[380px] py-4 lg:py-16 text-center lg:text-left"
             variants={containerVariants}
             initial="hidden"
@@ -222,31 +222,31 @@ export default function Hero() {
           >
             <div className="space-y-4 lg:space-y-6">
               {/* Gold small heading */}
-              <motion.h2
+              <m.h2
                 className="text-[#DAA87C] font-bold text-sm lg:text-base tracking-wide uppercase select-none"
                 variants={itemVariants}
               >
                 thiraala
-              </motion.h2>
+              </m.h2>
 
               {/* Giant bold title */}
-              <motion.h1
+              <m.h1
                 className="text-4xl sm:text-5xl lg:text-7xl font-bold tracking-tight text-[#1E3A2C] leading-none select-none"
                 variants={itemVariants}
               >
                 Saree Collections
-              </motion.h1>
+              </m.h1>
 
               {/* Description */}
-              <motion.p
+              <m.p
                 className="text-[#1E3A2C]/85 text-sm lg:text-[15px] leading-relaxed max-w-sm mx-auto lg:mx-0"
                 variants={itemVariants}
               >
                 Welcome to thiraala. Discover our curated collection of beautiful sarees for every occasion—blending simple elegance, comfort, and premium quality to make your everyday and special moments look effortless.
-              </motion.p>
+              </m.p>
 
               {/* Call to Action Button */}
-              <motion.div
+              <m.div
                 className="pt-2 flex flex-wrap items-center justify-center lg:justify-start gap-4 select-none"
                 variants={itemVariants}
               >
@@ -264,9 +264,9 @@ export default function Hero() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                   </svg>
                 </Link>
-              </motion.div>
+              </m.div>
             </div>
-          </motion.div>
+          </m.div>
 
           {/* Right Column: Moving / Floating Images Grid */}
           <div className="lg:col-span-7 flex items-end justify-center lg:justify-end gap-2.5 sm:gap-4 lg:gap-6 w-full h-[260px] sm:h-[480px] lg:h-[580px] select-none  relative">
@@ -312,7 +312,7 @@ export default function Hero() {
 
             {/* Card 1: Small left (Hero Slot 1) */}
             {Boolean(bannerImages.image1) && (
-              <motion.div
+              <m.div
                 className="w-[75px] sm:w-[150px] lg:w-[180px] h-[75px] sm:h-[150px] lg:h-[180px] self-end flex-shrink-0"
                 variants={cardVariants1}
                 initial="hidden"
@@ -333,12 +333,12 @@ export default function Hero() {
                     unoptimized={typeof bannerImages.image1 === "string" && bannerImages.image1.startsWith("data:")}
                   />
                 </div>
-              </motion.div>
+              </m.div>
             )}
 
             {/* Card 2: Medium center (Hero Slot 2) */}
             {Boolean(bannerImages.image2) && (
-              <motion.div
+              <m.div
                 className="w-[75px] sm:w-[150px] lg:w-[180px] h-[120px] sm:h-[230px] lg:h-[280px] self-end flex-shrink-0"
                 variants={cardVariants2}
                 initial="hidden"
@@ -359,12 +359,12 @@ export default function Hero() {
                     unoptimized={typeof bannerImages.image2 === "string" && bannerImages.image2.startsWith("data:")}
                   />
                 </div>
-              </motion.div>
+              </m.div>
             )}
 
             {/* Card 3: Large right (Hero Slot 3) */}
             {Boolean(bannerImages.image3) && (
-              <motion.div
+              <m.div
                 className="w-[145px] sm:w-[300px] lg:w-[360px] h-[210px] sm:h-[420px] lg:h-[520px] self-end flex-shrink-0"
                 variants={cardVariants3}
                 initial="hidden"
@@ -386,7 +386,7 @@ export default function Hero() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent pointer-events-none" />
                 </div>
-              </motion.div>
+              </m.div>
             )}
 
           </div>

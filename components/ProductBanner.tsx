@@ -1,15 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import Container from "@/components/Container";
-import productHero from "@/public/images/products-bg.png";
+import productHero from "@/public/images/products-bg.webp";
 
 export default function ProductBanner() {
   return (
     <section className="w-full pt-6">
       <Container>
-        <motion.div 
+        <m.div 
           className="relative w-full h-[350px] overflow-hidden rounded-[24px] sm:rounded-[32px] border border-[#1E3A2C]/5 shadow-sm"
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -22,7 +22,7 @@ export default function ProductBanner() {
             className="object-cover"
             priority
           />
-        </motion.div>
+        </m.div>
       </Container>
     </section>
   );

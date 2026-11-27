@@ -1,5 +1,7 @@
 "use client";
 
+
+import { errorMessage } from "@/lib/errors";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { Order } from "@/app/api/orders/route";
@@ -29,13 +31,13 @@ function Slips() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/orders", { cache: "no-store" });
+        const res = await fetch(`/api/orders?ids=${encodeURIComponent(ids.join(","))}`, { cache: "no-store" });
         const data = await res.json();
         if (!res.ok || !data.success) throw new Error(data.error || "Unable to load orders.");
         const byId = new Map((data.orders as Order[]).map((o) => [o.id.toUpperCase(), o]));
         setOrders(ids.map((id) => byId.get(id)).filter((o): o is Order => !!o));
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err) {
+        setError(errorMessage(err));
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

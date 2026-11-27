@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Container from "@/components/Container";
@@ -21,9 +21,6 @@ export default function ContactPage() {
   // Hidden field only bots fill in.
   const [honeypot, setHoneypot] = useState("");
 
-  useEffect(() => {
-    document.title = "Contact Us | thiraala";
-  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;

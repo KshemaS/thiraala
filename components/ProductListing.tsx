@@ -1,10 +1,12 @@
 "use client";
 
+
+import { errorMessage } from "@/lib/errors";
 import { useState, useEffect, useCallback, useTransition } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import CategoryCard from "@/components/CategoryCard";
 import Container from "@/components/Container";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import { FilteredProduct } from "@/app/api/products/filter/route";
 
 interface FacetItem {
@@ -41,7 +43,6 @@ const SORT_OPTIONS = [
 
 export default function ProductListing() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const [, startTransition] = useTransition();
 
   // Read initial query params
@@ -126,15 +127,16 @@ export default function ProductListing() {
       } else {
         throw new Error(data.error || "Failed to load products");
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Filter request error:", err);
-      setError(err.message || "Failed to load products");
+      setError(errorMessage(err, "Failed to load products"));
     } finally {
       setLoading(false);
     }
   }, [selectedCategory, selectedFabric, sortBy, searchQuery, selectedPriceIdx, inStockOnly]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- re-fetches products when the filters change; the spinner is meant to show
     fetchFilteredProducts();
   }, [fetchFilteredProducts]);
 
@@ -571,7 +573,7 @@ export default function ProductListing() {
               </div>
             ) : products.length > 0 ? (
               /* Products Grid */
-              <motion.div
+              <m.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.3 }}
@@ -595,7 +597,7 @@ export default function ProductListing() {
                     />
                   ))}
                 </AnimatePresence>
-              </motion.div>
+              </m.div>
             ) : (
               /* Empty State */
               <div className="w-full text-center py-20 bg-white border border-[#1E3A2C]/5 rounded-[32px] shadow-sm p-8">

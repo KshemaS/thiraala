@@ -1,9 +1,9 @@
 "use client";
 
+import Image from "next/image";
+
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
-import Image from "next/image";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Container from "@/components/Container";
@@ -12,10 +12,6 @@ import {
   Package,
   Truck,
   CheckCircle2,
-  Clock,
-  MapPin,
-  ChevronRight,
-  ShieldCheck,
   AlertCircle,
   Copy,
   Check,
@@ -38,9 +34,6 @@ function TrackOrderContent() {
   const [error, setError] = useState<string | null>(null);
   const [copiedTracking, setCopiedTracking] = useState(false);
 
-  useEffect(() => {
-    document.title = "Track Order Shipment | thiraala";
-  }, []);
 
   const fetchOrder = async (idToSearch: string) => {
     const cleanId = idToSearch.trim();
@@ -77,8 +70,10 @@ function TrackOrderContent() {
 
   useEffect(() => {
     if (initialId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data from the server when this opens; the data arrives asynchronously
       fetchOrder(initialId);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once when the page opens; the loader reads current state when it runs
   }, [initialId]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -426,10 +421,13 @@ function TrackOrderContent() {
                     {order.items.map((item, idx) => (
                       <div key={idx} className={`flex items-center gap-3.5 ${idx > 0 ? "pt-3.5" : ""}`}>
                         <div className="relative w-14 h-16 rounded-xl overflow-hidden bg-[#FAF8F5] border border-[#1E3A2C]/10 flex-shrink-0">
-                          <img
+                          <Image
                             src={item.foldedImg || "/images/no-photo.svg"}
                             alt={item.name}
-                            className="w-full h-full object-cover"
+                            fill
+                            sizes="56px"
+                            unoptimized={(item.foldedImg || "").startsWith("data:")}
+                            className="object-cover"
                           />
                         </div>
                         <div className="flex-1 min-w-0">

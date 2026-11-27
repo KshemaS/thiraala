@@ -26,7 +26,7 @@ export async function PUT(request: Request) {
 
   try {
     const body = await request.json().catch(() => null);
-    const incoming: any[] = Array.isArray(body?.rates) ? body.rates : [];
+    const incoming: unknown[] = Array.isArray(body?.rates) ? body.rates : [];
     const stateZones = body?.stateZones && typeof body.stateZones === "object" ? (body.stateZones as Record<string, unknown>) : null;
     if (incoming.length === 0 && !stateZones) {
       return NextResponse.json({ success: false, error: "Nothing to save." }, { status: 400 });
@@ -43,10 +43,11 @@ export async function PUT(request: Request) {
     }
 
     const updates: { zone: string; firstItemFee: number; extraItemFee: number }[] = [];
-    for (const r of incoming) {
-      const zone = ZONES.find((z) => z.key === r?.zone);
+    for (const raw of incoming) {
+      const r = (raw && typeof raw === "object" ? raw : {}) as { zone?: unknown; firstItemFee?: unknown; extraItemFee?: unknown };
+      const zone = ZONES.find((z) => z.key === r.zone);
       if (!zone) {
-        return NextResponse.json({ success: false, error: `Unknown zone "${r?.zone}".` }, { status: 400 });
+        return NextResponse.json({ success: false, error: `Unknown zone "${String(r.zone)}".` }, { status: 400 });
       }
       const first = Number(r.firstItemFee);
       const extra = Number(r.extraItemFee);

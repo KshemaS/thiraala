@@ -1,5 +1,7 @@
+"use client";
+
 import Container from "@/components/Container";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 
 export default function AboutPromise() {
   const containerVariants = {
@@ -27,20 +29,20 @@ export default function AboutPromise() {
   return (
     <section className="w-full bg-[#1E3A2C] text-[#fcfbfa] py-[60px] md:py-[80px] lg:py-[120px]">
       <Container>
-        <motion.div
+        <m.div
           variants={containerVariants}
           initial="hidden"
           whileInView="show"
           viewport={{ once: true, amount: 0.25 }}
           className="space-y-16"
         >
-          <motion.div className="text-center max-w-2xl mx-auto space-y-4" variants={itemVariants}>
+          <m.div className="text-center max-w-2xl mx-auto space-y-4" variants={itemVariants}>
             <span className="text-[#DAA87C] font-semibold text-xs tracking-widest uppercase">our promise</span>
             <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">The thiraala Principles</h2>
             <div className="w-12 h-1 bg-[#DAA87C] mx-auto rounded-full"></div>
-          </motion.div>
+          </m.div>
 
-          <motion.div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center" variants={itemVariants}>
+          <m.div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center" variants={itemVariants}>
             {/* Promise 1 */}
             <div className="space-y-4">
               {/* Breathable Icon */}
@@ -85,8 +87,8 @@ export default function AboutPromise() {
                 Designs that outlive seasonal trends. Minimalist borders, curated colors, and clean aesthetics designed for lasting wear.
               </p>
             </div>
-          </motion.div>
-        </motion.div>
+          </m.div>
+        </m.div>
       </Container>
     </section>
   );

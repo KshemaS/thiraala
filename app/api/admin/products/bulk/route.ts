@@ -1,3 +1,4 @@
+import { refreshesShop } from "@/lib/revalidateShop";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guard";
@@ -12,7 +13,7 @@ const rupees = (n: number) => `₹${n.toLocaleString("en-IN")}`;
  *                                               (colour-specific prices move too)
  * MRPs are left as they are.
  */
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const unauthorized = await requireAdmin();
   if (unauthorized) return unauthorized;
 
@@ -64,3 +65,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: "Unable to update the products." }, { status: 500 });
   }
 }
+
+export const POST = refreshesShop(handlePOST);

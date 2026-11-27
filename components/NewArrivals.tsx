@@ -3,87 +3,15 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import Container from "@/components/Container";
+import type { FilteredProduct } from "@/app/api/products/filter/route";
 
-// Import all saree assets statically to align with workspace practices
-import kshe from "@/public/images/kshe.jpeg";
-import honey from "@/public/images/honey.jpeg";
-import swa from "@/public/images/swa.jpeg";
-import arayannam from "@/public/images/arayannam.jpeg";
-import gopura from "@/public/images/gopura.jpeg";
-import mambazham from "@/public/images/mambazham.jpeg";
 
-const newArrivals = [
-  {
-    id: 601,
-    name: "Avanthika Silk Kasavu",
-    price: "₹3,250",
-    img: kshe,
-    alt: "Avanthika silk Kasavu saree with gold zari detail",
-  },
-  {
-    id: 602,
-    name: "Mayilpeeli Designer Saree",
-    price: "₹2,950",
-    img: swa,
-    alt: "Mayilpeeli designer saree with peacock motif weave",
-  },
-  {
-    id: 603,
-    name: "Athira Weave Special",
-    price: "₹2,400",
-    img: honey,
-    alt: "Athira weave cotton daily wear saree",
-  },
-  {
-    id: 604,
-    name: "Vrindavan Border Cotton",
-    price: "₹1,850",
-    img: arayannam,
-    alt: "Vrindavan border cotton lightweight saree",
-  },
-  {
-    id: 605,
-    name: "Haritha Floral Weave",
-    price: "₹2,200",
-    img: gopura,
-    alt: "Haritha floral motif designer green gold border saree",
-  },
-  {
-    id: 606,
-    name: "Kanaka Gold Tissue",
-    price: "₹3,600",
-    img: mambazham,
-    alt: "Kanaka gold tissue silk traditional set saree",
-  },
-];
-
-export default function NewArrivals() {
-  const [items, setItems] = useState<any[]>(newArrivals);
+/** Newest products, loaded on the server with the page (lib/homeData.ts). */
+export default function NewArrivals({ items }: { items: FilteredProduct[] }) {
   const [visibleSlides, setVisibleSlides] = useState(3);
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  // Dynamically load newest arrivals from API
-  useEffect(() => {
-    const fetchNewArrivals = async () => {
-      try {
-        const res = await fetch("/api/products/filter?sort=newest&limit=6");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && Array.isArray(data.products) && data.products.length > 0) {
-            setItems(data.products);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load dynamic new arrivals:", err);
-      }
-    };
-
-    fetchNewArrivals();
-    window.addEventListener("thiraala-products-updated", fetchNewArrivals);
-    return () => window.removeEventListener("thiraala-products-updated", fetchNewArrivals);
-  }, []);
+  const [slideIndex, setSlideIndex] = useState(0);
 
   // Monitor screen size dynamically to determine active slide counts
   useEffect(() => {
@@ -103,25 +31,16 @@ export default function NewArrivals() {
   }, []);
 
   const maxIndex = Math.max(0, items.length - visibleSlides);
+  // Kept in range when a resize shows more cards at once.
+  const currentIndex = Math.min(slideIndex, maxIndex);
 
   const nextSlide = () => {
-    if (currentIndex < maxIndex) {
-      setCurrentIndex((prev) => prev + 1);
-    }
+    if (currentIndex < maxIndex) setSlideIndex(currentIndex + 1);
   };
 
   const prevSlide = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex((prev) => prev - 1);
-    }
+    if (currentIndex > 0) setSlideIndex(currentIndex - 1);
   };
-
-  // Adjust slides viewport positioning if container resize forces index bounds out-of-range
-  useEffect(() => {
-    if (currentIndex > maxIndex) {
-      setCurrentIndex(maxIndex);
-    }
-  }, [maxIndex, currentIndex]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -181,10 +100,12 @@ export default function NewArrivals() {
     },
   };
 
+  if (items.length === 0) return null;
+
   return (
     <section className="w-full mb-[140px] select-none overflow-hidden">
       <Container>
-        <motion.div
+        <m.div
           variants={containerVariants}
           initial="hidden"
           whileInView="show"
@@ -192,7 +113,7 @@ export default function NewArrivals() {
           className="space-y-16"
         >
           {/* Centered Heading and Description */}
-          <motion.div className="text-center max-w-2xl mx-auto" variants={itemVariants}>
+          <m.div className="text-center max-w-2xl mx-auto" variants={itemVariants}>
             <h2 className="text-[#1E3A2C] font-bold text-3xl sm:text-4xl tracking-tight">
               New Arrivals
             </h2>
@@ -200,7 +121,7 @@ export default function NewArrivals() {
             <p className="text-[#1E3A2C]/70 text-sm sm:text-base leading-relaxed">
               Be the first to explore our latest weaves fresh off the looms. Discover timeless designs reinvented for modern celebrations.
             </p>
-          </motion.div>
+          </m.div>
 
           {/* Slick-like Slider Container */}
           <div className="relative w-full px-2 sm:px-6 md:px-12">
@@ -230,14 +151,11 @@ export default function NewArrivals() {
                 {items.map((saree, idx) => {
                   const col = idx % 3;
                   const cardVariant = col === 0 ? leftVariant : col === 2 ? rightVariant : centerVariant;
-                  const imgSrc =
-                    typeof saree.img === "string"
-                      ? saree.img
-                      : saree.img?.src || saree.wornImg || saree.foldedImg || "/images/no-photo.svg";
-                  const imgAlt = saree.alt || saree.altWorn || saree.name;
+                  const imgSrc = saree.img || saree.wornImg || saree.foldedImg || "/images/no-photo.svg";
+                  const imgAlt = saree.altWorn || saree.name;
 
                   return (
-                    <motion.div
+                    <m.div
                       key={saree.id}
                       variants={cardVariant}
                       initial="hidden"
@@ -281,7 +199,7 @@ export default function NewArrivals() {
                           </div>
                         </div>
                       </Link>
-                    </motion.div>
+                    </m.div>
                   );
                 })}
               </div>
@@ -302,7 +220,7 @@ export default function NewArrivals() {
               </svg>
             </button>
           </div>
-        </motion.div>
+        </m.div>
       </Container>
     </section>
   );

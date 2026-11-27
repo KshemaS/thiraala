@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import Container from "@/components/Container";
 
 interface EditorialPhoto {
@@ -31,6 +31,7 @@ export default function PhotoshootSlider() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data from the server when this opens; the data arrives asynchronously
     fetchSlides();
 
     // Listen for real-time changes saved in dashboard
@@ -87,7 +88,7 @@ export default function PhotoshootSlider() {
   return (
     <section className="w-full mt-[80px] lg:mt-[120px] mb-10 md:mb-4">
       <Container>
-        <motion.div
+        <m.div
           variants={containerVariants}
           initial="hidden"
           whileInView="show"
@@ -95,7 +96,7 @@ export default function PhotoshootSlider() {
           className="space-y-12"
         >
           {/* Centered Heading and Description */}
-          <motion.div className="text-center max-w-2xl mx-auto" variants={itemVariants}>
+          <m.div className="text-center max-w-2xl mx-auto" variants={itemVariants}>
             <h2 className="text-[#1E3A2C] font-bold text-3xl sm:text-4xl tracking-tight">
               Editorial Photoshoots
             </h2>
@@ -103,10 +104,10 @@ export default function PhotoshootSlider() {
             <p className="text-[#1E3A2C]/70 text-sm sm:text-base leading-relaxed">
               Glimpses of our sarees in real, everyday settings—capturing the fluid drape, fine textures, and premium comfort of our fabrics.
             </p>
-          </motion.div>
+          </m.div>
 
           {/* Image Slider Container (400px Height, Rounded Corners) */}
-          <motion.div
+          <m.div
             className="relative w-full h-[400px] overflow-hidden rounded-[24px] sm:rounded-[32px] select-none shadow-md"
             variants={itemVariants}
           >
@@ -166,8 +167,8 @@ export default function PhotoshootSlider() {
                 })}
               </div>
             )}
-          </motion.div>
-        </motion.div>
+          </m.div>
+        </m.div>
       </Container>
     </section>
   );

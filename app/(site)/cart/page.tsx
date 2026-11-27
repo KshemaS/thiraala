@@ -1,6 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+
+import { errorMessage } from "@/lib/errors";
+import { photoSrc } from "@/lib/placeholder";
+import type { Order } from "@/app/api/orders/route";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Header from "@/components/Header";
@@ -10,7 +14,7 @@ import RegisterModal from "@/components/RegisterModal";
 import { EMAIL_ERROR, indianMobile, isValidEmail, PHONE_ERROR } from "@/lib/contact";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 
 const loadRazorpayScript = (): Promise<boolean> => {
   return new Promise((resolve) => {
@@ -18,7 +22,7 @@ const loadRazorpayScript = (): Promise<boolean> => {
       resolve(false);
       return;
     }
-    if ((window as any).Razorpay) {
+    if (window.Razorpay) {
       resolve(true);
       return;
     }
@@ -27,7 +31,7 @@ const loadRazorpayScript = (): Promise<boolean> => {
 
     // Timeout guard: never hang the checkout process
     const timer = setTimeout(() => {
-      const isAvailable = typeof (window as any).Razorpay !== "undefined";
+      const isAvailable = typeof window.Razorpay !== "undefined";
       resolve(isAvailable);
     }, 3500);
 
@@ -42,7 +46,7 @@ const loadRazorpayScript = (): Promise<boolean> => {
     script.async = true;
     script.onload = () => {
       clearTimeout(timer);
-      resolve(typeof (window as any).Razorpay !== "undefined");
+      resolve(typeof window.Razorpay !== "undefined");
     };
     script.onerror = () => {
       clearTimeout(timer);
@@ -74,19 +78,19 @@ export default function CartPage() {
   };
 
   // Bring bag prices/stock up to date once the bag has loaded.
-  const [hasRefreshed, setHasRefreshed] = useState(false);
+  const hasRefreshed = useRef(false);
   useEffect(() => {
-    if (hasRefreshed || cart.length === 0) return;
-    setHasRefreshed(true);
+    if (hasRefreshed.current || cart.length === 0) return;
+    hasRefreshed.current = true;
     refreshCart();
-  }, [cart.length, hasRefreshed, refreshCart]);
+  }, [cart.length, refreshCart]);
 
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isOrderPlaced, setIsOrderPlaced] = useState(false);
   const [orderTotal, setOrderTotal] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [createdOrder, setCreatedOrder] = useState<any>(null);
+  const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
 
   // Checkout Form State - Contact Info
   const [name, setName] = useState("");
@@ -106,46 +110,36 @@ export default function CartPage() {
     message: string;
   } | null>(null);
 
-  const [isRazorpayReady, setIsRazorpayReady] = useState(false);
-
-  // Re-quote delivery whenever the pincode or number of sarees changes.
+  // Re-quote delivery whenever the pincode or number of sarees changes. (An
+  // old quote is ignored: deliveryFee only uses one for this pincode + count.)
   useEffect(() => {
     const pin = pincode.trim();
     if (/^[1-9]\d{5}$/.test(pin) && cartCount > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches the quote; state is set when it arrives
       fetchDelivery(pin, cartCount);
-    } else {
-      setDelivery(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pincode, cartCount]);
 
   const deliveryFee = delivery && delivery.pincode === pincode.trim() && delivery.sarees === cartCount ? delivery.fee : null;
   const grandTotal = cartTotal + (deliveryFee ?? 0);
 
-  // Load & verify Razorpay checkout.js script
+  // Start loading Razorpay checkout.js early so "Pay" opens quickly.
+  // (Checkout waits for it again before opening.)
   useEffect(() => {
-    if (typeof window !== "undefined" && (window as any).Razorpay) {
-      setIsRazorpayReady(true);
-    } else {
-      loadRazorpayScript().then((ready) => {
-        setIsRazorpayReady(ready);
-      });
-    }
+    if (!window.Razorpay) void loadRazorpayScript();
   }, []);
 
-  // Set dynamic page title
-  useEffect(() => {
-    document.title = "Shopping Bag | thiraala";
-  }, []);
 
-  // Sync user info into form state when user logs in
-  useEffect(() => {
-    if (user) {
-      if (!name) setName(`${user.firstName} ${user.lastName || ""}`.trim());
-      if (!email && user.email) setEmail(user.email);
-      if (!phone && user.phone) setPhone(user.phone);
-    }
-  }, [user]);
+  // Fill empty contact fields from the account when the customer signs in
+  // (adjusted during render when the user changes, not in an effect).
+  const [prefilledFor, setPrefilledFor] = useState<string | null>(null);
+  const userKey = user ? String(user.id ?? user.email) : null;
+  if (user && userKey !== prefilledFor) {
+    setPrefilledFor(userKey);
+    if (!name) setName(`${user.firstName} ${user.lastName || ""}`.trim());
+    if (!email && user.email) setEmail(user.email);
+    if (!phone && user.phone) setPhone(user.phone);
+  }
 
   // Pincode Search & Auto-fill Handler
   const handleSearchPincode = async (codeToSearch?: string) => {
@@ -354,12 +348,12 @@ export default function CartPage() {
       }
 
       // Step 3: ensure Razorpay checkout script is available
-      let ready = typeof (window as any).Razorpay !== "undefined";
+      let ready = typeof window.Razorpay !== "undefined";
       if (!ready) {
         ready = await loadRazorpayScript();
       }
 
-      if (!ready || typeof (window as any).Razorpay === "undefined") {
+      if (!ready || typeof window.Razorpay === "undefined") {
         alert(
           "Payment gateway could not be loaded.\n\n" +
             "Your order (" +
@@ -372,7 +366,8 @@ export default function CartPage() {
       }
 
       // Step 4: open Razorpay Checkout modal.
-      const razorpay = new (window as any).Razorpay({
+      const Razorpay = window.Razorpay!; // checked just above
+      const razorpay = new Razorpay({
         key: razorpayOrderData.keyId,
         amount: razorpayOrderData.amount,
         currency: razorpayOrderData.currency,
@@ -421,9 +416,9 @@ export default function CartPage() {
       });
 
       razorpay.open();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Order placement error:", error);
-      alert("Something went wrong while placing your order: " + (error?.message || "Please check your connection."));
+      alert("Something went wrong while placing your order: " + errorMessage(error, "Please check your connection."));
       setIsSubmitting(false);
     }
   };
@@ -436,7 +431,7 @@ export default function CartPage() {
         <Container>
           {isOrderPlaced ? (
             /* Order Success Screen */
-            <motion.div
+            <m.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               className="max-w-md mx-auto text-center py-16 flex flex-col items-center select-none"
@@ -449,7 +444,7 @@ export default function CartPage() {
 
               <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[#1E3A2C]/5 border border-[#1E3A2C]/10 text-xs font-bold text-[#1E3A2C] mb-2">
                 <span>Order ID:</span>
-                <span className="text-[#DAA87C] font-extrabold">{createdOrder?.id || "THR-1087"}</span>
+                <span className="text-[#DAA87C] font-extrabold">{createdOrder?.id}</span>
               </div>
 
               <h2 className="text-2xl font-bold text-[#1E3A2C]">Order Placed Successfully!</h2>
@@ -467,7 +462,7 @@ export default function CartPage() {
               {/* Action Buttons: Track Order & Continue Shopping */}
               <div className="mt-8 flex flex-col sm:flex-row items-center gap-3 w-full max-w-sm">
                 <Link
-                  href={`/track-order?id=${createdOrder?.id || "THR-1087"}`}
+                  href={`/track-order?id=${createdOrder?.id ?? ""}`}
                   className="w-full sm:flex-1 py-3 px-5 text-xs font-bold bg-[#1E3A2C] hover:bg-[#0c2b1c] text-white rounded-full shadow-md transition-all hover:scale-[1.02] flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <svg className="w-4 h-4 text-[#DAA87C]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -484,7 +479,7 @@ export default function CartPage() {
                   <span>Continue Shopping</span>
                 </Link>
               </div>
-            </motion.div>
+            </m.div>
           ) : cart.length === 0 ? (
             /* Empty Cart Screen */
             <div className="max-w-md mx-auto text-center py-16 flex flex-col items-center select-none">
@@ -522,9 +517,9 @@ export default function CartPage() {
 
                 <div className="space-y-4">
                   {cart.map((item) => {
-                    const imgSource = item.foldedImg?.src || item.foldedImg || item.wornImg?.src || item.wornImg || "/images/no-photo.svg";
+                    const imgSource = photoSrc(item.foldedImg || item.wornImg);
                     return (
-                      <motion.div
+                      <m.div
                         key={item.id}
                         layout
                         exit={{ opacity: 0, x: -30 }}
@@ -558,9 +553,9 @@ export default function CartPage() {
                               <p className="text-[10px] text-[#1E3A2C]/60 mt-1 font-semibold select-none">
                                 Delivery via India Post (2–4 days Kerala, 4–7 days India)
                               </p>
-                              {item.quantity >= (item.stock ?? 10) && (
+                              {(typeof item.stock === "number" && item.quantity >= item.stock) && (
                                 <p className="text-[10px] text-amber-700 font-bold mt-0.5">
-                                  Only {item.stock ?? 10} left in stock
+                                  Only {item.stock} left in stock
                                 </p>
                               )}
                             </div>
@@ -594,8 +589,8 @@ export default function CartPage() {
                               </span>
                               <button
                                 onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                disabled={item.quantity >= (item.stock ?? 10)}
-                                title={item.quantity >= (item.stock ?? 10) ? `Only ${item.stock ?? 10} left` : "Increase quantity"}
+                                disabled={(typeof item.stock === "number" && item.quantity >= item.stock)}
+                                title={(typeof item.stock === "number" && item.quantity >= item.stock) ? `Only ${item.stock} left` : "Increase quantity"}
                                 className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-[#1E3A2C] hover:bg-[#1E3A2C]/5 cursor-pointer transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                               >
                                 +
@@ -603,7 +598,7 @@ export default function CartPage() {
                             </div>
                           </div>
                         </div>
-                      </motion.div>
+                      </m.div>
                     );
                   })}
                 </div>
@@ -676,7 +671,7 @@ export default function CartPage() {
         {isCheckoutOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto">
             {/* Backdrop */}
-            <motion.div
+            <m.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -685,7 +680,7 @@ export default function CartPage() {
             />
 
             {/* Modal Card */}
-            <motion.div
+            <m.div
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
@@ -966,7 +961,7 @@ export default function CartPage() {
                   )}
                 </button>
               </form>
-            </motion.div>
+            </m.div>
           </div>
         )}
       </AnimatePresence>

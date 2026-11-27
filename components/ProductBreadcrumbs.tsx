@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { SareeProduct } from "@/data/products";
-import { UnifiedProduct } from "@/lib/products";
+import type { SareeProduct } from "@/data/products";
+import type { UnifiedProduct } from "@/lib/products";
 
-export default function ProductBreadcrumbs({ product }: { product: SareeProduct | UnifiedProduct | any }) {
+export default function ProductBreadcrumbs({ product }: { product: SareeProduct | UnifiedProduct }) {
   return (
     <nav className="text-xs font-semibold text-[#1E3A2C]/50 uppercase tracking-widest mb-8 flex flex-wrap items-center gap-2 select-none pb-6">
       <Link href="/" className="hover:text-[#DAA87C] transition-colors">

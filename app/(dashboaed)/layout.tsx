@@ -53,8 +53,11 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     pathname === "/dashboard/home/categories" ||
     pathname.startsWith("/dashboard/products/categories");
 
-  // Auto-expand Home/Products dropdown if user is on those routes
-  useEffect(() => {
+  // Auto-expand Home/Products dropdown when the user moves to those routes
+  // (adjusted during render when the path changes, not in an effect).
+  const [menuPath, setMenuPath] = useState<string | null>(null);
+  if (pathname !== menuPath) {
+    setMenuPath(pathname);
     if (pathname.startsWith("/dashboard/home") && !pathname.startsWith("/dashboard/home/categories")) {
       setIsHomeOpen(true);
     }
@@ -65,7 +68,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     ) {
       setIsProductsOpen(true);
     }
-  }, [pathname, isCategoriesRoute]);
+  }
 
   // proxy.ts redirects unauthenticated requests; this covers a session that
   // expires or is cleared while the dashboard is already open.

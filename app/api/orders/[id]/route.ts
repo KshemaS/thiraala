@@ -1,3 +1,4 @@
+import { queueOrderEmail } from "@/lib/orderEmails";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
@@ -79,7 +80,7 @@ export async function GET(
     }
     await recordSuccess("track", orderKey, address);
     return NextResponse.json({ success: true, order: publicTrackingView(order) });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error fetching order:", error);
     return NextResponse.json(
       { success: false, error: "Internal server error" },
@@ -315,12 +316,18 @@ export async function PATCH(
       throw err;
     }
 
+    // Let the customer know when their order goes out and when it arrives.
+    if (newStatus !== order.status) {
+      if (SHIPPED.includes(newStatus) && !SENT.includes(order.status)) queueOrderEmail("dispatched", order.id);
+      else if (newStatus === "Delivered") queueOrderEmail("delivered", order.id);
+    }
+
     return NextResponse.json({
       success: true,
       message: "Order updated successfully",
       order: toOrderJSON(updated, { admin: true }),
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error updating order:", error);
     return NextResponse.json(
       { success: false, error: "Internal server error" },
@@ -359,7 +366,7 @@ export async function DELETE(
       success: true,
       message: `Order ${id} deleted successfully`,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error deleting order:", error);
     return NextResponse.json(
       { success: false, error: "Internal server error" },

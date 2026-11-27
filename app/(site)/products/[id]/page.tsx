@@ -5,7 +5,8 @@ import Container from "@/components/Container";
 import ProductBreadcrumbs from "@/components/ProductBreadcrumbs";
 import ProductDetailView from "@/components/ProductDetailView";
 import RelatedProducts from "@/components/RelatedProducts";
-import { getProductById, getAllUnifiedProducts } from "@/lib/products";
+import { getProductById, type UnifiedProduct } from "@/lib/products";
+import { NO_PHOTO } from "@/lib/placeholder";
 import { notFound } from "next/navigation";
 
 export async function generateMetadata({
@@ -20,11 +21,49 @@ export async function generateMetadata({
       title: "Saree Not Found",
     };
   }
+  const description =
+    product.description ||
+    `Explore ${product.name} priced at ${product.price}. Handcrafted handloom saree from thiraala.`;
+  const photo = product.wornImg && product.wornImg !== NO_PHOTO ? product.wornImg : product.foldedImg;
   return {
     title: product.name,
-    description:
-      product.description ||
-      `Explore ${product.name} priced at ${product.price}. Handcrafted handloom saree from thiraala.`,
+    description,
+    // The same saree is reachable by id, SKU or slug; this is the one address to index.
+    alternates: { canonical: `/products/${product.id}` },
+    openGraph: {
+      title: product.name,
+      description,
+      url: `/products/${product.id}`,
+      images: photo && photo !== NO_PHOTO ? [{ url: photo, alt: product.altWorn || product.name }] : undefined,
+    },
+  };
+}
+
+const SITE = "https://www.thiraala.com";
+const absolute = (path: string) => (path.startsWith("http") ? path : `${SITE}${path}`);
+
+/** schema.org Product data, so search results can show the price and whether it's in stock. */
+function productJsonLd(product: UnifiedProduct) {
+  const photos = [product.wornImg, product.foldedImg].filter((p): p is string => !!p && p !== NO_PHOTO);
+  return {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description: product.description || undefined,
+    sku: product.sku,
+    image: [...new Set(photos)].map(absolute),
+    brand: { "@type": "Brand", name: "thiraala" },
+    category: product.category,
+    color: product.color || undefined,
+    material: product.sareeFabric || product.fabric || undefined,
+    offers: {
+      "@type": "Offer",
+      url: `${SITE}/products/${product.id}`,
+      priceCurrency: "INR",
+      price: product.priceValue,
+      availability: product.soldOut ? "https://schema.org/OutOfStock" : "https://schema.org/InStock",
+      itemCondition: "https://schema.org/NewCondition",
+    },
   };
 }
 
@@ -45,6 +84,11 @@ export default async function ProductDetailPage({
   return (
     <div className="min-h-screen flex flex-col justify-between selection:bg-[#DAA87C]/20 selection:text-[#DAA87C] bg-[#fcfbfa]">
       <Header />
+      <script
+        type="application/ld+json"
+        // "<" escaped so text in a product description can't end the script tag.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd(product)).replace(/</g, "\\u003c") }}
+      />
 
       <main className="flex-1 py-8 sm:py-12 md:py-16">
         <Container>

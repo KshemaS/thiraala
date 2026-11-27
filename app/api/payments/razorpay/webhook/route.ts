@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error processing Razorpay webhook:", error);
     // Still 200 once the signature is valid — avoid endless Razorpay retries
     // for a processing bug; the payment can be reconciled manually.

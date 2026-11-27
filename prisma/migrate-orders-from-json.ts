@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import type { Prisma } from "@prisma/client";
 import prisma from "../lib/prisma";
 
 interface LegacyOrderItem {
@@ -97,7 +98,7 @@ async function main() {
           trackingNumber: legacy.trackingNumber || "",
           courierName: legacy.courierName || "",
           notes: legacy.notes || "",
-          trackingTimeline: legacy.trackingTimeline as any,
+          trackingTimeline: legacy.trackingTimeline as unknown as Prisma.InputJsonValue,
           createdAt: new Date(legacy.createdAt),
           updatedAt: new Date(legacy.updatedAt),
           items: {

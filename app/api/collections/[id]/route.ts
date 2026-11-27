@@ -1,3 +1,4 @@
+import { refreshesShop } from "@/lib/revalidateShop";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guard";
@@ -20,7 +21,7 @@ export async function GET(request: Request, { params }: Params) {
 }
 
 // PUT — update a collection. Renaming it also renames it on its products.
-export async function PUT(request: Request, { params }: Params) {
+async function handlePUT(request: Request, { params }: Params) {
   const unauthorized = await requireAdmin();
   if (unauthorized) return unauthorized;
 
@@ -65,7 +66,7 @@ export async function PUT(request: Request, { params }: Params) {
 }
 
 // DELETE — remove a collection. Its products stay, just without this collection.
-export async function DELETE(request: Request, { params }: Params) {
+async function handleDELETE(request: Request, { params }: Params) {
   const unauthorized = await requireAdmin();
   if (unauthorized) return unauthorized;
 
@@ -87,3 +88,7 @@ export async function DELETE(request: Request, { params }: Params) {
     return NextResponse.json({ success: false, error: "Failed to delete collection" }, { status: 500 });
   }
 }
+
+export const PUT = refreshesShop(handlePUT);
+
+export const DELETE = refreshesShop(handleDELETE);

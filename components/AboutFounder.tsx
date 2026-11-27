@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import Container from "@/components/Container";
-import founderImg from "../public/images/founder.png";
+import founderImg from "../public/images/founder.webp";
 
 const founderSlides = [
   { src: founderImg, alt: "Founder of thiraala" },
@@ -68,7 +68,7 @@ export default function AboutFounder() {
   return (
     <section className="w-full pb-0 border-t border-[#1E3A2C]/5">
       <Container>
-        <motion.div
+        <m.div
           variants={containerVariants}
           initial="hidden"
           whileInView="show"
@@ -76,7 +76,7 @@ export default function AboutFounder() {
           className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20 items-center"
         >
           {/* Left Column: Founder Intro Text */}
-          <motion.div className="lg:col-span-7 space-y-6 order-2 lg:order-1" variants={itemVariants}>
+          <m.div className="lg:col-span-7 space-y-6 order-2 lg:order-1" variants={itemVariants}>
             <div className="space-y-2">
               <span className="text-[#DAA87C] font-semibold text-xs tracking-widest uppercase">
                 behind the loom
@@ -107,10 +107,10 @@ export default function AboutFounder() {
               <h4 className="text-[#1E3A2C] font-semibold text-base">Thiraala</h4>
               <p className="text-[#DAA87C] text-xs uppercase tracking-wider font-semibold">Founder, thiraala</p>
             </div>
-          </motion.div>
+          </m.div>
 
           {/* Right Column: Interactive Image Slider */}
-          <motion.div className="lg:col-span-5 flex flex-col items-center justify-center order-1 lg:order-2" variants={itemVariants}>
+          <m.div className="lg:col-span-5 flex flex-col items-center justify-center order-1 lg:order-2" variants={itemVariants}>
             <div
               className="relative w-full max-w-sm sm:max-w-md aspect-[3/4] rounded-[24px] sm:rounded-[32px] overflow-hidden shadow-lg border border-[#DAA87C]/15 bg-stone-50 group"
               style={{
@@ -151,8 +151,8 @@ export default function AboutFounder() {
                 ))}
               </div>
             </div>
-          </motion.div>
-        </motion.div>
+          </m.div>
+        </m.div>
       </Container>
     </section>
   );

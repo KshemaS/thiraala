@@ -2,13 +2,15 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import type { Photo } from "@/lib/placeholder";
+import type { ProductItem } from "@/app/api/products/route";
 
 export interface CartItem {
   id: number | string;
   name: string;
   price: string;
-  foldedImg?: any;
-  wornImg?: any;
+  foldedImg?: Photo;
+  wornImg?: Photo;
   quantity: number;
   stock?: number;
   /** Set for colour variants, where `id` is a per-colour cart key. */
@@ -19,9 +21,12 @@ export interface CartItem {
   priceValue?: number;
 }
 
+/** What can be put in the bag: a product, or a product with a colour chosen. */
+export type CartProductInput = Omit<CartItem, "quantity">;
+
 interface CartContextType {
   cart: CartItem[];
-  addToCart: (product: any, quantity?: number) => void;
+  addToCart: (product: CartProductInput, quantity?: number) => void;
   removeFromCart: (id: number | string) => void;
   updateQuantity: (id: number | string, quantity: number) => void;
   clearCart: () => void;
@@ -77,10 +82,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         guestItems.forEach((gItem) => {
           const idx = merged.findIndex((m) => String(m.id) === String(gItem.id));
           if (idx > -1) {
-            merged[idx].quantity = Math.min(
-              merged[idx].quantity + gItem.quantity,
-              merged[idx].stock ?? 10
-            );
+            // Cap at the stock we know about (the lower figure, if both carts
+            // have one). If neither does, keep the sum: refreshCart below fetches
+            // the real stock and trims it, and checkout checks stock anyway.
+            const known = [merged[idx].stock, gItem.stock].filter((n): n is number => typeof n === "number");
+            const sum = merged[idx].quantity + gItem.quantity;
+            merged[idx] = {
+              ...merged[idx],
+              quantity: known.length ? Math.max(1, Math.min(sum, ...known)) : sum,
+              ...(known.length ? { stock: Math.min(...known) } : {}),
+            };
           } else {
             merged.push(gItem);
           }
@@ -88,6 +99,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem(userKey, JSON.stringify(merged));
         localStorage.removeItem("thiraala_cart_guest");
         localStorage.removeItem("thiraala_cart");
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the saved bag from localStorage (outside React) when the signed-in user changes
         setCart(merged);
       } else {
         setCart(userItems);
@@ -110,12 +122,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const stockMessage = (name: string, left: number) =>
     left <= 0 ? `Sorry, ${name} is out of stock` : `Only ${left} left in stock`;
 
-  const addToCart = (product: any, quantity: number = 1) => {
+  const addToCart = (product: CartProductInput, quantity: number = 1) => {
     let updated: CartItem[];
     const existingIndex = cart.findIndex((item) => String(item.id) === String(product.id));
     
     // Stock comes with the product from the shop (and is refreshed in the bag).
-    const stockLimit = typeof product.stock === "number" ? product.stock : 10;
+    // Unknown stock isn't guessed: the bag refreshes real stock and checkout checks it.
+    const stockLimit = typeof product.stock === "number" ? product.stock : Infinity;
 
     if (existingIndex > -1) {
       const currentQty = cart[existingIndex].quantity;
@@ -128,7 +141,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       updated[existingIndex] = {
         ...updated[existingIndex],
         quantity: newQty,
-        stock: stockLimit,
+        stock: typeof product.stock === "number" ? product.stock : updated[existingIndex].stock,
       };
       saveCart(updated);
       showToast(`${product.name} quantity increased in bag (${newQty})`);
@@ -146,7 +159,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           foldedImg: product.foldedImg,
           wornImg: product.wornImg,
           quantity,
-          stock: stockLimit,
+          stock: typeof product.stock === "number" ? product.stock : undefined,
           productId: product.productId,
           variantId: product.variantId,
           selectedColor: product.selectedColor,
@@ -174,14 +187,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     const targetItem = cart.find((item) => String(item.id) === String(id));
-    const stockLimit = typeof targetItem?.stock === "number" ? targetItem.stock : 10;
+    const stockLimit = typeof targetItem?.stock === "number" ? targetItem.stock : Infinity;
     
     if (quantity > stockLimit) {
       showToast(stockMessage(targetItem?.name ?? "This item", stockLimit));
       return;
     }
     const updated = cart.map((item) =>
-      String(item.id) === String(id) ? { ...item, quantity, stock: stockLimit } : item
+      String(item.id) === String(id) ? { ...item, quantity } : item
     );
     saveCart(updated);
   };
@@ -216,32 +229,38 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const refreshCart = async (): Promise<boolean> => {
     if (cart.length === 0) return false;
     try {
-      const res = await fetch("/api/products", { cache: "no-store" });
+      // Only the products in the bag, not the whole catalogue.
+      const ids = [...new Set(cart.map((item) => String(item.productId ?? item.id)))];
+      const res = await fetch(`/api/products?ids=${encodeURIComponent(ids.join(","))}`, { cache: "no-store" });
       if (!res.ok) return false;
-      const products = await res.json();
+      const products: ProductItem[] = await res.json();
       if (!Array.isArray(products)) return false;
-      const byId = new Map(products.map((p: any) => [String(p.id), p]));
+      const byId = new Map(products.map((p) => [String(p.id), p]));
 
       let changed = false;
       const updated = cart.map((item) => {
         const product = byId.get(String(item.productId ?? item.id));
         if (!product || product.status === "inactive") return item;
         const variant = item.variantId
-          ? (product.variants || []).find((v: any) => v.id === item.variantId)
+          ? (product.variants || []).find((v) => v.id === item.variantId)
           : null;
         if (item.variantId && !variant) return item;
 
-        const priceValue: number = variant?.priceValue ?? product.priceValue;
+        const priceValue: number = variant?.priceValue ?? product.priceValue ?? 0;
+        const stock: number | undefined = variant ? variant.stock : product.stock;
         const next: CartItem = {
           ...item,
+          // Trim to what's actually left (an out-of-stock item keeps its
+          // quantity so the bag can show it as unavailable).
+          quantity: typeof stock === "number" && stock > 0 ? Math.min(item.quantity, stock) : item.quantity,
           name: product.name,
           price: `₹${priceValue.toLocaleString("en-IN")}`,
           priceValue,
-          stock: variant ? variant.stock : product.stock,
+          stock,
           foldedImg: variant?.foldedImg || product.foldedImg,
           wornImg: variant?.wornImg || product.wornImg,
         };
-        if (next.price !== item.price || next.stock !== item.stock || next.name !== item.name) changed = true;
+        if (next.price !== item.price || next.stock !== item.stock || next.name !== item.name || next.quantity !== item.quantity) changed = true;
         return next;
       });
 

@@ -30,7 +30,7 @@ export default function AdminLoginForm({ onSuccess }: AdminLoginFormProps) {
       } else if (onSuccess) {
         onSuccess();
       }
-    } catch (err) {
+    } catch {
       setError("An unexpected error occurred. Please try again.");
     } finally {
       setIsSubmitting(false);

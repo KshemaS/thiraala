@@ -1,8 +1,11 @@
+import { refreshesShop } from "@/lib/revalidateShop";
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getAdminSession, requireAdmin } from "@/lib/auth/guard";
 import { imageUrl } from "@/lib/productImages";
 import { parseProductFields, productSlug } from "@/lib/productInput";
+import { resolveProductLinks } from "@/lib/productLinks";
 import { attachImageRefs, OMIT_PHOTOS } from "@/lib/imageRefs";
 import {
   formatVariant,
@@ -54,32 +57,21 @@ export interface ProductItem {
   variants?: ProductVariantItem[];
 }
 
-export async function GET() {
-  try {
-    // Hidden (inactive) products and drafts are for the dashboard only.
-    const isAdmin = !!(await getAdminSession());
-    // Photos aren't loaded, only whether each exists (lib/imageRefs.ts).
-    const dbProducts = await attachImageRefs(
-      await prisma.product.findMany({
-        where: isAdmin ? undefined : { status: "active" },
-        orderBy: { createdAt: "desc" },
-        omit: OMIT_PHOTOS,
-        include: variantsIncludeSlim,
-      })
-    );
+type ProductRow = Awaited<ReturnType<typeof attachImageRefs<Prisma.ProductGetPayload<{ omit: typeof OMIT_PHOTOS; include: typeof variantsIncludeSlim }>>>>[number];
 
-    const formatted: ProductItem[] = dbProducts.map((p) => ({
+function toProductItem(p: ProductRow): ProductItem {
+  return {
         id: p.id,
         sku: p.sku,
         name: p.name,
-        subtitle: (p as any).subtitle || undefined,
+        subtitle: p.subtitle || undefined,
         slug: p.slug,
         price: p.price,
         priceValue: p.priceValue,
-        mrp: (p as any).mrp || undefined,
-        rating: (p as any).rating ?? undefined,
-        ratingCount: (p as any).ratingCount ?? undefined,
-        selectedColor: (p as any).selectedColor || undefined,
+        mrp: p.mrp || undefined,
+        rating: p.rating ?? undefined,
+        ratingCount: p.ratingCount ?? undefined,
+        selectedColor: p.selectedColor || undefined,
         category: p.categoryName,
         categoryId: p.categoryId || undefined,
         collection: p.collectionName || undefined,
@@ -90,19 +82,19 @@ export async function GET() {
         altFolded: p.altFolded || p.name,
         altWorn: p.altWorn || p.name,
         fabric: p.fabric || "",
-        sareeFabric: (p as any).sareeFabric || undefined,
+        sareeFabric: p.sareeFabric || undefined,
         color: p.color || "",
         pattern: p.pattern || "",
-        border: (p as any).border || undefined,
-        blouse: (p as any).blouse || undefined,
-        occasion: (p as any).occasion || undefined,
-        sareeLength: (p as any).sareeLength || "5.5 metres",
-        blouseLength: (p as any).blouseLength || "0.8 metres",
-        careInstructions: (p as any).careInstructions || undefined,
-        highlights: (p as any).highlights
-          ? typeof (p as any).highlights === "string"
-            ? (p as any).highlights.split("\n").filter(Boolean)
-            : (p as any).highlights
+        border: p.border || undefined,
+        blouse: p.blouse || undefined,
+        occasion: p.occasion || undefined,
+        sareeLength: p.sareeLength || "5.5 metres",
+        blouseLength: p.blouseLength || "0.8 metres",
+        careInstructions: p.careInstructions || undefined,
+        highlights: p.highlights
+          ? typeof p.highlights === "string"
+            ? p.highlights.split("\n").filter(Boolean)
+            : p.highlights
           : undefined,
         stock: p.stock,
         description: p.description || "",
@@ -110,8 +102,76 @@ export async function GET() {
         featured: p.featured,
         isNewArrival: p.isNewArrival,
         variants: p.variants.map(formatVariant),
-      }));
-    return NextResponse.json(formatted);
+  };
+}
+
+async function loadProducts(args: Omit<Prisma.ProductFindManyArgs, "omit" | "include" | "select">) {
+  // Photos aren't loaded, only whether each exists (lib/imageRefs.ts).
+  const rows = await attachImageRefs(await prisma.product.findMany({ ...args, omit: OMIT_PHOTOS, include: variantsIncludeSlim }));
+  return rows.map(toProductItem);
+}
+
+/** Dashboard filters (search, category, stock) as a database query. */
+function dashboardWhere(sp: URLSearchParams): Prisma.ProductWhereInput {
+  const and: Prisma.ProductWhereInput[] = [];
+  const q = sp.get("q")?.trim();
+  if (q) {
+    const has = { contains: q, mode: "insensitive" as const };
+    and.push({ OR: [{ name: has }, { sku: has }, { fabric: has }, { collectionName: has }] });
+  }
+  const category = sp.get("category");
+  if (category && category !== "All") and.push({ categoryName: category });
+  const stock = sp.get("stock");
+  if (stock === "InStock") and.push({ stock: { gt: 0 } });
+  else if (stock === "OutOfStock") and.push({ stock: { lte: 0 } });
+  else if (stock === "NewArrivals") and.push({ isNewArrival: true });
+  return { AND: and };
+}
+
+/**
+ * GET — products. Shoppers get active products only; the admin also gets
+ * hidden ones.
+ *  - ?ids=a,b,c: just those products (the bag refreshing its prices/stock).
+ *  - ?page=N&limit=M (admin): one page of the dashboard list, searched and
+ *    filtered in the database (q, category, stock), plus counts.
+ *  - otherwise: every product, as a plain list.
+ */
+export async function GET(request: Request) {
+  try {
+    const sp = new URL(request.url).searchParams;
+    // Hidden (inactive) products and drafts are for the dashboard only.
+    const isAdmin = !!(await getAdminSession());
+    const visible: Prisma.ProductWhereInput = isAdmin ? {} : { status: "active" };
+
+    const ids = sp.get("ids")?.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 100);
+    if (ids) {
+      return NextResponse.json(await loadProducts({ where: { ...visible, id: { in: ids } } }));
+    }
+
+    const page = isAdmin ? parseInt(sp.get("page") || "", 10) : NaN;
+    if (isAdmin && page > 0) {
+      const limit = Math.min(200, Math.max(1, parseInt(sp.get("limit") || "50", 10) || 50));
+      const where = dashboardWhere(sp);
+      const [products, filteredCount, total, inStock, categories] = await Promise.all([
+        loadProducts({ where, orderBy: { createdAt: "desc" }, skip: (page - 1) * limit, take: limit }),
+        prisma.product.count({ where }),
+        prisma.product.count(),
+        prisma.product.count({ where: { stock: { gt: 0 } } }),
+        prisma.product.groupBy({ by: ["categoryName"], orderBy: { categoryName: "asc" } }),
+      ]);
+      return NextResponse.json({
+        success: true,
+        products,
+        filteredCount,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(filteredCount / limit)),
+        metrics: { total, inStock, outOfStock: total - inStock, totalCategories: categories.length },
+        categories: categories.map((c) => c.categoryName).filter(Boolean),
+      });
+    }
+
+    return NextResponse.json(await loadProducts({ where: visible, orderBy: { createdAt: "desc" } }));
   } catch (err) {
     console.error("Failed to load products:", err);
     return NextResponse.json(
@@ -121,7 +181,7 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const unauthorized = await requireAdmin();
   if (unauthorized) return unauthorized;
 
@@ -162,6 +222,12 @@ export async function POST(request: Request) {
       );
     }
 
+    const links = await resolveProductLinks(prisma, {
+      categoryName: f.categoryName || "General",
+      collectionName: f.collectionName ?? null,
+    });
+    if (!links.ok) return NextResponse.json({ success: false, error: links.error }, { status: 400 });
+
     let saved;
     try {
       saved = await prisma.$transaction(async (tx) => {
@@ -176,10 +242,10 @@ export async function POST(request: Request) {
             mrp: f.mrp ?? null,
             rating: f.rating ?? null,
             ratingCount: f.ratingCount ?? null,
-            categoryName: f.categoryName || "General",
-            categoryId: typeof body.categoryId === "string" && body.categoryId ? body.categoryId : null,
-            collectionName: f.collectionName ?? null,
-            collectionId: typeof body.collectionId === "string" && body.collectionId ? body.collectionId : null,
+            categoryName: links.categoryName!,
+            categoryId: links.categoryId ?? null,
+            collectionName: links.collectionName ?? null,
+            collectionId: links.collectionId ?? null,
             stock,
             ...f.text,
             sareeLength: f.text.sareeLength ?? undefined,
@@ -206,8 +272,10 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ success: true, product: { ...saved, priceValue: f.priceValue, price: f.price, stock } });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error creating product:", error);
     return NextResponse.json({ success: false, error: "Failed to create product" }, { status: 500 });
   }
 }
+
+export const POST = refreshesShop(handlePOST);

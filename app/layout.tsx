@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import MotionProvider from "@/components/MotionProvider";
 import { Open_Sans } from "next/font/google";
 import "./globals.css";
 import { WishlistProvider } from "@/context/WishlistContext";
@@ -12,6 +13,8 @@ const openSans = Open_Sans({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.thiraala.com"),
+  openGraph: { siteName: "thiraala", type: "website", locale: "en_IN" },
   title: {
     default: "thiraala | Elegant Saree Collection",
     template: "%s | thiraala",
@@ -30,11 +33,13 @@ export default function RootLayout({
       className={`${openSans.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <AuthProvider>
-          <WishlistProvider>
-            <CartProvider>{children}</CartProvider>
-          </WishlistProvider>
-        </AuthProvider>
+        <MotionProvider>
+          <AuthProvider>
+            <WishlistProvider>
+              <CartProvider>{children}</CartProvider>
+            </WishlistProvider>
+          </AuthProvider>
+        </MotionProvider>
       </body>
     </html>
   );

@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import type { ProductItem } from "@/app/api/products/route";
+import { m, AnimatePresence } from "framer-motion";
 import {
   FolderTree,
   Plus,
@@ -16,7 +17,6 @@ import {
   ImageIcon,
   Search,
   Layers,
-  Sparkles,
 } from "lucide-react";
 
 export interface CategoryItem {
@@ -30,7 +30,7 @@ export interface CategoryItem {
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<CategoryItem[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<ProductItem[]>([]);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -80,6 +80,7 @@ export default function CategoriesPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data from the server when this opens; the data arrives asynchronously
     loadCategories();
   }, []);
 
@@ -116,9 +117,7 @@ export default function CategoriesPage() {
 
   const getProductCountForCategory = (catName: string) => {
     return products.filter(
-      (p) =>
-        p.category?.toLowerCase() === catName.toLowerCase() ||
-        (Array.isArray(p.categories) && p.categories.some((c: string) => c.toLowerCase() === catName.toLowerCase()))
+      (p) => p.category?.toLowerCase() === catName.toLowerCase()
     ).length;
   };
 
@@ -250,7 +249,7 @@ export default function CategoriesPage() {
       {/* Toast Alert */}
       <AnimatePresence>
         {toastMessage && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
@@ -260,7 +259,7 @@ export default function CategoriesPage() {
               <Check className="w-3.5 h-3.5 stroke-[3]" />
             </div>
             <span>{toastMessage}</span>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 
@@ -619,7 +618,7 @@ export default function CategoriesPage() {
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             {/* Backdrop */}
-            <motion.div
+            <m.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -628,7 +627,7 @@ export default function CategoriesPage() {
             />
 
             {/* Modal Dialog */}
-            <motion.div
+            <m.div
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -791,7 +790,7 @@ export default function CategoriesPage() {
                   <span>Save Category</span>
                 </button>
               </div>
-            </motion.div>
+            </m.div>
           </div>
         )}
       </AnimatePresence>

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState } from "react";
+import { m, AnimatePresence } from "framer-motion";
 import { useAuth, UserData } from "@/context/AuthContext";
 
 export type { UserData };
@@ -23,7 +23,8 @@ export default function RegisterModal({
   notice,
 }: RegisterModalProps) {
   const { login, signup } = useAuth();
-  const [mode, setMode] = useState<"login" | "register">(initialMode);
+  const [mode, setMode] = useState<"login" | "register" | "forgot">(initialMode);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Form states
   const [firstName, setFirstName] = useState("");
@@ -35,12 +36,17 @@ export default function RegisterModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  useEffect(() => {
+  // Each time the popup opens, start on the requested tab with no old
+  // messages (adjusted during render when it opens, not in an effect).
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen);
     if (isOpen) {
       setMode(initialMode);
       setErrorMessage(null);
+      setSuccessMessage(null);
     }
-  }, [isOpen, initialMode]);
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,6 +62,21 @@ export default function RegisterModal({
     }
 
     try {
+      if (mode === "forgot") {
+        const res = await fetch("/api/auth/forgot-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email.trim() }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+          setErrorMessage(data.error || "Couldn't send the reset link. Please try again.");
+        } else {
+          setSuccessMessage(data.message);
+        }
+        return;
+      }
+
       if (mode === "login") {
         const res = await login(email, password);
         if (!res.success || !res.user) {
@@ -105,7 +126,7 @@ export default function RegisterModal({
       setPhone("");
       setErrorMessage(null);
       onClose();
-    } catch (err: any) {
+    } catch (err) {
       console.error("Auth submit error:", err);
       setErrorMessage("A network error occurred. Please try again.");
     } finally {
@@ -118,7 +139,7 @@ export default function RegisterModal({
       {isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           {/* Backdrop overlay */}
-          <motion.div
+          <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -127,7 +148,7 @@ export default function RegisterModal({
           />
 
           {/* Modal Card */}
-          <motion.div
+          <m.div
             initial={{ scale: 0.95, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 20 }}
@@ -183,11 +204,15 @@ export default function RegisterModal({
               <h3 className="text-2xl font-bold text-[#1E3A2C] tracking-tight">
                 {mode === "login"
                   ? "Welcome Back"
+                  : mode === "forgot"
+                  ? "Reset Password"
                   : "Create Account"}
               </h3>
               <p className="text-xs text-[#1E3A2C]/65 mt-1 font-semibold">
                 {mode === "login"
                   ? "Sign in to proceed seamlessly with your order"
+                  : mode === "forgot"
+                  ? "Enter your account email and we'll send you a link to choose a new password"
                   : "Register to save your drapes and customize collections"}
               </p>
               <div className="w-10 h-0.5 bg-[#DAA87C] mx-auto mt-2.5 rounded-full"></div>
@@ -196,6 +221,12 @@ export default function RegisterModal({
             {/* Success Message Alert */}
             {notice && (
               <p className="mt-4 px-3 py-2 rounded-xl bg-[#DAA87C]/10 text-[#1E3A2C] text-xs font-semibold text-center">{notice}</p>
+            )}
+
+            {successMessage && (
+              <p role="status" className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-medium">
+                {successMessage}
+              </p>
             )}
 
             {/* Error Message Alert */}
@@ -272,6 +303,7 @@ export default function RegisterModal({
                 </div>
               )}
 
+              {mode !== "forgot" && (
               <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
                     <label className="block text-[11px] font-bold text-[#1E3A2C]/80 uppercase tracking-wider leading-relaxed select-none">
@@ -306,7 +338,21 @@ export default function RegisterModal({
                       )}
                     </button>
                   </div>
+                  {mode === "login" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode("forgot");
+                        setErrorMessage(null);
+                        setSuccessMessage(null);
+                      }}
+                      className="self-end text-[11px] font-bold text-[#1E3A2C]/60 hover:text-[#1E3A2C] hover:underline cursor-pointer"
+                    >
+                      Forgot password?
+                    </button>
+                  )}
                 </div>
+              )}
 
               <button
                 type="submit"
@@ -320,13 +366,13 @@ export default function RegisterModal({
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                     <span>
-                      {mode === "login" ? "Signing In..." : "Creating Account..."}
+                      {mode === "login" ? "Signing In..." : mode === "forgot" ? "Sending..." : "Creating Account..."}
                     </span>
                   </>
                 ) : (
                   <>
                     <span>
-                      {mode === "login" ? "Sign In" : "Register"}
+                      {mode === "login" ? "Sign In" : mode === "forgot" ? "Send Reset Link" : "Register"}
                     </span>
                     <svg className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
@@ -338,7 +384,22 @@ export default function RegisterModal({
 
             {/* Bottom Toggle Footer */}
             <div className="text-center pt-2 border-t border-[#1E3A2C]/10 text-xs font-semibold text-[#1E3A2C]/60 select-none">
-              {mode === "login" ? (
+              {mode === "forgot" ? (
+                <p>
+                  Remembered it?{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode("login");
+                      setErrorMessage(null);
+                      setSuccessMessage(null);
+                    }}
+                    className="text-[#DAA87C] font-bold hover:underline cursor-pointer ml-1"
+                  >
+                    Back to Sign In
+                  </button>
+                </p>
+              ) : mode === "login" ? (
                 <p>
                   Don&apos;t have an account?{" "}
                   <button
@@ -368,7 +429,7 @@ export default function RegisterModal({
                 </p>
               )}
             </div>
-          </motion.div>
+          </m.div>
         </div>
       )}
     </AnimatePresence>

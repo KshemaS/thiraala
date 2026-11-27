@@ -89,7 +89,7 @@ function wholeNumber(v: unknown, label: string, min: number, max: number): numbe
 }
 
 export function parseProductFields(
-  body: Record<string, any>,
+  body: Record<string, unknown>,
   opts: { requireCore: boolean; current?: { priceValue: number; mrp: number | null; name: string; sku: string } }
 ): { fields: ProductFields } | { error: string } {
   const out: ProductFields = { text: {} };

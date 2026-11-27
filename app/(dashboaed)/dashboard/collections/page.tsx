@@ -3,21 +3,18 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import {
   Layers,
   Plus,
   Edit3,
   Trash2,
-  Upload,
   Check,
   X,
   Search,
   Sparkles,
-  AlertCircle,
   Loader2,
   RefreshCw,
-  FolderTree,
   ImageIcon,
 } from "lucide-react";
 import { CollectionItem } from "@/app/api/collections/route";
@@ -87,6 +84,7 @@ export default function CollectionsPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data from the server when this opens; the data arrives asynchronously
     fetchData();
 
     const handleCollectionsUpdated = () => {
@@ -286,7 +284,7 @@ export default function CollectionsPage() {
     <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-6">
       {/* Toast */}
       {toastMessage && (
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
@@ -294,7 +292,7 @@ export default function CollectionsPage() {
         >
           <Check className="w-4 h-4 text-[#DAA87C]" />
           <span>{toastMessage}</span>
-        </motion.div>
+        </m.div>
       )}
 
       {/* Page Header */}
@@ -698,7 +696,7 @@ export default function CollectionsPage() {
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1E3A2C]/40 backdrop-blur-xs">
-            <motion.div
+            <m.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
@@ -924,7 +922,7 @@ export default function CollectionsPage() {
                   <span>{editingCollection ? "Update Collection" : "Save Collection"}</span>
                 </button>
               </div>
-            </motion.div>
+            </m.div>
           </div>
         )}
       </AnimatePresence>
@@ -933,7 +931,7 @@ export default function CollectionsPage() {
       <AnimatePresence>
         {deletingCollection && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1E3A2C]/40 backdrop-blur-xs">
-            <motion.div
+            <m.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
@@ -974,7 +972,7 @@ export default function CollectionsPage() {
                   <span>Delete</span>
                 </button>
               </div>
-            </motion.div>
+            </m.div>
           </div>
         )}
       </AnimatePresence>

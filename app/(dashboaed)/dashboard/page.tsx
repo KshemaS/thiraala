@@ -1,5 +1,7 @@
 "use client";
 
+
+import { errorMessage } from "@/lib/errors";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
@@ -79,14 +81,15 @@ export default function DashboardOverviewPage() {
       if (!res.ok || !json.success) throw new Error(json.error || "Unable to load the overview.");
       setData(json);
       setError(null);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(errorMessage(err));
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data from the server when this opens; the data arrives asynchronously
     load();
     window.addEventListener("thiraala-orders-updated", load);
     window.addEventListener("thiraala-products-updated", load);

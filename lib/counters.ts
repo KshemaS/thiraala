@@ -1,3 +1,4 @@
+import { errorCode } from "@/lib/errors";
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 
@@ -34,8 +35,8 @@ export async function ensureOrderCounter(): Promise<void> {
   if (await prisma.counter.findUnique({ where: { name: ORDER_COUNTER } })) return;
   try {
     await prisma.counter.create({ data: { name: ORDER_COUNTER, value: await highestExistingOrderNumber() } });
-  } catch (err: any) {
-    if (err?.code !== "P2002") throw err; // another request created it first
+  } catch (err) {
+    if (errorCode(err) !== "P2002") throw err; // another request created it first
   }
 }
 

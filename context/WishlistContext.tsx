@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import RegisterModal from "@/components/RegisterModal";
+import type { Photo } from "@/lib/placeholder";
 
 /**
  * The wishlist is for signed-in customers only, kept on the server
@@ -16,9 +17,24 @@ export interface SareeProduct {
   productId?: number | string;
   name: string;
   price: string;
-  foldedImg?: any;
-  wornImg?: any;
-  img?: any;
+  foldedImg?: Photo;
+  wornImg?: Photo;
+  img?: Photo;
+  altFolded?: string;
+  altWorn?: string;
+  category?: string;
+  createdAt?: string;
+}
+
+/** An item as /api/wishlist returns it. */
+interface WishlistApiItem {
+  id: string;
+  productId?: string;
+  name: string;
+  price: string;
+  foldedImg?: string;
+  wornImg?: string;
+  img?: string;
   altFolded?: string;
   altWorn?: string;
   category?: string;
@@ -78,7 +94,7 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
         const data = await res.json();
         if (data.success && Array.isArray(data.items)) {
           // Normalize items format
-          const formatted: SareeProduct[] = data.items.map((it: any) => ({
+          const formatted: SareeProduct[] = data.items.map((it: WishlistApiItem) => ({
             id: it.productId !== undefined ? it.productId : it.id,
             productId: it.productId,
             name: it.name,
@@ -104,6 +120,7 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
 
   // Initial load (and again whenever the signed-in customer changes)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data from the server when this opens; the data arrives asynchronously
     refreshWishlist();
   }, [refreshWishlist]);
 

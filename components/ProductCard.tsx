@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image, { StaticImageData } from "next/image";
 import { useWishlist } from "@/context/WishlistContext";
 import { OutOfStockBadge } from "@/components/CategoryCard";
+import { photoSrc } from "@/lib/placeholder";
 
 export interface SareeProduct {
   id: number | string;
@@ -29,18 +30,11 @@ export default function ProductCard({ saree }: ProductCardProps) {
   const handleWishlistClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    toggleWishlist(saree as any);
+    toggleWishlist(saree);
   };
 
-  const foldedSrc =
-    typeof saree.foldedImg === "string"
-      ? saree.foldedImg
-      : (saree.foldedImg as any)?.src || "/images/no-photo.svg";
-
-  const wornSrc =
-    typeof saree.wornImg === "string"
-      ? saree.wornImg
-      : (saree.wornImg as any)?.src || "/images/no-photo.svg";
+  const foldedSrc = photoSrc(saree.foldedImg);
+  const wornSrc = photoSrc(saree.wornImg);
 
   return (
     <Link

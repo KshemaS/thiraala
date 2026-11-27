@@ -1,7 +1,9 @@
 "use client";
 
+
+import { errorMessage } from "@/lib/errors";
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Edit3, Loader2, AlertCircle } from "lucide-react";
 import ProductForm from "@/components/dashboard/ProductForm";
@@ -9,7 +11,6 @@ import { ProductItem } from "@/app/api/products/route";
 
 export default function EditProductPage() {
   const params = useParams();
-  const router = useRouter();
   const id = params?.id as string;
 
   const [product, setProduct] = useState<ProductItem | null>(null);
@@ -29,9 +30,9 @@ export default function EditProductPage() {
         }
         const data = await res.json();
         setProduct(data);
-      } catch (err: any) {
+      } catch (err) {
         console.error("Error loading product:", err);
-        setError(err.message || "Failed to load product details.");
+        setError(errorMessage(err, "Failed to load product details."));
       } finally {
         setIsLoading(false);
       }

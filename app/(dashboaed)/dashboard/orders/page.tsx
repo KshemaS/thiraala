@@ -1,39 +1,31 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import Image from "next/image";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
+import { m, AnimatePresence } from "framer-motion";
 import {
   ShoppingBag,
   Package,
   Truck,
   CheckCircle2,
   Clock,
-  AlertCircle,
   Search,
-  Filter,
   RefreshCw,
   Eye,
   ExternalLink,
-  MapPin,
   Phone,
-  Mail,
   Copy,
   Check,
   X,
-  ChevronRight,
   Printer,
-  Edit2,
-  Send,
-  Calendar,
-  CreditCard,
-  DollarSign,
   ArrowUpRight,
   XCircle,
-  ShieldCheck,
 } from "lucide-react";
-import { Order, OrderStatus, PaymentStatus } from "@/app/api/orders/route";
+import { Order, OrderStatus, PaymentStatus, type OrderMetrics } from "@/app/api/orders/route";
+
+const PAGE_SIZE = 50;
+const NO_METRICS: OrderMetrics = { total: 0, pending: 0, confirmed: 0, dispatched: 0, inTransit: 0, delivered: 0, cancelled: 0, attention: 0, revenue: 0 };
 
 /**
  * Store policy (enforced by the server too): no cancelling once payment is
@@ -55,6 +47,24 @@ export default function OrdersDashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [paymentFilter, setPaymentFilter] = useState<string>("All");
+
+  // One page of orders at a time; search and filters run on the server.
+  const [page, setPage] = useState(1);
+  const [filteredCount, setFilteredCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [metricsData, setMetricsData] = useState<OrderMetrics | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+  // Changing the search or a filter goes back to page 1.
+  const filterKey = `${debouncedSearch}|${statusFilter}|${paymentFilter}`;
+  const [pageFor, setPageFor] = useState(filterKey);
+  if (pageFor !== filterKey) {
+    setPageFor(filterKey);
+    setPage(1);
+  }
 
   // Selected Order for Details & Tracking Modal
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -91,25 +101,31 @@ export default function OrdersDashboardPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // Fetch orders from API
-  const fetchOrders = async () => {
+  // Fetch the current page of orders from the API
+  const fetchOrders = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/orders");
+      const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
+      if (debouncedSearch) params.set("search", debouncedSearch);
+      if (statusFilter !== "All") params.set("status", statusFilter);
+      if (paymentFilter !== "All") params.set("payment", paymentFilter);
+      // Opened from the overview: /dashboard/orders?order=THR-1234
+      const wanted = new URLSearchParams(window.location.search).get("order");
+      if (wanted) params.set("focus", wanted);
+
+      const res = await fetch(`/api/orders?${params}`);
       const data = await res.json();
       if (data.success && Array.isArray(data.orders)) {
         setOrders(data.orders);
-        // Opened from the overview: /dashboard/orders?order=THR-1234
-        const wanted = new URLSearchParams(window.location.search).get("order");
-        if (wanted && !selectedOrder) {
-          const match = data.orders.find((o: Order) => o.id.toLowerCase() === wanted.toLowerCase());
-          if (match) setSelectedOrder(match);
+        setFilteredCount(data.filteredCount ?? data.orders.length);
+        setTotalPages(data.totalPages ?? 1);
+        if (data.metrics) setMetricsData(data.metrics);
+        if (wanted && data.focus) {
+          setSelectedOrder((cur) => cur ?? data.focus);
+          window.history.replaceState(null, "", window.location.pathname); // open it only once
         }
-        // If an order is currently open in modal, sync it
-        if (selectedOrder) {
-          const updated = data.orders.find((o: Order) => o.id === selectedOrder.id);
-          if (updated) setSelectedOrder(updated);
-        }
+        // If an order is currently open in the modal, sync it
+        setSelectedOrder((cur) => (cur ? data.orders.find((o: Order) => o.id === cur.id) ?? cur : cur));
       }
     } catch (err) {
       console.error("Failed to fetch orders:", err);
@@ -117,9 +133,10 @@ export default function OrdersDashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [page, debouncedSearch, statusFilter, paymentFilter]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads the current page from the server; the data arrives asynchronously
     fetchOrders();
 
     // Listen for cross-tab / window order updates
@@ -131,10 +148,13 @@ export default function OrdersDashboardPage() {
     return () => {
       window.removeEventListener("thiraala-orders-updated", handleOrdersUpdated);
     };
-  }, []);
+  }, [fetchOrders]);
 
-  // When selected order changes, initialize edit form
-  useEffect(() => {
+  // When the selected order changes, fill the edit form from it (state
+  // adjusted during render rather than in an effect, so no stale flash).
+  const [formFor, setFormFor] = useState<typeof selectedOrder>(null);
+  if (selectedOrder !== formFor) {
+    setFormFor(selectedOrder);
     if (selectedOrder) {
       setEditStatus(selectedOrder.status);
       setEditCourier(selectedOrder.courierName || "");
@@ -142,51 +162,12 @@ export default function OrdersDashboardPage() {
       setEditPaymentStatus(selectedOrder.paymentStatus);
       setEditNotes(selectedOrder.notes || "");
     }
-  }, [selectedOrder]);
+  }
 
-  // Metrics
-  const metrics = useMemo(() => {
-    const total = orders.length;
-    const pending = orders.filter((o) => o.status === "Pending").length;
-    const confirmed = orders.filter((o) => o.status === "Order Confirmed" || o.status === "Confirmed").length;
-    const dispatched = orders.filter((o) => o.status === "Dispatched" || o.status === "Shipped").length;
-    const inTransit = orders.filter((o) => o.status === "In Transit").length;
-    const delivered = orders.filter((o) => o.status === "Delivered").length;
-    const cancelled = orders.filter((o) => o.status === "Cancelled").length;
-    const revenue = orders
-      .filter((o) => o.status !== "Cancelled")
-      .reduce((sum, o) => sum + (o.total || 0), 0);
-
-    return { total, pending, confirmed, dispatched, inTransit, delivered, cancelled, revenue };
-  }, [orders]);
-
-  // Filtered orders
-  const filteredOrders = useMemo(() => {
-    return orders.filter((o) => {
-      const q = searchQuery.toLowerCase().trim();
-      const matchesSearch =
-        !q ||
-        o.id.toLowerCase().includes(q) ||
-        o.customerName.toLowerCase().includes(q) ||
-        o.phone.includes(q) ||
-        (o.email && o.email.toLowerCase().includes(q)) ||
-        o.items.some((i) => i.name.toLowerCase().includes(q));
-
-      const matchesStatus =
-        statusFilter === "All" ||
-        o.status === statusFilter ||
-        (statusFilter === "Order Confirmed" && o.status === "Confirmed") ||
-        (statusFilter === "Dispatched" && o.status === "Shipped");
-      const matchesPayment =
-        paymentFilter === "All" ||
-        (paymentFilter === "Paid" && o.paymentStatus === "Paid") ||
-        (paymentFilter === "Unpaid" && o.paymentStatus === "Pending") ||
-        (paymentFilter === "Failed" && o.paymentStatus === "Failed") ||
-        (paymentFilter === "Attention" && !!o.attentionReason);
-
-      return matchesSearch && matchesStatus && matchesPayment;
-    });
-  }, [orders, searchQuery, statusFilter, paymentFilter]);
+  // Counts over all orders (from the server), and this page's orders
+  // (already searched and filtered by the server).
+  const metrics = metricsData ?? NO_METRICS;
+  const filteredOrders = orders;
 
   // Save changes to order
   const handleUpdateOrder = async (e: React.FormEvent) => {
@@ -402,7 +383,7 @@ export default function OrdersDashboardPage() {
       {/* Toast Notification */}
       <AnimatePresence>
         {toastMessage && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
@@ -410,7 +391,7 @@ export default function OrdersDashboardPage() {
           >
             <CheckCircle2 className="w-4 h-4 text-[#DAA87C]" />
             <span>{toastMessage}</span>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 
@@ -425,7 +406,7 @@ export default function OrdersDashboardPage() {
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1E3A2C] mt-1 tracking-tight flex items-center gap-2.5">
             <span>Orders & Consignment Tracking</span>
             <span className="text-xs px-2.5 py-1 rounded-full bg-[#1E3A2C]/10 text-[#1E3A2C] font-mono font-bold">
-              {orders.length}
+              {metrics.total}
             </span>
           </h1>
           <p className="text-xs text-[#1E3A2C]/60 mt-1 font-medium">
@@ -698,11 +679,14 @@ export default function OrdersDashboardPage() {
                         {firstItem && (
                           <div className="flex items-center gap-2.5">
                             <div className="relative w-10 h-12 rounded-lg overflow-hidden bg-[#FAF8F5] border border-[#1E3A2C]/10 flex-shrink-0">
-                              <img
-                                src={firstItem.foldedImg || "/images/no-photo.svg"}
-                                alt={firstItem.name}
-                                className="w-full h-full object-cover"
-                              />
+                              <Image
+                            src={firstItem.foldedImg || "/images/no-photo.svg"}
+                            alt={firstItem.name}
+                            fill
+                            sizes="56px"
+                            unoptimized={(firstItem.foldedImg || "").startsWith("data:")}
+                            className="object-cover"
+                          />
                             </div>
                             <div className="min-w-0 max-w-[180px]">
                               <p className="font-bold text-[#1E3A2C] truncate">{firstItem.name}</p>
@@ -821,6 +805,38 @@ export default function OrdersDashboardPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Pages */}
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-[#1E3A2C]/10 text-xs text-[#1E3A2C]/70">
+          <span>
+            {filteredCount === 0
+              ? "No orders"
+              : `Showing ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, filteredCount)} of ${filteredCount}`}
+          </span>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1 || isLoading}
+                className="h-8 px-3 rounded-lg border border-[#1E3A2C]/15 bg-white font-semibold disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="font-semibold">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages || isLoading}
+                className="h-8 px-3 rounded-lg border border-[#1E3A2C]/15 bg-white font-semibold disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Comprehensive Order Details & Live Tracking Drawer / Modal */}
@@ -828,7 +844,7 @@ export default function OrdersDashboardPage() {
         {selectedOrder && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
             {/* Backdrop */}
-            <motion.div
+            <m.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -837,7 +853,7 @@ export default function OrdersDashboardPage() {
             />
 
             {/* Modal Box */}
-            <motion.div
+            <m.div
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
@@ -1258,10 +1274,13 @@ export default function OrdersDashboardPage() {
                     {selectedOrder.items.map((item, idx) => (
                       <div key={idx} className={`flex items-center gap-4 ${idx > 0 ? "pt-3.5" : ""}`}>
                         <div className="relative w-14 h-16 rounded-xl overflow-hidden bg-[#FAF8F5] border border-[#1E3A2C]/10 flex-shrink-0">
-                          <img
+                          <Image
                             src={item.foldedImg || "/images/no-photo.svg"}
                             alt={item.name}
-                            className="w-full h-full object-cover"
+                            fill
+                            sizes="56px"
+                            unoptimized={(item.foldedImg || "").startsWith("data:")}
+                            className="object-cover"
                           />
                         </div>
 
@@ -1289,7 +1308,7 @@ export default function OrdersDashboardPage() {
                   </div>
                 </div>
               </div>
-            </motion.div>
+            </m.div>
           </div>
         )}
       </AnimatePresence>

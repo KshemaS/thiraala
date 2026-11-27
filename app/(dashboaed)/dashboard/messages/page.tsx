@@ -1,5 +1,7 @@
 "use client";
 
+
+import { errorMessage } from "@/lib/errors";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Inbox, Loader2, Mail, MessageCircle, Phone, RefreshCw, Trash2, CheckCircle2, Archive, RotateCcw } from "lucide-react";
 
@@ -46,23 +48,28 @@ export default function MessagesPage() {
       setMessages(data.messages);
       setCounts(data.counts);
       setError(null);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(errorMessage(err));
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data from the server when this opens; the data arrives asynchronously
     load();
   }, [load]);
 
   const shown = useMemo(() => (filter === "all" ? messages : messages.filter((m) => m.status === filter)), [messages, filter]);
   const selected = messages.find((m) => m.id === selectedId) || null;
 
-  useEffect(() => {
+  // Opening another message loads its note into the box (state adjusted
+  // during render, so the box never shows the previous message's note).
+  const [noteFor, setNoteFor] = useState<string | null>(null);
+  if ((selected?.id ?? null) !== noteFor) {
+    setNoteFor(selected?.id ?? null);
     setNote(selected?.adminNote || "");
-  }, [selected?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }
 
   const update = async (id: string, patch: { status?: CustomerMessage["status"]; adminNote?: string }) => {
     // Saving just the note (on leaving the box) mustn't disable the buttons,
@@ -85,8 +92,8 @@ export default function MessagesPage() {
         }
         window.dispatchEvent(new Event("thiraala-messages-updated"));
       }
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err) {
+      alert(errorMessage(err));
     } finally {
       if (isStatusChange) setIsSaving(false);
     }

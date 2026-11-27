@@ -1,7 +1,7 @@
 "use client";
 
 import Container from "@/components/Container";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 
 export default function MissionVision() {
   const containerVariants = {
@@ -29,7 +29,7 @@ export default function MissionVision() {
   return (
     <section className="w-full bg-gradient-to-b from-[#fcfbfa] via-[#f8f5ee] to-[#fcfbfa] pt-[60px] border-y border-[#1E3A2C]/5">
       <Container>
-        <motion.div
+        <m.div
           variants={containerVariants}
           initial="hidden"
           whileInView="show"
@@ -38,7 +38,7 @@ export default function MissionVision() {
         >
           
           {/* Left Column: Heading and Context */}
-          <motion.div className="lg:col-span-4 space-y-6" variants={itemVariants}>
+          <m.div className="lg:col-span-4 space-y-6" variants={itemVariants}>
             <span className="text-[#DAA87C] font-semibold text-xs tracking-widest uppercase">
               purpose & future
             </span>
@@ -48,10 +48,10 @@ export default function MissionVision() {
             <p className="text-[#1E3A2C]/70 text-sm sm:text-base leading-relaxed font-normal">
               We believe that fashion should feel natural and carry a story. Our purpose guides every single thread we weave, balancing comfort and craftsmanship.
             </p>
-          </motion.div>
+          </m.div>
 
           {/* Right Column: Mission & Vision Cards (Modern high-contrast layout) */}
-          <motion.div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-8" variants={itemVariants}>
+          <m.div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-8" variants={itemVariants}>
             
             {/* Mission Card - Light Theme */}
             <div className="group relative bg-white p-8 sm:p-10 rounded-[32px] border border-[#DAA87C]/20 shadow-[0_20px_40px_rgba(30,58,44,0.04)] hover:shadow-[0_30px_60px_rgba(30,58,44,0.08)] transition-all duration-500 hover:-translate-y-2 flex flex-col justify-between overflow-hidden">
@@ -115,9 +115,9 @@ export default function MissionVision() {
               </div>
             </div>
 
-          </motion.div>
+          </m.div>
 
-        </motion.div>
+        </m.div>
       </Container>
     </section>
   );

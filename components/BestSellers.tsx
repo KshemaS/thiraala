@@ -1,71 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import Container from "@/components/Container";
+import type { FilteredProduct } from "@/app/api/products/filter/route";
 
-// Import all saree assets statically to align with workspace practices
-import gopura from "@/public/images/gopura.jpeg";
-import swa from "@/public/images/swa.jpeg";
-import kshe from "@/public/images/kshe.jpeg";
-import foldedArayannam from "@/public/images/folded-arayannam.jpeg";
-import arayannam from "@/public/images/arayannam.jpeg";
 
-const bestSellers = [
-  {
-    id: 1,
-    name: "Thumba Saree",
-    price: "₹1,350",
-    wornImg: gopura,
-    altWorn: "Model wearing Thumba Saree",
-  },
-  {
-    id: 2,
-    name: "Puliyilakkara",
-    price: "₹499",
-    wornImg: kshe,
-    altWorn: "Model wearing Puliyilakkara saree",
-  },
-  {
-    id: 3,
-    name: "Mul Cotton White",
-    price: "₹1,090",
-    wornImg: arayannam,
-    altWorn: "Model wearing Mul Cotton White saree",
-  },
-  {
-    id: 4,
-    name: "Vaka Saree",
-    price: "₹1,250",
-    wornImg: swa,
-    altWorn: "Model wearing Vaka Saree",
-  },
-];
-
-export default function BestSellers() {
-  const [items, setItems] = useState<any[]>(bestSellers);
-
-  useEffect(() => {
-    const fetchBestSellers = async () => {
-      try {
-        const res = await fetch("/api/products/filter?sort=rating&limit=4");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && Array.isArray(data.products) && data.products.length > 0) {
-            setItems(data.products.slice(0, 4));
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load best sellers:", err);
-      }
-    };
-
-    fetchBestSellers();
-    window.addEventListener("thiraala-products-updated", fetchBestSellers);
-    return () => window.removeEventListener("thiraala-products-updated", fetchBestSellers);
-  }, []);
+/** Best-selling products, loaded on the server with the page (lib/homeData.ts). */
+export default function BestSellers({ items }: { items: FilteredProduct[] }) {
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -125,10 +68,12 @@ export default function BestSellers() {
     },
   };
 
+  if (items.length === 0) return null;
+
   return (
     <section className="w-full mb-[140px] select-none overflow-hidden">
       <Container>
-        <motion.div
+        <m.div
           variants={containerVariants}
           initial="hidden"
           whileInView="show"
@@ -136,7 +81,7 @@ export default function BestSellers() {
           className="space-y-16"
         >
           {/* Centered Heading and Description */}
-          <motion.div className="text-center max-w-2xl mx-auto" variants={itemVariants}>
+          <m.div className="text-center max-w-2xl mx-auto" variants={itemVariants}>
             <h2 className="text-[#1E3A2C] font-bold text-3xl sm:text-4xl tracking-tight">
               Best Sellers
             </h2>
@@ -144,21 +89,18 @@ export default function BestSellers() {
             <p className="text-[#1E3A2C]/70 text-sm sm:text-base leading-relaxed font-normal">
               The pieces our community loves the most. Hand-selected for their exceptional quality, comfort, and timeless beauty.
             </p>
-          </motion.div>
+          </m.div>
 
           {/* Grid listing section using unique Arch Card style */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10 sm:gap-4">
             {items.map((saree, idx) => {
               const col = idx % 4;
               const cardVariant = col === 0 ? leftVariant : col === 3 ? rightVariant : centerVariant;
-              const wornSrc =
-                typeof saree.wornImg === "string"
-                  ? saree.wornImg
-                  : saree.wornImg?.src || saree.foldedImg || "/images/no-photo.svg";
-              const altText = saree.altWorn || saree.alt || saree.name;
+              const wornSrc = saree.wornImg || saree.foldedImg || "/images/no-photo.svg";
+              const altText = saree.altWorn || saree.name;
 
               return (
-                <motion.div
+                <m.div
                   key={saree.id}
                   variants={cardVariant}
                   initial="hidden"
@@ -198,11 +140,11 @@ export default function BestSellers() {
                       </span>
                     </div>
                   </Link>
-                </motion.div>
+                </m.div>
               );
             })}
           </div>
-        </motion.div>
+        </m.div>
       </Container>
     </section>
   );

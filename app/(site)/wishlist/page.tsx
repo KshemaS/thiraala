@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Container from "@/components/Container";
@@ -10,7 +10,7 @@ import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import RegisterModal from "@/components/RegisterModal";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import { Trash2, ShoppingBag, ArrowRight, Heart } from "lucide-react";
 
 export default function WishlistPage() {
@@ -20,9 +20,6 @@ export default function WishlistPage() {
   const { isLoggedIn, isLoading: authLoading } = useAuth();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
 
-  useEffect(() => {
-    document.title = "My Wishlist | thiraala";
-  }, []);
 
   const handleAddAllToCart = () => {
     wishlist.forEach((item) => {
@@ -32,7 +29,6 @@ export default function WishlistPage() {
         price: item.price,
         foldedImg: item.foldedImg,
         wornImg: item.wornImg,
-        stock: (item as any).stock,
       });
     });
   };
@@ -141,7 +137,7 @@ export default function WishlistPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10">
                 <AnimatePresence>
                   {wishlist.map((item) => (
-                    <motion.div
+                    <m.div
                       key={item.id}
                       layout
                       initial={{ opacity: 0, scale: 0.95 }}
@@ -173,7 +169,6 @@ export default function WishlistPage() {
                               price: item.price,
                               foldedImg: item.foldedImg,
                               wornImg: item.wornImg,
-                              stock: (item as any).stock,
                             })
                           }
                           className="flex-1 py-2 px-3 rounded-xl border border-[#1E3A2C]/10 bg-white hover:bg-[#1E3A2C] text-[#1E3A2C] hover:text-[#FAF8F5] text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs group/btn"
@@ -191,7 +186,7 @@ export default function WishlistPage() {
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
-                    </motion.div>
+                    </m.div>
                   ))}
                 </AnimatePresence>
               </div>

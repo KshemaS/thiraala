@@ -1,6 +1,8 @@
+import { refreshesShop } from "@/lib/revalidateShop";
 import { NextResponse } from "next/server";
 import type { Prisma, Product, ProductVariant } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import { resolveProductLinks } from "@/lib/productLinks";
 import { getAdminSession, requireAdmin } from "@/lib/auth/guard";
 import {
   formatVariant,
@@ -85,7 +87,7 @@ export async function GET(
   }
 }
 
-export async function PUT(
+async function handlePUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -150,6 +152,10 @@ export async function PUT(
         ? undefined
         : f.stock;
 
+    // Keep the category / collection links in step with their names.
+    const links = await resolveProductLinks(prisma, { categoryName: f.categoryName, collectionName: f.collectionName });
+    if (!links.ok) return NextResponse.json({ success: false, error: links.error }, { status: 400 });
+
     const data: Prisma.ProductUpdateInput = {
       name: f.name,
       sku: f.sku,
@@ -159,8 +165,15 @@ export async function PUT(
       mrp: f.mrp,
       rating: f.rating,
       ratingCount: f.ratingCount,
-      categoryName: f.categoryName,
-      collectionName: f.collectionName,
+      categoryName: links.categoryName,
+      category: links.categoryId === undefined ? undefined : { connect: { id: links.categoryId } },
+      collectionName: links.collectionName,
+      collection:
+        links.collectionId === undefined
+          ? undefined
+          : links.collectionId === null
+            ? { disconnect: true }
+            : { connect: { id: links.collectionId } },
       stock,
       ...f.text,
       // These two have defaults and can't be emptied.
@@ -187,7 +200,7 @@ export async function PUT(
 
     const [withRefs] = await attachImageRefs([updated]);
     return NextResponse.json({ success: true, data: formatProduct(withRefs) });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error updating product:", error);
     return NextResponse.json(
       { success: false, error: variantSkuConflict(error) || "Failed to update product" },
@@ -196,7 +209,7 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
+async function handleDELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -228,7 +241,7 @@ export async function DELETE(
     // Variants are removed with the product (onDelete: Cascade).
     await prisma.product.delete({ where: { id: product.id } });
     return NextResponse.json({ success: true, message: "Product deleted successfully" });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error deleting product:", error);
     return NextResponse.json(
       { success: false, error: "Failed to delete product" },
@@ -236,3 +249,7 @@ export async function DELETE(
     );
   }
 }
+
+export const PUT = refreshesShop(handlePUT);
+
+export const DELETE = refreshesShop(handleDELETE);
